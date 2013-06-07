@@ -1,0 +1,10 @@
+cmake_minimum_required(VERSION 2.8)
+project(boomstick)
+set(CMAKE_CXX_COMPILER "clang++")
+include_directories(${PROJECT_SOURCE_DIR})
+include_directories(${PROJECT_SOURCE_DIR}/spinner)
+set(CMAKE_CXX_FLAGS_DEBUG "-std=c++11 -g -O0 -msse2")
+add_library(boomstick STATIC geom2D.cpp)
+
+add_executable(bs_test main.cpp)
+target_link_libraries(bs_test boomstick)
