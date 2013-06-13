@@ -1,122 +1,265 @@
 #include "geom2D.hpp"
+#include "spinner/bits.hpp"
+#include "spinner/misc.hpp"
 
-namespace spn {
-	namespace Geo2D {
-		// ---------------------- Poly ----------------------
-		Poly::Poly(): _rflag(RFL_ALL) {}
-		Poly::Poly(const Vec2& p0, const Vec2& p1, const Vec2& p2): _point{p0,p1,p2}, _rflag(RFL_ALL) {}
-
-		float Poly::getArea() const {
-			if(_rflag & RFL_AREA) {
-				_rflag &= ~RFL_AREA;
-				_area = CalcArea(_point[0], _point[1], _point[2]);
+namespace boom {
+	namespace geo2d {
+		using spn::Bit;
+		template <class CLIP>
+		inline Vec2 NearestPoint(const StLineCore& st, const Vec2& p, CLIP clip) {
+			Vec2 toP = p - st.pos;
+			float d = st.dir.dot(toP);
+			return st.pos + st.dir * clip(d);
+		}
+		template <class CLIP>
+		inline Vec2x2 NearestPoint(const StLineCore& st0, const StLineCore& st1, CLIP clip0, CLIP clip1) {
+			float st0d = st0.dir.len_sq(),
+					st1d = st1.dir.len_sq(),
+					st01d = st0.dir.dot(st1.dir);
+			float d = st0d * st1d - spn::Square(st01d);
+			if(std::fabs(d) < 1e-5f) {
+				// 2つの直線は平行
+				return Vec2x2(st0.pos, NearestPoint(st1, st0.pos, [](float f){return f;}));
 			}
-			return _area;
-		}
-		const AVec2& Poly::getCenter() const {
-			if(_rflag & RFL_CENTER) {
-				_rflag &= ~RFL_CENTER;
-				_center = (_point[0] + _point[1] + _point[2]) * (1.0f/3);
-			}
-			return _center;
-		}
-		void Poly::setPoint(int n, const Vec2& v) {
-			_point[n] = v;
-			_rflag = RFL_ALL;
-		}
-		void Poly::addOffset(const Vec2& ofs) {
-			for(int i=0 ; i<3 ; i++)
-				_point[i] += ofs;
-		}
-		float Poly::getInertia() const {
-			if(_rflag & RFL_INERTIA) {
-				_rflag &= ~RFL_INERTIA;
+			spn::Mat22 m0(st1d, st01d,
+						st01d, st0d);
+			spn::Vec2	m1((st1.pos - st0.pos).dot(st0.dir),
+							(st0.pos - st1.pos).dot(st1.dir));
 
-				_inertia = (1.0f/18) * (_point[0].dot(_point[0])
-										+ _point[0].dot(_point[0])
-										+ _point[0].dot(_point[0])
-										- _point[1].dot(_point[2])
-										- _point[2].dot(_point[0])
-										- _point[0].dot(_point[1]));
-			}
-			return _inertia;
-		}
-
-		float Poly::CalcArea(const Vec2& p0, const Vec2& p1, const Vec2& p2) {
-			return  (p1-p0).ccw(p2-p0) * 0.5f;
-		}
-		float Poly::CalcArea(const Vec2& p0, const Vec2& p1) {
-			return p0.ccw(p1) * 0.5f;
+			m1 = m0 * m1;
+			m1 *= _sseRcp22Bit(d);
+			return Vec2x2(st0.pos + st0.dir * clip0(m1.x),
+							st1.pos + st1.dir * clip1(m1.y));
 		}
 
 		// ---------------------- Circle ----------------------
-		Circle::Circle(): _rflag(true) {}
-		Circle::Circle(const Vec2& c, float r): _center(c), _radius(r), _rflag(true) {}
-		float Circle::area() const {
-			if(_rflag) {
-				_rflag = false;
+		CircleCore::CircleCore(const Vec2& c, float r): center(c), radius(r) {}
+		float CircleCore::area() const {
+			throw std::runtime_error("");
+		}
+		Vec2 CircleCore::support(const Vec2& dir) const {
+			return dir * radius + center;
+		}
 
-				_area = 0;
-			}
+		Vec2 Circle::support(const Vec2& dir) const {
+			return CircleCore::support(dir);
+		}
+		CircleModel::CircleModel(): _rflag(0xff) {}
+		CircleModel::CircleModel(const CircleCore& c): _circle(c), _rflag(0xff) {}
+		Vec2 Circle::center() const { return CircleCore::center; }
+		Vec2 CircleModel::support(const Vec2& dir) const { return _circle.support(dir); }
+		Vec2 CircleModel::center() const { return _circle.center; }
+
+		// ---------------------- StLine ----------------------
+		StLineCore::StLineCore(const Vec2& p, const Vec2& d): pos(p), dir(d) {}
+		Vec2x2 StLineCore::nearest(const StLineCore& st) const {
+			auto fn = [](float f) { return f; };
+			return NearestPoint(*this, st, fn, fn);
+		}
+		Vec2 StLineCore::nearest(const Vec2& p) const {
+			return pos + (p-pos).dot(dir);
+		}
+		float StLineCore::distance(const Vec2& p) const {
+			return (p - pos).dot(dir);
+		}
+
+		// ---------------------- Ray ----------------------
+		RayCore::RayCore(const Vec2& p, const Vec2& d): pos(p), dir(d) {}
+		const StLineCore& RayCore::asStLine() const { return *reinterpret_cast<const StLineCore*>(this); }
+		Vec2x2 RayCore::nearest(const RayCore& r) const {
+			auto fn = [](float f) { return std::max(0.f, f); };
+			return NearestPoint(asStLine(), r.asStLine(), fn, fn);
+		}
+		Vec2 RayCore::nearest(const Vec2& p) const {
+			return NearestPoint(asStLine(), p, [](float f){ return std::max(0.f,f); });
+		}
+
+		// ---------------------- Line ----------------------
+		LineCore::LineCore(const Vec2& v0, const Vec2& v1): point{v0,v1} {}
+		float LineCore::distance(const LineCore& l) const {
+			auto fn = [](float f) { return spn::Saturate(f, 0.f, 1.f); };
+			Vec2x2 vp = NearestPoint(toStLine(), l.toStLine(), fn,fn);
+			return vp.first.distance(vp.second);
+		}
+		float LineCore::length() const {
+			return point[0].distance(point[1]);
+		}
+		float LineCore::len_sq() const {
+			return point[0].dist_sq(point[1]);
+		}
+		bool LineCore::hit(const LineCore& l) const {
+			return distance(l) < 1e-5f;
+		}
+		LineCore::LNear LineCore::nearest(const Vec2& p) const {
+			Vec2 toP(p-point[0]),
+				toV1(point[1]-point[0]);
+			float len = toV1.length();
+			float d = toV1.dot(toP);
+			toP *= _sseRcp22Bit(len);
+
+			if(d <= 0)
+				return LNear(point[0], BEGIN);
+			else if(d >= len)
+				return LNear(point[1], END);
+			else
+				return LNear(point[0]+toP*d, ONLINE);
+		}
+		float LineCore::ratio(const Vec2& p) const {
+			Vec2 toP(p-point[0]),
+				toV1(point[1]-point[0]);
+			float len = toV1.length();
+			return toV1.dot(toP) * _sseRcp22Bit(len);
+		}
+		StLineCore LineCore::toStLine() const {
+			return StLineCore(point[0], (point[1]-point[0]).normalization());
+		}
+		Vec2 LineCore::support(const Vec2& dir) const {
+			float d[2] = {dir.dot(point[0]), dir.dot(point[1])};
+			if(d[0] > d[1])
+				return point[0];
+			return point[1];
+		}
+
+		// ---------------------- Poly ----------------------
+		PolyCore::PolyCore(const Vec2& p0, const Vec2& p1, const Vec2& p2): point{p0,p1,p2} {}
+		float PolyCore::area() const {
+			return CalcArea(point[0], point[1], point[2]);
+		}
+		Vec2 PolyCore::center() const {
+			return (point[0] + point[1] + point[2]) * (1.0f/3);
+		}
+		float PolyCore::CalcArea(const Vec2& p0, const Vec2& p1, const Vec2& p2) {
+			return  (p1-p0).ccw(p2-p0) * 0.5f;
+		}
+		float PolyCore::CalcArea(const Vec2& p0, const Vec2& p1) {
+			return p0.ccw(p1) * 0.5f;
+		}
+		Vec2 PolyCore::support(const Vec2& dir) const {
+			throw std::runtime_error("");
+		}
+		void PolyCore::addOffset(const Vec2& ofs) {
+			for(int i=0 ; i<3 ; i++)
+				point[i] += ofs;
+		}
+
+		Vec2 Poly::support(const Vec2& dir) const { return PolyCore::support(dir); }
+		Vec2 Poly::center() const { return PolyCore::center(); }
+
+		PolyModel::PolyModel(): _rflag(RFL_ALL) {}
+		PolyModel::PolyModel(const Vec2& p0, const Vec2& p1, const Vec2& p2): _poly{p0,p1,p2}, _rflag(RFL_ALL) {}
+		float PolyModel::getArea() const {
+			if(Bit::ChClear(_rflag, RFL_AREA))
+				_area = _poly.area();
 			return _area;
 		}
-		const AVec2& Circle::getCenter() const { return _center; }
-		float Circle::getRadius() const { return _radius; }
-		void Circle::setCenter(const Vec2& v) {
-			// 面積は変化しない
-			_center = v;
+		const AVec2& PolyModel::getCenter() const {
+			if(Bit::ChClear(_rflag, RFL_CENTER))
+				_center = _poly.center();
+			return _center;
 		}
-		void Circle::setRadius(float r) {
-			_rflag = true;
-			_radius = r;
+		void PolyModel::setPoint(int n, const Vec2& v) {
+			_poly.point[n] = v;
+			_rflag = RFL_ALL;
+		}
+		void PolyModel::addOffset(const Vec2& ofs) {
+			_poly.addOffset(ofs);
+		}
+		float PolyModel::getInertia() const {
+			if(Bit::ChClear(_rflag, RFL_INERTIA)) {
+				_inertia = (1.0f/18) * (_poly.point[0].dot(_poly.point[0])
+										+ _poly.point[0].dot(_poly.point[0])
+										+ _poly.point[0].dot(_poly.point[0])
+										- _poly.point[1].dot(_poly.point[2])
+										- _poly.point[2].dot(_poly.point[0])
+										- _poly.point[0].dot(_poly.point[1]));
+			}
+			return _inertia;
+		}
+		Vec2 PolyModel::support(const Vec2& dir) const {
+			return _poly.support(dir);
+		}
+		Vec2 PolyModel::center() const {
+			return Vec2(getCenter());
 		}
 
 		// ---------------------- Convex ----------------------
-		Convex::Convex(): _rflag(RFL_ALL) {}
-		Convex::Convex(const PointL& pl): _point(pl), _rflag(RFL_ALL) {}
-		Convex::Convex(PointL&& pl): _point(pl), _rflag(RFL_ALL) {}
-
-		const Convex::PointL& Convex::getPoint() const { return _point; }
-		Convex::PointL& Convex::refPoint() {
-			_rflag = RFL_ALL;
-			return _point;
+		ConvexCore::ConvexCore(const PointL& pl): point(pl) {}
+		ConvexCore::ConvexCore(PointL&& pl): point(pl) {}
+		float ConvexCore::area() const {
+			AreaSum as;
+			iterate(as);
+			return as.result;
 		}
-		float Convex::getArea() const {
-			if(_rflag & RFL_AREA) {
-				_rflag &= ~RFL_AREA;
+		void ConvexCore::addOffset(const Vec2& ofs) {
+			for(auto& p : point)
+				p += ofs;
+		}
+		Vec2 ConvexCore::support(const Vec2& dir) const {
+			throw std::runtime_error("");
+		}
+		Vec2 ConvexCore::center() const {
+			return std::get<2>(area_inertia_center());
+		}
+		std::tuple<float,float,Vec2> ConvexCore::area_inertia_center() const {
+			int nL = point.size();
+			AreaList al(nL);
+			iterate(al);
+			float invarea = _sseRcp22Bit(al.sum);
+			float areaInv3 = invarea * (1.0f/3),
+					areaInv6 = invarea * (1.0f/6);
+			Vec2 center(0,0);
+			float inertia = 0;
+			iterate([&, areaInv3, areaInv6](int n, const Vec2& p0, const Vec2& p1) {
+				center += al.areaL[n] * areaInv3 * (p0 + p1);
+				inertia += al.areaL[n] * areaInv6 * (p0.dot(p0) + p0.dot(p1) + p1.dot(p1));
+			});
+			inertia -= center.len_sq();
+			return std::make_tuple(al.sum, inertia, center);
+		}
+		Vec2 Convex::support(const Vec2& dir) const {
+			return ConvexCore::support(dir);
+		}
+		Vec2 Convex::center() const {
+			return ConvexCore::center();
+		}
 
-				AreaSum as;
-				iterate(as);
-				_area = as.result;
+		ConvexModel::ConvexModel(): _rflag(RFL_ALL) {}
+		ConvexModel::ConvexModel(const ConvexCore::PointL& pl): _convex(pl), _rflag(RFL_ALL) {}
+		ConvexModel::ConvexModel(ConvexCore::PointL&& pl): _convex(pl), _rflag(RFL_ALL) {}
+
+		void ConvexModel::_refreshCInertia() const {
+			if(Bit::ChClear(_rflag, RFL_CENTER_INERTIA)) {
+				auto res = _convex.area_inertia_center();
+				_area = std::get<0>(res);
+				_inertia = std::get<1>(res);
+				_center = std::get<2>(res);
 			}
+		}
+		float ConvexModel::getArea() const {
+			_refreshCInertia();
 			return _area;
 		}
-		void Convex::_refreshCInertia() const {
-			if(_rflag & RFL_CENTER_INERTIA) {
-				_rflag &= ~RFL_CENTER_INERTIA;
-
-				int nL = _point.size();
-				AreaList al(nL);
-				iterate(al);
-				al.sum = _sseRcp22Bit(al.sum);
-				float areaInv3 = al.sum * (1.0f/3),
-						areaInv6 = al.sum * (1.0f/6);
-				_center *= 0;
-				_inertia = 0;
-				iterate([this, &al, areaInv3, areaInv6](int n, const Vec2& p0, const Vec2& p1) {
-					_center += al.areaL[n] * areaInv3 * (p0 + p1);
-					_inertia += al.areaL[n] * areaInv6 * (p0.dot(p0) + p0.dot(p1) + p1.dot(p1));
-				});
-				_inertia -= _center.dot(_center);
-			}
+		float ConvexModel::getInertia() const {
+			_refreshCInertia();
+			return _inertia;
 		}
-		const AVec2& Convex::center() const {
+		const AVec2& ConvexModel::getCenter() const {
 			_refreshCInertia();
 			return _center;
 		}
-		float Convex::getInertia() const {
-			_refreshCInertia();
-			return _inertia;
+		const ConvexCore::PointL& ConvexModel::getPoint() const { return _convex.point; }
+		ConvexCore::PointL& ConvexModel::refPoint() {
+			_rflag = RFL_ALL;
+			return _convex.point;
+		}
+		void ConvexModel::addOffset(const Vec2& ofs) {
+			_convex.addOffset(ofs);
+		}
+		Vec2 ConvexModel::support(const Vec2& dir) const {
+			return _convex.support(dir);
+		}
+		Vec2 ConvexModel::center() const {
+			return Vec2(getCenter());
 		}
 	}
 }
