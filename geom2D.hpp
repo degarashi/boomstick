@@ -463,9 +463,10 @@ namespace boom {
 				Vec2x2	_nvec;
 			};
 			const static spn::AMat22 cs_mRot[2];
+			void _addAsv(const Vec2& v0, const Vec2& v1, const Vec2x2* (&vtx)[2]);
 
 			/*! \param[in] n 計算した頂点の挿入先インデックス */
-			const Vec2& _minkowskiSub(const Vec2& dir, int n=-1);
+			const Vec2x2& _minkowskiSub(const Vec2& dir, int n=-1);
 			//! Hit時の脱出ベクトル
 			/*! 最低でも3頂点以上持っている前提 */
 			void _epaMethodOnHit();

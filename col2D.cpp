@@ -76,8 +76,9 @@ namespace boom {
 
 				auto& ts = ToSearch[idx];
 				// 現時点で三角形が原点を含んでいるか
-				float cm = (_vtx[ts[1]] - _vtx[ts[0]]).ccw(-_vtx[ts[0]]) * (_vtx[ts[1]] - _vtx[ts[2]]).ccw(-_vtx[ts[2]]);
-				if(cm >= 0) {
+				float cm = (_vtx[ts[1]] - _vtx[ts[0]]).ccw(-_vtx[ts[0]]) *
+							(_vtx[ts[2]] - _vtx[ts[1]]).ccw(-_vtx[ts[1]]);
+				if(cm >= -1e-5f) {
 					_inner = TriangleLerp(_vtx[0], _vtx[1], _vtx[2], ori,
 										_posB[0], _posB[1], _posB[2]);
 					return true;
@@ -106,7 +107,7 @@ namespace boom {
 		}
 
 		// ---------------------- GEpa ----------------------
-		const Vec2& GEpa::_minkowskiSub(const Vec2& dir, int n) {
+		const Vec2x2& GEpa::_minkowskiSub(const Vec2& dir, int n) {
 			int nV = _vl.size();
 			auto* vp = new Vec2x2;
 			vp->second = _m1.support(-dir);
@@ -116,7 +117,7 @@ namespace boom {
 			else
 				_vl.push_back(vp);
 
-			return vp->first;
+			return *vp;
 		}
 		// デバッグ用Print関数
 		namespace {
@@ -148,30 +149,32 @@ namespace boom {
 			}
 			return 0xffff;
 		}
+		namespace {
+			const Vec2 c_origin(0);
+		}
+		void GEpa::_addAsv(const Vec2& v0, const Vec2& v1, const Vec2x2* (&vtx)[2]) {
+			auto res = LineCore(v0,v1).nearest(c_origin);
+			float len = res.first.length();
+			if(res.second == LineCore::ONLINE) {
+				res.first *= _sseRcp22Bit(len);
+				_asv.insert(LmLen{len, res.first, {vtx[0], vtx[1]}});
+			}
+		}
 		void GEpa::_epaMethodOnHit() {
 			_adjustLoop();
 			_geneASV();
 
 			// 衝突時: 脱出ベクトルを求める
-			Vec2 ori(0);
-			auto fn = [this, ori](const Vec2& v0, const Vec2& v1, const Vec2x2* (&vtx)[2]) {
-				auto res = LineCore(v0,v1).nearest(ori);
-				float len = res.first.length();
-				if(res.second == LineCore::ONLINE) {
-					res.first *= _sseRcp22Bit(len);
-					_asv.insert(LmLen{len, res.first, {vtx[0], vtx[1]}});
-				}
-			};
 			float minLen = std::numeric_limits<float>::max();
 			while(!_asv.empty()) {
 				auto fr = _asv.pop_frontR();
 
 				_printASV();
-				const Vec2 &v1 = _minkowskiSub(fr.dir, _getIndex(fr.vtx[0])),
-							&v0 = fr.vtx[0]->first,
-							&v2 = fr.vtx[1]->first;
+				const Vec2x2 &v1 = _minkowskiSub(fr.dir, _getIndex(fr.vtx[0])),
+							&v0 = *fr.vtx[0],
+							&v2 = *fr.vtx[1];
 				_printASV();
-				float d1 = fr.dir.dot(v1);
+				float d1 = fr.dir.dot(v1.first);
 				if(spn::IsNear(d1, fr.dist, 5e-4f)) {
 					if(minLen > fr.dist) {
 						minLen = fr.dist;
@@ -181,8 +184,8 @@ namespace boom {
 						break;
 				}
 
-				fn(v0,v1, fr.vtx);
-				fn(v1,v2, fr.vtx);
+				_addAsv(v0.first, v1.first, fr.vtx);
+				_addAsv(v1.first, v2.first, fr.vtx);
 			}
 		}
 		void GEpa::_epaMethodNoHit() {
@@ -197,23 +200,26 @@ namespace boom {
 					_nvec.first = p.second + fr.dir * fr.dist;
 					return;
 				}
-
-				const Vec2& v1 = _minkowskiSub(-fr.dir, _getIndex(fr.vtx[0])),
-							&v0 = fr.vtx[0]->first,
-							&v2 = fr.vtx[1]->first;
-				float d1 = fr.dir.dot(v1);
-				if(d1 <= fr.dist + 5e-4f) {
-					auto& p = *_vl.back();
-					_nvec.second = p.second;
-					_nvec.first = p.second + fr.dir * fr.dist;
+				_printASV();
+				const Vec2x2& v1 = _minkowskiSub(-fr.dir, _getIndex(fr.vtx[0])),
+							&v0 = *fr.vtx[0],
+							&v2 = *fr.vtx[1];
+				_printASV();
+				float d1 = fr.dir.dot(v1.first);
+				if(spn::IsNear(d1, fr.dist, 5e-4f)) {
+					_nvec.second = v1.second;
+					_nvec.first = v1.second + fr.dir * fr.dist;
 					return;
 				}
+				_addAsv(v0.first, v1.first, fr.vtx);
+				_addAsv(v1.first, v2.first, fr.vtx);
 			}
 			assert(false);
 		}
 		void GEpa::_adjustLoop() {
 			int nV = _vl.size();
-			assert(nV >= 3);
+			if(nV < 3)
+				return;
 			// 頂点0を基準にCCWの値でソート
 			struct Ccw {
 				float	val;
@@ -240,7 +246,7 @@ namespace boom {
 		}
 		void GEpa::_geneASV() {
 			int nV = _vl.size();
-			assert(nV >= 3);
+			assert(nV >= 3 || !getResult());
 			_asv.clear();
 
 			Vec2 ori(0);
@@ -309,7 +315,7 @@ namespace boom {
 					_epaMethodOnHit();
 				} else {
 					if(nV == 1) {
-						const Vec2& v = _minkowskiSub(-_vtx[0].normalization());
+						const Vec2& v = _minkowskiSub(-_vtx[0].normalization()).first;
 						auto res = LineCore(_vtx[0], v).nearest(Vec2(0));
 						if(res.second == LineCore::ONLINE) {
 							float len = res.first.length();
