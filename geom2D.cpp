@@ -93,16 +93,15 @@ namespace boom {
 		LineCore::LNear LineCore::nearest(const Vec2& p) const {
 			Vec2 toP(p-point[0]),
 				toV1(point[1]-point[0]);
-			float len = toV1.length();
+			float lenV1 = toV1.length();
+			toV1 *= _sseRcp22Bit(lenV1);
 			float d = toV1.dot(toP);
-			toP *= _sseRcp22Bit(len);
-
 			if(d <= 0)
 				return LNear(point[0], BEGIN);
-			else if(d >= len)
+			else if(d >= lenV1)
 				return LNear(point[1], END);
 			else
-				return LNear(point[0]+toP*d, ONLINE);
+				return LNear(point[0]+toV1*d, ONLINE);
 		}
 		float LineCore::ratio(const Vec2& p) const {
 			Vec2 toP(p-point[0]),
@@ -118,6 +117,12 @@ namespace boom {
 			if(d[0] > d[1])
 				return point[0];
 			return point[1];
+		}
+		bool LineCore::online(const Vec2& p) const {
+			Vec2 toV1(point[1]-point[0]),
+				toP(p-point[0]);
+			toV1.normalize();
+			return spn::IsNear(toV1.dot(toP), toP.length(), 1e-5f);
 		}
 
 		// ---------------------- Poly ----------------------
@@ -185,6 +190,13 @@ namespace boom {
 		// ---------------------- Convex ----------------------
 		ConvexCore::ConvexCore(const PointL& pl): point(pl) {}
 		ConvexCore::ConvexCore(PointL&& pl): point(pl) {}
+		ConvexCore::ConvexCore(std::initializer_list<Vec2> v): point(v.size()) {
+			auto itrD = point.begin();
+			auto itr = v.begin();
+			while(itr != v.end())
+				*itrD++ = *itr++;
+		}
+
 		float ConvexCore::area() const {
 			AreaSum as;
 			iterate(as);
@@ -195,7 +207,17 @@ namespace boom {
 				p += ofs;
 		}
 		Vec2 ConvexCore::support(const Vec2& dir) const {
-			throw std::runtime_error("");
+			Vec2 result = point[0];
+			float dMax = point[0].dot(dir);
+			int nV = point.size();
+			for(int i=1 ; i<nV ; i++) {
+				float d = point[i].dot(dir);
+				if(d > dMax) {
+					result = point[i];
+					dMax = d;
+				}
+			}
+			return result;
 		}
 		Vec2 ConvexCore::center() const {
 			return std::get<2>(area_inertia_center());
@@ -203,14 +225,14 @@ namespace boom {
 		std::tuple<float,float,Vec2> ConvexCore::area_inertia_center() const {
 			int nL = point.size();
 			AreaList al(nL);
-			iterate(al);
+			iterate(std::ref(al));
 			float invarea = _sseRcp22Bit(al.sum);
 			float areaInv3 = invarea * (1.0f/3),
 					areaInv6 = invarea * (1.0f/6);
 			Vec2 center(0,0);
 			float inertia = 0;
 			iterate([&, areaInv3, areaInv6](int n, const Vec2& p0, const Vec2& p1) {
-				center += al.areaL[n] * areaInv3 * (p0 + p1);
+				center += (p0 + p1) * al.areaL[n] * areaInv3;
 				inertia += al.areaL[n] * areaInv6 * (p0.dot(p0) + p0.dot(p1) + p1.dot(p1));
 			});
 			inertia -= center.len_sq();

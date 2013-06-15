@@ -1,6 +1,8 @@
 #pragma once
 #include "spinner/matrix.hpp"
 #include "spinner/type.hpp"
+#include "spinner/misc.hpp"
+#include "spinner/assoc.hpp"
 #include <cassert>
 #include <vector>
 #include <memory>
@@ -44,6 +46,15 @@ namespace boom {
 		auto toT01(f0.l_intp(f1, res.second)),
 				toT21(f2.l_intp(f1, res.second));
 		return toT01.l_intp(toT21, res.first);
+	}
+	template <class T>
+	T LineLerp(const Vec2& v0, const Vec2& v1, const Vec2& vt,
+				const T& f0, const T& f1)
+	{
+		auto line(v1-v0),
+			line2(vt-v0);
+		float r = line2.length() * _sseRcp22Bit(line.length());
+		return spn::Lerp(f0, f1, r);
 	}
 
 	namespace geo2d {
@@ -130,6 +141,7 @@ namespace boom {
 			float ratio(const Vec2& p) const;
 			Vec2 support(const Vec2& dir) const;
 			StLineCore toStLine() const;
+			bool online(const Vec2& p) const;
 		};
 		struct Line : LineCore, IModelP<LineCore> {
 			using LineCore::LineCore;
@@ -249,13 +261,12 @@ namespace boom {
 			};
 			struct AreaList {
 				AreaL	areaL;
-				float*	ptr;
 				float	sum;
 
-				AreaList(int n): areaL(n), ptr(&areaL[0]), sum(0) {}
+				AreaList(int n): areaL(n), sum(0) {}
 				void operator()(int n, const Vec2& p0, const Vec2& p1) {
 					float a = PolyCore::CalcArea(p0,p1);
-					*ptr++ = a;
+					areaL[n] = a;
 					sum += a;
 				}
 			};
@@ -264,6 +275,7 @@ namespace boom {
 			PointL	point;
 
 			ConvexCore() = default;
+			ConvexCore(std::initializer_list<Vec2> v);
 			ConvexCore(const PointL& pl);
 			ConvexCore(PointL&& pl);
 
@@ -429,18 +441,46 @@ namespace boom {
 		};
 		/*! 常に頂点リストを時計回りに保つ */
 		class GEpa : public GSimplex {
-			using V2L = std::vector<Vec2x2>;
-			V2L 			_vl;
-			Vec2			_pvec,
-							_nvec[2];
+			std::vector<Vec2x2*>	_vl;
+			int _getIndex(const Vec2x2* vp) const;
 
+			//! 点と辺の両対応
+			struct LmLen {
+				float			dist;
+				Vec2			dir;
+				const Vec2x2	*vtx[2];	//!< index[1]==nullptrの時は単一の頂点を表す
+
+				bool operator < (const LmLen& len) const {
+					return dist < len.dist;
+				}
+			};
+			//! 最短距離リスト
+			spn::AssocVec<LmLen>	_asv;
+			void _printASV();
+
+			union {
+				Vec2	_pvec;
+				Vec2x2	_nvec;
+			};
 			const static spn::AMat22 cs_mRot[2];
 
 			/*! \param[in] n 計算した頂点の挿入先インデックス */
 			const Vec2& _minkowskiSub(const Vec2& dir, int n=-1);
-			void _epaMethod();
+			//! Hit時の脱出ベクトル
+			/*! 最低でも3頂点以上持っている前提 */
+			void _epaMethodOnHit();
+			//! NoHit時の最短ベクトル
+			void _epaMethodNoHit();
+
+			//! NoHit: 頂点が2つしか無い時の補正
+			void _recover2NoHit();
+			//! Hit: 頂点が2つしか無い時の補正
+			void _recover2OnHit();
 			//! 頂点の並び順を時計回りに修正
 			void _adjustLoop();
+			//! 頂点リスト(3つ以上)から最短距離リストを生成
+			void _geneASV();
+
 			public:
 				GEpa(const IModel& m0, const IModel& m1);
 				Vec2x2 getNearestPair() const;
@@ -462,5 +502,5 @@ namespace boom {
 		bool HitCheck(const IModel& mdl0, const IModel& mdl1);
 		//! 固有のアルゴリズムでmdlFromのmdlToに対する最深点を算出
 		Vec2 HitPos(const IModel& mdlFrom, const IModel& mdlTo);
-	}
+	};
 }

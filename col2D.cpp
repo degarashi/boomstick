@@ -5,6 +5,7 @@
 #include "spinner/misc.hpp"
 #include "spinner/assoc.hpp"
 #include <limits>
+#include <iostream>
 
 namespace boom {
 	float Area_x2(const Vec2& v0, const Vec2& v1) {
@@ -38,14 +39,17 @@ namespace boom {
 			dir.normalize();
 
 			_minkowskiSub(dir, 0);
-			if(dir.dot(_vtx[0]) < -DOT_THRESHOLD)
+			if(dir.dot(_vtx[0]) < -DOT_THRESHOLD) {
+				_nVtx = 1;
 				return false;
+			}
 			dir = _vtx[0].normalization() * -1.f;
 			_minkowskiSub(dir, 1);
 
 			const Vec2 ori(0);
 			Vec2 tmp = _vtx[1] - _vtx[0];
 			float tmpLen = tmp.length();
+			tmp *= _sseRcp22Bit(tmpLen);
 			float r = tmp.dot(-_vtx[0]);
 			if(r > tmpLen)
 				return false;
@@ -73,7 +77,7 @@ namespace boom {
 				auto& ts = ToSearch[idx];
 				// 現時点で三角形が原点を含んでいるか
 				float cm = (_vtx[ts[1]] - _vtx[ts[0]]).ccw(-_vtx[ts[0]]) * (_vtx[ts[1]] - _vtx[ts[2]]).ccw(-_vtx[ts[2]]);
-				if(cm < 0) {
+				if(cm >= 0) {
 					_inner = TriangleLerp(_vtx[0], _vtx[1], _vtx[2], ori,
 										_posB[0], _posB[1], _posB[2]);
 					return true;
@@ -103,159 +107,237 @@ namespace boom {
 
 		// ---------------------- GEpa ----------------------
 		const Vec2& GEpa::_minkowskiSub(const Vec2& dir, int n) {
-			Vec2x2 tmp;
-			tmp.second = _m1.support(-dir);
-			tmp.first = _m0.support(dir) - tmp.second;
-
-			if(n < 0) {
-				_vl.push_back(tmp);
-				return _vl.back().first;
-			}
-			_vl.insert(_vl.begin()+n, tmp);
-			return _vl[n].first;
-		}
-		void GEpa::_epaMethod() {
-			if(_vl.size() == 2) {
-				// 補助法線でちゃんとした凸包を形成
-				Vec2 toV1(_vl[1].first - _vl[0].first);
-				Vec2 dir = toV1 * cs_mRot[0];
-				dir.normalize();
-
-				const Vec2& v = _minkowskiSub(dir);
-				LineCore lc(_vl[0].first, _vl[1].first);
-				float r = lc.ratio(v);
-				if(spn::IsInRange(r, 0.f, 1.f)) {
-					_pvec = Vec2(0);
-					return;
-				}
-
-				dir = toV1 * cs_mRot[1];
-				const Vec2& v2 = _minkowskiSub(dir, 1);
-				if(spn::IsInRange(lc.ratio(v2), 0.f, 1.f)) {
-					_pvec = Vec2(0);
-					return;
-				}
-			}
-
-			struct LmLen {
-				float	dist;
-				Vec2	dir;
-				int		idx;
-
-				bool operator < (const LmLen& len) const {
-					return dist < len.dist;
-				}
-			};
-			spn::AssocVec<LmLen> asv;
-			const Vec2 ori(0);
-			float minDist = std::numeric_limits<float>::max();
-			Vec2 minVec, minPosB;
-			// 辺の最短リストを構築
-			auto addLineDist = [ori, &asv, &minDist, &minVec, &minPosB](const Vec2& vt0, const Vec2& vt1, int idx) {
-				auto ls = LineCore(vt0,vt1).nearest(ori);
-				float len = ls.first.length();
-				if(minDist > len) {
-					minDist = len;
-					minVec = ls.first;
-				}
-				if(ls.second == LineCore::ONLINE)
-					asv.insert(LmLen{len, ls.first * _sseRcp22Bit(len), idx});
-			};
-
-			// 現在の頂点情報で距離リストを構築
 			int nV = _vl.size();
-			for(int i=0 ; i<nV ; i++)
-				addLineDist(_vl[i].first, _vl[(i+1)%nV].first, i);
+			auto* vp = new Vec2x2;
+			vp->second = _m1.support(-dir);
+			vp->first = _m0.support(dir) - vp->second;
+			if(n >= 0)
+				_vl.insert(_vl.begin()+n, vp);
+			else
+				_vl.push_back(vp);
 
-			if(!getResult()) {
-				// 無衝突時: 最近傍対を求める
-				while(!asv.empty()) {
-					auto fr = asv.pop_frontR();
-					_minkowskiSub(-fr.dir, fr.idx);
-					const auto &v0 = _vl[fr.idx].first,
-								&v1 = _vl[fr.idx+1].first,
-								&v2 = _vl[(fr.idx+2)%nV].first;
-					float ccw = (v1 - v0).ccw(v2 - v0);
-					if(ccw > -1e-4f)
-						break;
-					addLineDist(v0,v1, fr.idx);
-					addLineDist(v1,v2, fr.idx+1);
-				}
-				_nvec[0] = minPosB + minVec;
-				_nvec[1] = minPosB;
-				return;
-			} else {
-				// 衝突時: 脱出ベクトルを求める
-				while(!asv.empty()) {
-					auto fr = asv.pop_frontR();
-					_minkowskiSub(fr.dir, fr.idx);
-					// ライン上なら終了
-					const auto &v0 = _vl[fr.idx].first,
-								&v1 = _vl[fr.idx+1].first,
-								&v2 = _vl[(fr.idx+2)%nV].first;
-					Vec2 v01(v1-v0),
-						v02(v2-v0);
-					v01.normalize();
-					v02.normalize();
-					if(v01.dot(v02) > 1.f-1e-3f) {
-						_pvec = fr.dir * fr.dist;
-						return;
-					}
-					// 距離リストに登録
-					addLineDist(v0,v1, fr.idx);
-					addLineDist(v1,v2, fr.idx+1);
-				}
-				// リストが空になる事はない筈
-				throw std::runtime_error("something wrong");
+			return vp->first;
+		}
+		// デバッグ用Print関数
+		namespace {
+			void PrintV(const Vec2& v) {
+				std::cout << '[' << v.x << ',' << v.y << ']';
 			}
+			void PrintV(const Vec2x2& v) {
+				PrintV(v.first);
+				PrintV(v.second);
+			}
+		}
+		void GEpa::_printASV() {
+			for(auto& p : _vl) {
+				PrintV(*p);
+				std::cout << std::endl;
+			}
+			for(auto& p : _asv) {
+				std::cout << p.dist << ':';
+				PrintV(p.dir);
+				std::cout << std::hex << p.vtx[0] << ',' << p.vtx[1] << std::endl;
+			}
+		}
+
+		int GEpa::_getIndex(const Vec2x2 *vp) const {
+			int nV = _vl.size();
+			for(int i=0 ; i<nV ; i++) {
+				if(_vl[i] == vp)
+					return i;
+			}
+			return 0xffff;
+		}
+		void GEpa::_epaMethodOnHit() {
+			_adjustLoop();
+			_geneASV();
+
+			// 衝突時: 脱出ベクトルを求める
+			Vec2 ori(0);
+			auto fn = [this, ori](const Vec2& v0, const Vec2& v1, const Vec2x2* (&vtx)[2]) {
+				auto res = LineCore(v0,v1).nearest(ori);
+				float len = res.first.length();
+				if(res.second == LineCore::ONLINE) {
+					res.first *= _sseRcp22Bit(len);
+					_asv.insert(LmLen{len, res.first, {vtx[0], vtx[1]}});
+				}
+			};
+			float minLen = std::numeric_limits<float>::max();
+			while(!_asv.empty()) {
+				auto fr = _asv.pop_frontR();
+
+				_printASV();
+				const Vec2 &v1 = _minkowskiSub(fr.dir, _getIndex(fr.vtx[0])),
+							&v0 = fr.vtx[0]->first,
+							&v2 = fr.vtx[1]->first;
+				_printASV();
+				float d1 = fr.dir.dot(v1);
+				if(spn::IsNear(d1, fr.dist, 5e-4f)) {
+					if(minLen > fr.dist) {
+						minLen = fr.dist;
+						_pvec = fr.dir * fr.dist;
+					}
+					if(_asv.empty() || _asv.front().dist > fr.dist)
+						break;
+				}
+
+				fn(v0,v1, fr.vtx);
+				fn(v1,v2, fr.vtx);
+			}
+		}
+		void GEpa::_epaMethodNoHit() {
+			_adjustLoop();
+			_geneASV();
+			// 無衝突時: 最近傍対を求める
+			while(!_asv.empty()) {
+				auto fr = _asv.pop_frontR();
+				if(!fr.vtx[1]) {
+					auto& p = *fr.vtx[0];
+					_nvec.second = p.second;
+					_nvec.first = p.second + fr.dir * fr.dist;
+					return;
+				}
+
+				const Vec2& v1 = _minkowskiSub(-fr.dir, _getIndex(fr.vtx[0])),
+							&v0 = fr.vtx[0]->first,
+							&v2 = fr.vtx[1]->first;
+				float d1 = fr.dir.dot(v1);
+				if(d1 <= fr.dist + 5e-4f) {
+					auto& p = *_vl.back();
+					_nvec.second = p.second;
+					_nvec.first = p.second + fr.dir * fr.dist;
+					return;
+				}
+			}
+			assert(false);
 		}
 		void GEpa::_adjustLoop() {
 			int nV = _vl.size();
-			if(nV > 2) {
-				// 頂点0を基準にCCWの値でソート
-				struct Ccw {
-					float	val;
-					int		idx;
+			assert(nV >= 3);
+			// 頂点0を基準にCCWの値でソート
+			struct Ccw {
+				float	val;
+				int		idx;
 
-					bool operator < (const Ccw& c) const {
-						return val < c.val;
-					}
-				};
-				spn::AssocVec<Ccw> asv;
-
-				const Vec2& v0 = _vl[0].first;
-				for(int i=1 ; i<nV ; i++)
-					asv.insert(Ccw{v0.ccw(_vl[i].first), i});
-
-				decltype(_vl) nvl(nV);
-				auto* pDst = &nvl[0];
-				*pDst++ = _vl[0];
-				while(!asv.empty()) {
-					auto c = asv.pop_frontR();
-					*pDst++ = _vl[c.idx];
+				bool operator > (const Ccw& c) const {
+					return val > c.val;
 				}
-				std::swap(_vl, nvl);
+			};
+			spn::AssocVec<Ccw, std::greater<Ccw>> asv;
+
+			const Vec2& v0 = _vl[0]->first;
+			for(int i=1 ; i<nV ; i++)
+				asv.insert(Ccw{v0.ccw(_vl[i]->first), i});
+
+			decltype(_vl) nvl(nV);
+			auto* pDst = &nvl[0];
+			*pDst++ = _vl[0];
+			while(!asv.empty()) {
+				auto c = asv.pop_frontR();
+				*pDst++ = _vl[c.idx];
 			}
+			std::swap(_vl, nvl);
+		}
+		void GEpa::_geneASV() {
+			int nV = _vl.size();
+			assert(nV >= 3);
+			_asv.clear();
+
+			Vec2 ori(0);
+			for(int i=0 ; i<nV ; i++) {
+				auto &p0 = *_vl[i],
+					&p1 = *_vl[(i+1)%nV];
+				auto res = LineCore(p1.first, p0.first).nearest(ori);
+				float len = res.first.length();
+				if(len < 1e-5f) {
+					// 線分上に原点があるので少し小細工
+					// 線分方向90度回転かつ線分に関わっていない頂点側
+					Vec2 dir(p1.first - p0.first);
+					dir.normalize();
+					dir *= cs_mRot[0];
+					if(dir.dot(_vl[(i+2)%nV]->first - p0.first) > 0.f)
+						dir *= -1.f;
+					res.first = dir;
+				} else
+					res.first *= _sseRcp22Bit(len);
+				_asv.insert(LmLen{len, res.first, {_vl[i], _vl[(i+1)%nV]}});
+			}
+		}
+
+		void GEpa::_recover2NoHit() {
+			auto res = LineCore(_vtx[0], _vtx[1]).nearest(Vec2(0));
+			float len = res.first.length();
+			LmLen lmlen;
+			lmlen.dist = len;
+			lmlen.dir *= _sseRcp22Bit(len);
+			if(res.second != LineCore::ONLINE) {
+				lmlen.vtx[0] = lmlen.vtx[1] = _vl[(res.second == LineCore::BEGIN) ? 0 : 1];
+			} else {
+				lmlen.vtx[0] = _vl[0];
+				lmlen.vtx[1] = _vl[1];
+			}
+			_asv.insert(lmlen);
+		}
+		void GEpa::_recover2OnHit() {
+			LmLen lm;
+			lm.dist = 0;
+			lm.dir = _vtx[0]-_vtx[1];
+			lm.dir.normalize();
+			lm.dir *= cs_mRot[0];
+			lm.vtx[0] = _vl[0];
+			lm.vtx[1] = _vl[1];
+			_asv.insert(lm);
+
+			std::swap(lm.vtx[0], lm.vtx[1]);
+			lm.dir *= -1.f;
+			_asv.insert(lm);
 		}
 
 		GEpa::GEpa(const IModel& m0, const IModel& m1): GSimplex(m0,m1) {
 			int nV = _nVtx;
+			_vl.resize(nV);
 			for(int i=0 ; i<nV ; i++)
-				_vl[i] = Vec2x2(_vtx[i], _posB[i]);
-			_adjustLoop();
-			_epaMethod();
+				_vl[i] = new Vec2x2(_vtx[i], _posB[i]);
+
+			do {
+				if(getResult()) {
+					if(nV == 1) {
+						_pvec *= 0;
+						break;
+					} else if(nV == 2)
+						_recover2OnHit();
+					_epaMethodOnHit();
+				} else {
+					if(nV == 1) {
+						const Vec2& v = _minkowskiSub(-_vtx[0].normalization());
+						auto res = LineCore(_vtx[0], v).nearest(Vec2(0));
+						if(res.second == LineCore::ONLINE) {
+							float len = res.first.length();
+							_asv.insert(LmLen{len, res.first*_sseRcp22Bit(len), {_vl[0],_vl[1]}});
+						}
+						else {
+							const auto& p = *_vl[0];
+							_nvec.second = p.second;
+							_nvec.first = _nvec.second + p.first;
+							break;
+						}
+					} else if(nV == 2)
+						_recover2NoHit();
+					_epaMethodNoHit();
+				}
+			} while(false);
 		}
 		Vec2x2 GEpa::getNearestPair() const {
-			return Vec2x2(_nvec[0], _nvec[1]);
+			return _nvec;
 		}
 		const Vec2& GEpa::getPVector() const {
 			return _pvec;
 		}
 		const spn::AMat22 GEpa::cs_mRot[2] = {
-			{spn::COS45, spn::SIN45,
-			-spn::SIN45, spn::COS45},
-			{spn::COS45, -spn::SIN45,
-			spn::SIN45, spn::COS45}
+			{spn::COS90, spn::SIN90,
+			-spn::SIN90, spn::COS90},
+			{spn::COS90, -spn::SIN90,
+			spn::SIN90, spn::COS90}
 		};
 
 		/*! 算出不能なケースは考えない */
