@@ -134,10 +134,10 @@ namespace boom {
 			return (point[0] + point[1] + point[2]) * (1.0f/3);
 		}
 		float PolyCore::CalcArea(const Vec2& p0, const Vec2& p1, const Vec2& p2) {
-			return  (p1-p0).ccw(p2-p0) * 0.5f;
+			return  (p1-p0).cw(p2-p0) * 0.5f;
 		}
 		float PolyCore::CalcArea(const Vec2& p0, const Vec2& p1) {
-			return p0.ccw(p1) * 0.5f;
+			return p0.cw(p1) * 0.5f;
 		}
 		Vec2 PolyCore::support(const Vec2& dir) const {
 			throw std::runtime_error("");
@@ -209,14 +209,14 @@ namespace boom {
 			*pDst++ = tsrc[0];
 			*pDst++ = tsrc[1];
 			for(int rc=2 ; rc<nV ; rc++) {
-				if(Vec2::Ccw(tsrc[rc-2], tsrc[rc-1], tsrc[rc]) < 0)
+				if(Vec2::Cw(tsrc[rc-2], tsrc[rc-1], tsrc[rc]) < 0)
 					--pDst;
 				*pDst++ = tsrc[rc];
 			}
 			*pDst++ = tsrc[nV-1];
 			*pDst++ = tsrc[nV-2];
 			for(int rc=nV-3 ; rc>=0 ; rc--) {
-				if(Vec2::Ccw(tsrc[rc+2], tsrc[rc+1], tsrc[rc]) < 0)
+				if(Vec2::Cw(tsrc[rc+2], tsrc[rc+1], tsrc[rc]) < 0)
 					--pDst;
 				*pDst++ = tsrc[rc];
 			}

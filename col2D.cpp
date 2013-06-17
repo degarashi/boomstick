@@ -15,7 +15,7 @@ namespace boom {
 		spn::SIN90, spn::COS90}
 	};
 	float Area_x2(const Vec2& v0, const Vec2& v1) {
-		return std::fabs(v0.ccw(v1));
+		return std::fabs(v0.cw(v1));
 	}
 	float Area_x2(const Vec3& v0, const Vec3& v1) {
 		return v0.cross(v1).length();
@@ -82,8 +82,8 @@ namespace boom {
 
 				auto& ts = ToSearch[idx];
 				// 現時点で三角形が原点を含んでいるか
-				float cm = (_vtx[ts[1]] - _vtx[ts[0]]).ccw(-_vtx[ts[0]]) *
-							(_vtx[ts[2]] - _vtx[ts[1]]).ccw(-_vtx[ts[1]]);
+				float cm = (_vtx[ts[1]] - _vtx[ts[0]]).cw(-_vtx[ts[0]]) *
+							(_vtx[ts[2]] - _vtx[ts[1]]).cw(-_vtx[ts[1]]);
 				if(cm >= -1e-5f) {
 					_inner = TriangleLerp(_vtx[0], _vtx[1], _vtx[2], ori,
 										_posB[0], _posB[1], _posB[2]);
@@ -226,20 +226,20 @@ namespace boom {
 			int nV = _vl.size();
 			if(nV < 3)
 				return;
-			// 頂点0を基準にCCWの値でソート
-			struct Ccw {
+			// 頂点0を基準にCWの値でソート
+			struct Cw {
 				float	val;
 				int		idx;
 
-				bool operator > (const Ccw& c) const {
+				bool operator > (const Cw& c) const {
 					return val > c.val;
 				}
 			};
-			spn::AssocVec<Ccw, std::greater<Ccw>> asv;
+			spn::AssocVec<Cw, std::greater<Cw>> asv;
 
 			const Vec2& v0 = _vl[0]->first;
 			for(int i=1 ; i<nV ; i++)
-				asv.insert(Ccw{v0.ccw(_vl[i]->first), i});
+				asv.insert(Cw{v0.cw(_vl[i]->first), i});
 
 			decltype(_vl) nvl(nV);
 			auto* pDst = &nvl[0];
