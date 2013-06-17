@@ -30,13 +30,35 @@ void TestAssoc() {
 		std::cout << p;
 	std::cout << std::endl;
 }
-
-int main(int argc, char **argv) {
+void TestConvex() {
 	Convex cnv0{Vec2(0,0), Vec2(0,1), Vec2(1,1), Vec2(1,0)},
 			cnv1{Vec2(0,0.5f), Vec2(0.5f,1), Vec2(1,1), Vec2(1,0)};
 	cnv1.addOffset(Vec2(1.2f,0));
 	GEpa ga(cnv0, cnv1);
 	auto np = ga.getNearestPair();
 	auto ip = ga.getInner();
+}
+class Gravity : public IResist {
+	float _grav;
+	public:
+		Gravity(float g): _grav(g) {}
+		void resist(Accel& acc, const RPose::Value& pose) const override {
+			acc.linear += Vec2(0, -_grav);
+			_callNext(acc, pose);
+		}
+};
+void TestRigid() {
+	RigidMgr rm(IItg::sptr(new Itg_Eular));
+
+	IModel::sptr spModel(new ConvexModel({Vec2(0,0), Vec2(0,1), Vec2(1,1), Vec2(1,0)}));
+	Rigid::sptr spR(new Rigid(spModel));
+	rm.add(spR);
+	rm.add(IResist::sptr(new Gravity(9.8f)));
+	for(int i=0 ; i<10 ; i++)
+		rm.simulate(1.f);
+}
+
+int main(int argc, char **argv) {
+	TestRigid();
 	return 0;
 }

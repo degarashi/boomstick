@@ -196,6 +196,34 @@ namespace boom {
 			while(itr != v.end())
 				*itrD++ = *itr++;
 		}
+		ConvexCore ConvexCore::FromConcave(const PointL& src) {
+			int nV = src.size();
+			assert(nV >= 3);
+
+			// X軸についてソート
+			PointL tsrc(src);
+			std::sort(tsrc.begin(), tsrc.end(), [](const Vec2& v0, const Vec2& v1){ return v0.x < v1.x; });
+
+			PointL pts(nV*2);
+			Vec2* pDst = &pts[0];
+			*pDst++ = tsrc[0];
+			*pDst++ = tsrc[1];
+			for(int rc=2 ; rc<nV ; rc++) {
+				if(Vec2::Ccw(tsrc[rc-2], tsrc[rc-1], tsrc[rc]) < 0)
+					--pDst;
+				*pDst++ = tsrc[rc];
+			}
+			*pDst++ = tsrc[nV-1];
+			*pDst++ = tsrc[nV-2];
+			for(int rc=nV-3 ; rc>=0 ; rc--) {
+				if(Vec2::Ccw(tsrc[rc+2], tsrc[rc+1], tsrc[rc]) < 0)
+					--pDst;
+				*pDst++ = tsrc[rc];
+			}
+			assert(&pts[0]+nV*2 <= pDst);
+			pts.resize(pDst - &pts[0]);
+			return ConvexCore(std::move(pts));
+		}
 
 		float ConvexCore::area() const {
 			AreaSum as;

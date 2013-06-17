@@ -8,6 +8,12 @@
 #include <iostream>
 
 namespace boom {
+	const spn::AMat22 cs_mRot90[2] = {
+		{spn::COS90, spn::SIN90,
+		-spn::SIN90, spn::COS90},
+		{spn::COS90, -spn::SIN90,
+		spn::SIN90, spn::COS90}
+	};
 	float Area_x2(const Vec2& v0, const Vec2& v1) {
 		return std::fabs(v0.ccw(v1));
 	}
@@ -260,7 +266,7 @@ namespace boom {
 					// 線分方向90度回転かつ線分に関わっていない頂点側
 					Vec2 dir(p1.first - p0.first);
 					dir.normalize();
-					dir *= cs_mRot[0];
+					dir *= cs_mRot90[0];
 					if(dir.dot(_vl[(i+2)%nV]->first - p0.first) > 0.f)
 						dir *= -1.f;
 					res.first = dir;
@@ -289,7 +295,7 @@ namespace boom {
 			lm.dist = 0;
 			lm.dir = _vtx[0]-_vtx[1];
 			lm.dir.normalize();
-			lm.dir *= cs_mRot[0];
+			lm.dir *= cs_mRot90[0];
 			lm.vtx[0] = _vl[0];
 			lm.vtx[1] = _vl[1];
 			_asv.insert(lm);
@@ -339,12 +345,6 @@ namespace boom {
 		const Vec2& GEpa::getPVector() const {
 			return _pvec;
 		}
-		const spn::AMat22 GEpa::cs_mRot[2] = {
-			{spn::COS90, spn::SIN90,
-			-spn::SIN90, spn::COS90},
-			{spn::COS90, -spn::SIN90,
-			spn::SIN90, spn::COS90}
-		};
 
 		/*! 算出不能なケースは考えない */
 		Float2 TriangleRatio2(const Vec2& v0, const Vec2& v1, const Vec2& v2, const Vec2& vt) {

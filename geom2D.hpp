@@ -3,6 +3,7 @@
 #include "spinner/type.hpp"
 #include "spinner/misc.hpp"
 #include "spinner/assoc.hpp"
+#include "spinner/pose.hpp"
 #include <cassert>
 #include <vector>
 #include <memory>
@@ -12,11 +13,14 @@ namespace boom {
 	using spn::Vec2;
 	using spn::Vec3;
 	using spn::AMat32;
+	using spn::AMat33;
 	using spn::_sseRcp22Bit;
 	using spn::CType;
 	using Float2 = std::pair<float,float>;
 	using Vec2x2 = std::pair<Vec2,Vec2>;
 
+	//! 90度回転行列(2D)
+	extern const spn::AMat22 cs_mRot90[2];
 	//! v0とv1で表される面積の2倍
 	float Area_x2(const Vec2& v0, const Vec2& v1);
 	float Area_x2(const Vec3& v0, const Vec3& v1);
@@ -275,9 +279,12 @@ namespace boom {
 			PointL	point;
 
 			ConvexCore() = default;
+			/*! \param[in] v 凸包と分かっている頂点 */
 			ConvexCore(std::initializer_list<Vec2> v);
 			ConvexCore(const PointL& pl);
 			ConvexCore(PointL&& pl);
+
+			static ConvexCore FromConcave(const PointL& src);
 
 			float area() const;
 			float inertia() const;
@@ -334,91 +341,134 @@ namespace boom {
 		};
 
 		//! 剛体制御用
-		struct RPose {
-			Vec2	pos, vel, acc;
-			float	rot, rotVel, rotAcc;
+		class RPose : public spn::Pose2D {
+			Vec2			_vel,
+							_acc;
+			GAP_MATRIX_DEF(mutable, _finalInv, 3,3,
+			   ((float _rotVel))
+			   ((float _rotAcc))
+			   ((mutable uint32_t _invAccum))	//!< 逆行列キャッシュを作った時のカウンタ値
+			)
+			//! Pose2Dのaccumカウンタとは別で速度に関する変数が書き換えられた際にインクリメント
+			uint32_t		_velAccum;
+			protected:
+				void _setAsChanged();
+			public:
+				struct Value : spn::Pose2D::Value {
+					Vec2	&vel, &acc;
+					float	&rotVel, &rotAcc;
 
-			const Vec2& getLinearVeloc() const;
-			float getOmega() const;
-			Vec2 getVelocAt(const Vec2& at) const;
-			std::pair<Vec2,float> getVelocities(const Vec2& at) const;
-			Vec2 toLocal(const Vec2& wpos) const;
-			Vec2 toLocalDir(const Vec2& dir) const;
-			Vec2 toWorld(const Vec2& lpos) const;
-			Vec2 toWorldDir(const Vec2& ldir) const;
+					Value(RPose& rp);
+					~Value();
+				};
+
+				RPose();
+				RPose(const RPose& rp);
+				void identity();
+
+				// ---- setter / getter ----
+				void setVelocity(const Vec2& v);
+				const Vec2& getVelocity() const;
+				void setRotVel(float m);
+				float getRotVel() const;
+				void setAccel(const Vec2& v);
+				const Vec2& getAccel() const;
+				void setRotAccel(float a);
+				float getRotAccel() const;
+
+				//! ある地点の移動方向と速度を調べる
+				/*! \param[in] at 速度を調べるワールド座標 */
+				Vec2 getVelocAt(const Vec2& at) const;
+				//! ある地点の線形速度と回転ベクトルを別々に取得
+				/*! \param[in] at 速度を調べるワールド座標 */
+				Vec2x2 getVelocities(const Vec2& at) const;
+				Vec2 toLocal(const Vec2& wpos) const;
+				Vec2 toLocalDir(const Vec2& wdir) const;
+				Vec2 toWorld(const Vec2& lpos) const;
+				Vec2 toWorldDir(const Vec2& ldir) const;
+				uint32_t getVelocityAccum() const;
+
+				const AMat33& getFinalInv() const;
+				RPose lerp(const RPose& p1, float t) const;
+				Value refValue();
 		};
-		//! 剛体テンプレート
-		/*! TはgetCore()を実装している前提 */
-		template <class T>
-		class RigidModel : public T, public RPose, public IModel {
-			RPose			_pose;
-			mutable	AMat32	_poseInv;
-			mutable uint16_t const	*_accum, *_prevAccum;
+
+		//! 剛体ラッパ (形状 + 姿勢)
+		class Rigid : public IModel {
+			public:
+				using sptr = std::shared_ptr<Rigid>;
+				using csptr = const sptr&;
+			private:
+				IModel::sptr	_spModel;	//!< 形状
+				RPose			_pose;		//!< 姿勢
 
 			public:
-				using T::T;
+				Rigid(IModel::csptr sp);
+				Rigid(IModel::csptr sp, const RPose& pose);
 
 				// --- シミュレーションに関する関数など ---
-				Vec2 support(const Vec2& dir) const override {
-					// dirを座標変換
-					Vec2 tdir = (dir);
-					return T::getCore().support(tdir);
-				}
+				Vec2 support(const Vec2& dir) const override;
+				Vec2 center() const override;
+				uint32_t getCID() const override;
 
 				RPose& refPose();
 				const RPose& getPose() const;
 		};
-		class RigidMgr;
 		//! 位置と速度を与えた時にかかる加速度(抵抗力)を計算
-		class IResist : public std::enable_shared_from_this<IResist>{
+		class IResist : public std::enable_shared_from_this<IResist> {
 			public:
 				using sptr = std::shared_ptr<IResist>;
 				using csptr = const sptr&;
+				struct Accel {
+					Vec2	linear;
+					float	rot;
+				};
+
 			protected:
-				sptr	spNext;
+				sptr	_spNext;		//!< 次の抵抗力計算インタフェース (null可)
+				void _callNext(Accel& acc, const RPose::Value& pose) const;
 
 			public:
 				virtual ~IResist() {}
-				Vec2 resist(const RPose& pose, const RigidMgr& r) {
-					Vec2 ret;
-					resist(ret, pose, r);
-					return ret;
-				}
-				virtual void resist(Vec2& accum, const RPose& pose, const RigidMgr& r) = 0;
+				void addNext(csptr sp);
+				//! 抵抗力計算の起点
+				Accel resist(const RPose::Value& pose) const;
+				//! 抵抗力を計算
+				/*! \param[in] r 衝突判定クエリの為の剛体マネージャ
+					\param[in] pose 現在の姿勢
+					\param[inout] accum 抵抗ベクトルの出力先(加算) */
+				virtual void resist(Accel& acc, const RPose::Value& pose) const;
 		};
 		//! 積分インタフェース
 		struct IItg {
 			using sptr = std::shared_ptr<IItg>;
 			using csptr = const sptr&;
-			/*! Resistインタフェースは線形リストでつなげる */
-			virtual void advance(const RPose& ps, const IResist* pres, float dt) = 0;
+
+			//! 剛体の姿勢を積分計算
+			/*! Resistインタフェースは線形リストでつなげる
+				\param[inout] st 現在の姿勢
+				\param[in] pres 抵抗力計算インタフェース
+				\param[in] r 衝突判定クエリの為の剛体マネージャ for IResist
+				\param[in] dt 前回フレームからの時間(sec) */
+			virtual void advance(RPose::Value& st, const IResist* pres, float dt) = 0;
 		};
 		//! オイラー積分
 		struct Itg_Eular : IItg {
-			void advance(const RPose& ps, const IResist* pres, float dt) override;
+			void advance(RPose::Value& st, const IResist* pres, float dt) override;
 		};
 
 		//! 剛体マネージャ
 		class RigidMgr {
-			//! 剛体ラッパ
-			struct Rigid {
-				using sptr = std::shared_ptr<Rigid>;
-				using csptr = const sptr&;
-
-				RPose&			rpose;	//!< 姿勢
-				IModel::sptr	model;	//!< 形状
-
-				Rigid(IModel::csptr mdl);
-			};
 			using RList = std::vector<Rigid::sptr>;
-			RList		_rlist;
-			IItg::sptr	_itg;	//!< 適用する積分アルゴリズム
-			//!< 重力などの力
+			RList			_rlist;
+			IItg::sptr		_itg;	//!< 適用する積分アルゴリズム
+			IResist::sptr	_res;	//!< 重力などの力
 
 			public:
 				RigidMgr(IItg::csptr itg);
 
 				void add(Rigid::csptr sp);
+				void add(IResist::csptr sp);
 				void simulate(float dt);
 		};
 		//! ヒットチェックだけ
@@ -462,7 +512,6 @@ namespace boom {
 				Vec2	_pvec;
 				Vec2x2	_nvec;
 			};
-			const static spn::AMat22 cs_mRot[2];
 			void _addAsv(const Vec2& v0, const Vec2& v1, const Vec2x2* (&vtx)[2]);
 
 			/*! \param[in] n 計算した頂点の挿入先インデックス */
