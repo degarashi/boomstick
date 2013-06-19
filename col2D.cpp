@@ -70,7 +70,7 @@ namespace boom {
 			}
 
 			_nVtx = 3;
-			LineCore::LNear res(tmp, LineCore::ONLINE);
+			LNear res(tmp, LINEPOS::ONLINE);
 			int idx = 2;
 			for(;;) {
 				auto& rV = _vtx[idx];
@@ -90,13 +90,13 @@ namespace boom {
 					return true;
 				}
 				res = LineCore(_vtx[ts[0]], _vtx[ts[1]]).nearest(rV);
-				if(res.second == LineCore::ONLINE) {
+				if(res.second == LINEPOS::ONLINE) {
 					// この辺について調べる
 					idx = ts[2];
 					continue;
 				}
 				res = LineCore(_vtx[ts[1]], _vtx[ts[2]]).nearest(rV);
-				if(res.second == LineCore::ONLINE) {
+				if(res.second == LINEPOS::ONLINE) {
 					// この辺について調べる
 					idx = ts[0];
 					continue;
@@ -161,7 +161,7 @@ namespace boom {
 		void GEpa::_addAsv(const Vec2& v0, const Vec2& v1, const Vec2x2* (&vtx)[2]) {
 			auto res = LineCore(v0,v1).nearest(c_origin);
 			float len = res.first.length();
-			if(res.second == LineCore::ONLINE) {
+			if(res.second == LINEPOS::ONLINE) {
 				res.first *= _sseRcp22Bit(len);
 				_asv.insert(LmLen{len, res.first, {vtx[0], vtx[1]}});
 			}
@@ -282,8 +282,8 @@ namespace boom {
 			LmLen lmlen;
 			lmlen.dist = len;
 			lmlen.dir *= _sseRcp22Bit(len);
-			if(res.second != LineCore::ONLINE) {
-				lmlen.vtx[0] = lmlen.vtx[1] = _vl[(res.second == LineCore::BEGIN) ? 0 : 1];
+			if(res.second != LINEPOS::ONLINE) {
+				lmlen.vtx[0] = lmlen.vtx[1] = _vl[(res.second == LINEPOS::BEGIN) ? 0 : 1];
 			} else {
 				lmlen.vtx[0] = _vl[0];
 				lmlen.vtx[1] = _vl[1];
@@ -323,7 +323,7 @@ namespace boom {
 					if(nV == 1) {
 						const Vec2& v = _minkowskiSub(-_vtx[0].normalization()).first;
 						auto res = LineCore(_vtx[0], v).nearest(Vec2(0));
-						if(res.second == LineCore::ONLINE) {
+						if(res.second == LINEPOS::ONLINE) {
 							float len = res.first.length();
 							_asv.insert(LmLen{len, res.first*_sseRcp22Bit(len), {_vl[0],_vl[1]}});
 						}

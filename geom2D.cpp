@@ -31,6 +31,28 @@ namespace boom {
 			return Vec2x2(st0.pos + st0.dir * clip0(m1.x),
 							st1.pos + st1.dir * clip1(m1.y));
 		}
+		// ---------------------- Point ----------------------
+		float PointCore::distance(const LineCore& l) const {
+			Vec2 dir(l.point[1] - l.point[0]);
+			dir.normalize();
+			return std::fabs(((*this) - l.point[0]).ccw(dir));
+		}
+		LNear PointCore::nearest(const LineCore& l) const {
+			return l.nearest(*this);
+		}
+		bool PointCore::hit(const PointCore& p) const {
+			return distance(p) <= NEAR_THRESHOLD;
+		}
+
+		Vec2 Point::support(const Vec2& dir) const {
+			return *this;
+		}
+		Vec2 Point::center() const {
+			return *this;
+		}
+		bool Point::isInner(const Vec2& pos) const {
+			return false;
+		}
 
 		// ---------------------- Circle ----------------------
 		CircleCore::CircleCore(const Vec2& c, float r): center(c), radius(r) {}
@@ -40,15 +62,20 @@ namespace boom {
 		Vec2 CircleCore::support(const Vec2& dir) const {
 			return dir * radius + center;
 		}
-
-		Vec2 Circle::support(const Vec2& dir) const {
-			return CircleCore::support(dir);
+		bool CircleCore::hit(const Vec2& pt) const {
+			return center.dist_sq(pt) <= spn::Square(radius);
 		}
+
+		Vec2 Circle::support(const Vec2& dir) const { return CircleCore::support(dir); }
+		Vec2 Circle::center() const { return CircleCore::center; }
+		bool Circle::isInner(const Vec2& pos) const { return CircleCore::hit(pos); }
+
 		CircleModel::CircleModel(): _rflag(0xff) {}
 		CircleModel::CircleModel(const CircleCore& c): _circle(c), _rflag(0xff) {}
-		Vec2 Circle::center() const { return CircleCore::center; }
+
 		Vec2 CircleModel::support(const Vec2& dir) const { return _circle.support(dir); }
 		Vec2 CircleModel::center() const { return _circle.center; }
+		bool CircleModel::isInner(const Vec2& pos) const { return _circle.hit(pos); }
 
 		// ---------------------- StLine ----------------------
 		StLineCore::StLineCore(const Vec2& p, const Vec2& d): pos(p), dir(d) {}
@@ -90,18 +117,18 @@ namespace boom {
 		bool LineCore::hit(const LineCore& l) const {
 			return distance(l) < 1e-5f;
 		}
-		LineCore::LNear LineCore::nearest(const Vec2& p) const {
+		LNear LineCore::nearest(const Vec2& p) const {
 			Vec2 toP(p-point[0]),
 				toV1(point[1]-point[0]);
 			float lenV1 = toV1.length();
 			toV1 *= _sseRcp22Bit(lenV1);
 			float d = toV1.dot(toP);
 			if(d <= 0)
-				return LNear(point[0], BEGIN);
+				return LNear(point[0], LINEPOS::BEGIN);
 			else if(d >= lenV1)
-				return LNear(point[1], END);
+				return LNear(point[1], LINEPOS::END);
 			else
-				return LNear(point[0]+toV1*d, ONLINE);
+				return LNear(point[0]+toV1*d, LINEPOS::ONLINE);
 		}
 		float LineCore::ratio(const Vec2& p) const {
 			Vec2 toP(p-point[0]),
@@ -123,6 +150,21 @@ namespace boom {
 				toP(p-point[0]);
 			toV1.normalize();
 			return spn::IsNear(toV1.dot(toP), toP.length(), 1e-5f);
+		}
+		std::pair<bool,Vec2> LineCore::crossPoint(const LineCore& l) const {
+			auto fn = [](float f){ return spn::Saturate(f, 0.f,1.f); };
+			Vec2 cp = NearestPoint(l.toStLine(), point[0], fn);
+			return std::make_pair(online(cp), cp);
+		}
+
+		Vec2 Line::support(const Vec2& dir) const {
+			return LineCore::support(dir);
+		}
+		Vec2 Line::center() const {
+			return (point[0] + point[1]) * 0.5f;
+		}
+		bool Line::isInner(const Vec2& pos) const {
+			return false;
 		}
 
 		// ---------------------- Poly ----------------------
@@ -250,6 +292,42 @@ namespace boom {
 		Vec2 ConvexCore::center() const {
 			return std::get<2>(area_inertia_center());
 		}
+		ConvexCore::CPos ConvexCore::checkPosition(const Vec2& pos) const {
+			// 適当に内部点を算出
+			Vec2 inner = (point[0] + point[1] + point[2]) * (1.f/3);
+			Vec2 toP(pos - inner);
+			if(toP.len_sq() < 1e-6f) {
+				// 重心がちょうどposと重なってしまったら少しずらす
+				inner.lerp(point[0], 0.5f);
+			}
+
+			// 内部のどの三角形に該当するか2分探索
+			int nV = point.size(),
+				a = 0,
+				b = nV;
+			while(a+1 < b) {
+				int c = (b-a) / 2;
+				float dA = (point[a]-inner).cw(toP),
+					dB = (point[(b%nV)]-inner).cw(toP),
+					dC = (point[c]-inner).cw(toP);
+				if(dA >= 0 && dB < 0)
+					b = c;
+				else if(dB>=0 && dC < 0)
+					a = c;
+			}
+			float d = (point[b] - point[a]).cw(pos - point[a]);
+			POSITION posf;
+			if(d > 0)
+				posf = POSITION::INNER;
+			else if(d < 0)
+				posf = POSITION::OUTER;
+			else
+				posf = POSITION::ONLINE;
+			return CPos(posf, a);
+		}
+		bool ConvexCore::isInner(const Vec2& pos) const {
+			return checkPosition(pos).first != POSITION::OUTER;
+		}
 		std::tuple<float,float,Vec2> ConvexCore::area_inertia_center() const {
 			int nL = point.size();
 			AreaList al(nL);
@@ -266,16 +344,13 @@ namespace boom {
 			inertia -= center.len_sq();
 			return std::make_tuple(al.sum, inertia, center);
 		}
-		Vec2 Convex::support(const Vec2& dir) const {
-			return ConvexCore::support(dir);
-		}
-		Vec2 Convex::center() const {
-			return ConvexCore::center();
-		}
+		Vec2 Convex::support(const Vec2& dir) const { return ConvexCore::support(dir); }
+		Vec2 Convex::center() const { return ConvexCore::center(); }
+		bool Convex::isInner(const Vec2& pos) const { return ConvexCore::isInner(pos); }
 
 		ConvexModel::ConvexModel(): _rflag(RFL_ALL) {}
-		ConvexModel::ConvexModel(const ConvexCore::PointL& pl): _convex(pl), _rflag(RFL_ALL) {}
-		ConvexModel::ConvexModel(ConvexCore::PointL&& pl): _convex(pl), _rflag(RFL_ALL) {}
+		ConvexModel::ConvexModel(const PointL& pl): _convex(pl), _rflag(RFL_ALL) {}
+		ConvexModel::ConvexModel(PointL&& pl): _convex(pl), _rflag(RFL_ALL) {}
 
 		void ConvexModel::_refreshCInertia() const {
 			if(Bit::ChClear(_rflag, RFL_CENTER_INERTIA)) {
@@ -297,19 +372,39 @@ namespace boom {
 			_refreshCInertia();
 			return _center;
 		}
-		const ConvexCore::PointL& ConvexModel::getPoint() const { return _convex.point; }
-		ConvexCore::PointL& ConvexModel::refPoint() {
+		const PointL& ConvexModel::getPoint() const { return _convex.point; }
+		PointL& ConvexModel::refPoint() {
 			_rflag = RFL_ALL;
 			return _convex.point;
 		}
-		void ConvexModel::addOffset(const Vec2& ofs) {
-			_convex.addOffset(ofs);
+		void ConvexModel::addOffset(const Vec2& ofs) { _convex.addOffset(ofs); }
+		Vec2 ConvexModel::support(const Vec2& dir) const { return _convex.support(dir); }
+		Vec2 ConvexModel::center() const { return Vec2(getCenter()); }
+		bool ConvexModel::isInner(const Vec2& pos) const { return _convex.isInner(pos); }
+
+		Vec3 Dual(const Plane& plane) {
+			float d = plane.d;
+			assert(plane.d <= 0);
+			if(std::fabs(d) < 1e-3f)
+				d = (d<0) ? -1e-3f : 1e-3f;
+
+			return plane.getNormal() / -d;
 		}
-		Vec2 ConvexModel::support(const Vec2& dir) const {
-			return _convex.support(dir);
+		Plane Dual(const Vec3& p) {
+			float invlen = _sseRcp22Bit(p.length());
+			return Plane(p*invlen, -invlen);
 		}
-		Vec2 ConvexModel::center() const {
-			return Vec2(getCenter());
+		StLineCore Dual(const Vec2& v) {
+			Vec2 t0(0,-v.y),
+				t1(1, v.x-v.y);
+			t1 = (t1-t0).normalization();
+			return StLineCore(t0, t1);
+		}
+		Vec2 Dual(const StLineCore& l) {
+			const Vec2& t0 = l.pos;
+			Vec2 t1 = l.dir + t0;
+			return Vec2((t0.y-t1.y) / (t0.x-t1.x),
+						-t0.ccw(t1) / (t1.x-t0.x));
 		}
 	}
 }

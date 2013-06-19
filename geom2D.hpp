@@ -4,6 +4,7 @@
 #include "spinner/misc.hpp"
 #include "spinner/assoc.hpp"
 #include "spinner/pose.hpp"
+#include "spinner/plane.hpp"
 #include <cassert>
 #include <vector>
 #include <memory>
@@ -12,6 +13,7 @@ namespace boom {
 	using spn::AVec2;
 	using spn::Vec2;
 	using spn::Vec3;
+	using spn::Plane;
 	using spn::AMat32;
 	using spn::AMat33;
 	using spn::_sseRcp22Bit;
@@ -62,6 +64,16 @@ namespace boom {
 	}
 
 	namespace geo2d {
+		struct PointCore;
+		struct LineCore;
+		struct PolyCore;
+		struct CircleCore;
+		struct ConvexCore;
+		using CTGeo = CType<PointCore, LineCore, PolyCore, CircleCore, ConvexCore>;
+
+		using PointL = std::vector<Vec2>;
+		using LineL = std::vector<LineCore>;
+
 		struct IModel {
 			using sptr = std::shared_ptr<IModel>;
 			using csptr = const sptr&;
@@ -73,29 +85,37 @@ namespace boom {
 			virtual Vec2 center() const = 0;
 			//! 形状毎に一意なコリジョン管理IDを取得
 			virtual uint32_t getCID() const = 0;
+			//! ある座標が図形の内部に入っているか
+			virtual bool isInner(const Vec2& pos) const = 0;
 		};
-
-		struct PointCore;
-		struct LineCore;
-		struct PolyCore;
-		struct CircleCore;
-		struct ConvexCore;
-		using CTGeo = CType<PointCore, LineCore, PolyCore, CircleCore, ConvexCore>;
 		template <class T>
 		struct IModelP : IModel {
 			virtual uint32_t getCID() const override { return CTGeo::Find<T>::result; }
 		};
+		#define DEF_IMODEL_FUNCS \
+			Vec2 support(const Vec2& dir) const override; \
+			Vec2 center() const override; \
+			bool isInner(const Vec2& pos) const override; 
+
+		enum class LINEPOS {
+			BEGIN,
+			END,
+			ONLINE
+		};
+		using LNear = std::pair<Vec2,LINEPOS>;
 
 		struct PointCore : Vec2 {
+			constexpr static float NEAR_THRESHOLD = 1e-5f;
+
 			using Vec2::Vec2;
+			using Vec2::distance;
 			float distance(const LineCore& l) const;
-			std::pair<Vec2,int> nearest(const LineCore& l) const;
+			LNear nearest(const LineCore& l) const;
 			bool hit(const PointCore& p) const;
 		};
 		struct Point : PointCore, IModelP<PointCore> {
 			using PointCore::PointCore;
-			Vec2 support(const Vec2& dir) const override;
-			Vec2 center() const override;
+			DEF_IMODEL_FUNCS
 		};
 
 		//! 直線
@@ -123,12 +143,6 @@ namespace boom {
 
 		//! 線分
 		struct LineCore {
-			enum LINEPOS {
-				BEGIN,
-				END,
-				ONLINE
-			};
-
 			Vec2	point[2];
 
 			LineCore() = default;
@@ -139,9 +153,12 @@ namespace boom {
 			float len_sq() const;
 			bool hit(const LineCore& l) const;
 
-			using LNear = std::pair<Vec2,LINEPOS>;
 			/*! \return Vec2(最寄り座標),LINEPOS(最寄り線分位置) */
 			LNear nearest(const Vec2& p) const;
+			//! 線分が交差する位置を調べる
+			/*! \return first: 交差していればtrue
+						second: 交差座標 */
+			std::pair<bool,Vec2> crossPoint(const LineCore& l) const;
 			float ratio(const Vec2& p) const;
 			Vec2 support(const Vec2& dir) const;
 			StLineCore toStLine() const;
@@ -149,8 +166,7 @@ namespace boom {
 		};
 		struct Line : LineCore, IModelP<LineCore> {
 			using LineCore::LineCore;
-			Vec2 support(const Vec2& dir) const override;
-			Vec2 center() const override;
+			DEF_IMODEL_FUNCS
 		};
 
 		//! 円の共通クラス
@@ -168,13 +184,15 @@ namespace boom {
 			float inertia() const;			//!< 重心を軸とした慣性モーメント
 
 			Vec2 support(const Vec2& dir) const;
+			bool hit(const Vec2& pt) const;
+			// radius
+			void getArcPoints(PointL& dst, float ang0, float ang1, float deep) const;
 		};
 		//! 円の基本クラス
 		/*! 共通クラスを当たり判定対応にラップした物 */
 		struct Circle : CircleCore, IModelP<CircleCore> {
 			using CircleCore::CircleCore;
-			Vec2 support(const Vec2& dir) const override;
-			Vec2 center() const override;
+			DEF_IMODEL_FUNCS
 		};
 		//! 円の剛体用クラス
 		/*! キャッシュを管理する関係で形状へのアクセスは関数を通す仕様 元クラスはcompososition */
@@ -196,8 +214,7 @@ namespace boom {
 				void setCenter(const Vec2& v);
 				void setRadius(float r);
 
-				Vec2 support(const Vec2& dir) const override;
-				Vec2 center() const override;
+				DEF_IMODEL_FUNCS
 		};
 
 		struct PolyCore {
@@ -248,8 +265,7 @@ namespace boom {
 				void setPoint(int n, const Vec2& v);
 				void addOffset(const Vec2& ofs);
 
-				Vec2 support(const Vec2& dir) const override;
-				Vec2 center() const override;
+				DEF_IMODEL_FUNCS
 		};
 
 		//! 多角形基本クラス
@@ -274,8 +290,6 @@ namespace boom {
 					sum += a;
 				}
 			};
-
-			using PointL = std::vector<Vec2>;
 			PointL	point;
 
 			ConvexCore() = default;
@@ -292,6 +306,7 @@ namespace boom {
 			/*! 同時に求めると少し効率が良い */
 			std::tuple<float,float,Vec2> area_inertia_center() const;
 			Vec2 support(const Vec2& dir) const;
+			bool isInner(const Vec2& pos) const;
 
 			template <class CB>
 			void iterate(CB cb) const {
@@ -305,11 +320,18 @@ namespace boom {
 					cb(i, point[i], point[i+1]);
 			}
 			void addOffset(const Vec2& ofs);
+
+			enum class POSITION {
+				INNER,
+				ONLINE,
+				OUTER
+			};
+			using CPos = std::pair<POSITION, int>;
+			CPos checkPosition(const Vec2& pos) const;
 		};
 		struct Convex : ConvexCore, IModelP<ConvexCore> {
 			using ConvexCore::ConvexCore;
-			Vec2 support(const Vec2& dir) const override;
-			Vec2 center() const override;
+			DEF_IMODEL_FUNCS
 		};
 		class ConvexModel : public IModelP<ConvexCore> {
 			private:
@@ -326,18 +348,17 @@ namespace boom {
 
 			public:
 				ConvexModel();
-				ConvexModel(const ConvexCore::PointL& pl);
-				ConvexModel(ConvexCore::PointL&& pl);
+				ConvexModel(const PointL& pl);
+				ConvexModel(PointL&& pl);
 
 				float getArea() const;
 				float getInertia() const;
 				const AVec2& getCenter() const;
-				const ConvexCore::PointL& getPoint() const;
-				ConvexCore::PointL& refPoint();
+				const PointL& getPoint() const;
+				PointL& refPoint();
 
 				void addOffset(const Vec2& ofs);
-				Vec2 support(const Vec2& dir) const override;
-				Vec2 center() const override;
+				DEF_IMODEL_FUNCS
 		};
 
 		//! 剛体制御用
@@ -354,6 +375,10 @@ namespace boom {
 			protected:
 				void _setAsChanged();
 			public:
+				struct TValue : spn::Pose2D::TValue {
+					Vec2	vel, acc;
+					float	rotVel, rotAcc;
+				};
 				struct Value : spn::Pose2D::Value {
 					Vec2	&vel, &acc;
 					float	&rotVel, &rotAcc;
@@ -410,6 +435,7 @@ namespace boom {
 				Vec2 support(const Vec2& dir) const override;
 				Vec2 center() const override;
 				uint32_t getCID() const override;
+				bool isInner(const Vec2& pos) const override;
 
 				RPose& refPose();
 				const RPose& getPose() const;
@@ -552,5 +578,14 @@ namespace boom {
 		bool HitCheck(const IModel& mdl0, const IModel& mdl1);
 		//! 固有のアルゴリズムでmdlFromのmdlToに対する最深点を算出
 		Vec2 HitPos(const IModel& mdlFrom, const IModel& mdlTo);
-	};
+
+		//! DualTransform (point2D -> line2D)
+		StLineCore Dual(const Vec2& v);
+		//! DualTransform (line2D -> point2D)
+		Vec2 Dual(const StLineCore& l);
+		//! DualTransform (point3D -> plane)
+		Plane Dual(const Vec3& v);
+		//! DualTransform (plane -> point3D)
+		Vec3 Dual(const Plane& plane);
+	}
 }

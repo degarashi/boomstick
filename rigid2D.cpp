@@ -108,6 +108,9 @@ namespace boom {
 		uint32_t Rigid::getCID() const {
 			return _spModel->getCID();
 		}
+		bool Rigid::isInner(const Vec2& pos) const {
+			return false;
+		}
 		RPose& Rigid::refPose() {
 			return _pose;
 		}
