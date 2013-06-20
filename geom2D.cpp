@@ -50,9 +50,6 @@ namespace boom {
 		Vec2 Point::center() const {
 			return *this;
 		}
-		bool Point::isInner(const Vec2& pos) const {
-			return false;
-		}
 
 		// ---------------------- Circle ----------------------
 		CircleCore::CircleCore(const Vec2& c, float r): center(c), radius(r) {}
@@ -88,6 +85,13 @@ namespace boom {
 		}
 		float StLineCore::distance(const Vec2& p) const {
 			return (p - pos).dot(dir);
+		}
+		Vec2 StLineCore::placeOnLine(const Vec2& p) const {
+			return pos + dir*dot(p);
+		}
+		float StLineCore::dot(const Vec2& p) const {
+			Vec2 tv(p-pos);
+			return dir.dot(tv);
 		}
 
 		// ---------------------- Ray ----------------------
@@ -151,10 +155,21 @@ namespace boom {
 			toV1.normalize();
 			return spn::IsNear(toV1.dot(toP), toP.length(), 1e-5f);
 		}
-		std::pair<bool,Vec2> LineCore::crossPoint(const LineCore& l) const {
+		LNear LineCore::crossPoint(const LineCore& l) const {
 			auto fn = [](float f){ return spn::Saturate(f, 0.f,1.f); };
 			Vec2 cp = NearestPoint(l.toStLine(), point[0], fn);
-			return std::make_pair(online(cp), cp);
+			return LNear(cp, online(cp) ? LINEPOS::ONLINE : LINEPOS::NOTHIT);
+		}
+		LNear LineCore::crossPoint(const StLineCore& l) const {
+			float c0 = l.dir.ccw(point[0]-l.pos),
+				c1 = l.dir.ccw(point[1]-l.pos);
+			if(c0*c1 <= 0) {
+				Vec2 dir(point[1]-point[0]);
+				dir.normalize();
+				float d = c0 / (c0+c1);
+				return LNear(point[0] + dir*d, LINEPOS::ONLINE);
+			}
+			return LNear(Vec2(), LINEPOS::NOTHIT);
 		}
 
 		Vec2 Line::support(const Vec2& dir) const {
@@ -162,9 +177,6 @@ namespace boom {
 		}
 		Vec2 Line::center() const {
 			return (point[0] + point[1]) * 0.5f;
-		}
-		bool Line::isInner(const Vec2& pos) const {
-			return false;
 		}
 
 		// ---------------------- Poly ----------------------
@@ -188,9 +200,17 @@ namespace boom {
 			for(int i=0 ; i<3 ; i++)
 				point[i] += ofs;
 		}
+		bool PolyCore::isInTriangle(const Vec2& p) const {
+			Vec2 vt(p-point[0]),
+				v1(point[1]-point[0]),
+				v2(point[2]-point[0]);
+			return v1.cw(vt) >= 0 &&
+					vt.cw(v2) >= 0;
+		}
 
 		Vec2 Poly::support(const Vec2& dir) const { return PolyCore::support(dir); }
 		Vec2 Poly::center() const { return PolyCore::center(); }
+		bool Poly::isInner(const Vec2& pos) const { return isInTriangle(pos); }
 
 		PolyModel::PolyModel(): _rflag(RFL_ALL) {}
 		PolyModel::PolyModel(const Vec2& p0, const Vec2& p1, const Vec2& p2): _poly{p0,p1,p2}, _rflag(RFL_ALL) {}
@@ -228,6 +248,7 @@ namespace boom {
 		Vec2 PolyModel::center() const {
 			return Vec2(getCenter());
 		}
+		bool PolyModel::isInner(const Vec2& pos) const { return _poly.isInTriangle(pos); }
 
 		// ---------------------- Convex ----------------------
 		ConvexCore::ConvexCore(const PointL& pl): point(pl) {}
@@ -344,6 +365,72 @@ namespace boom {
 			inertia -= center.len_sq();
 			return std::make_tuple(al.sum, inertia, center);
 		}
+		std::pair<ConvexCore,ConvexCore> ConvexCore::splitTwo(const StLineCore& l) const {
+			int nV = point.size();
+			PointL pt0(nV+1), pt1(nV+1);		// 最初に最大容量確保しておき、後で縮める
+			auto *pDst0 = &pt0[0],
+				*pDst1 = &pt1[0];
+
+			constexpr float DOT_THRESHOLD = 1e-5f;
+			// ライン上は前回値, プラスは1, マイナスは0を返す
+			auto fcheck = [](int prev, float d) -> int{
+				if(d < -DOT_THRESHOLD)
+					return 0;
+				if(d < DOT_THRESHOLD)
+					return prev;
+				return 1;
+			};
+			auto fadd = [&pDst0, &pDst1, &l](const Vec2& pPrev, const Vec2& pCur, int flg) {
+				switch(flg) {
+					case 0x03:		// Left -> Left
+						*pDst0++ = pCur;
+						break;
+					case 0x02: {	// Left -> Right
+						auto res = LineCore(pPrev, pCur).crossPoint(l);
+						assert(res.second == LINEPOS::ONLINE);
+						*pDst0++ = res.first;
+						*pDst1++ = pCur;
+						break; }
+					case 0x01: {	// Right -> Left
+						auto res = LineCore(pPrev, pCur).crossPoint(l);
+						assert(res.second == LINEPOS::ONLINE);
+						*pDst1++ = res.first;
+						*pDst0++ = pCur;
+						break; }
+					case 0x00:		// Right -> Right
+						*pDst1++ = pCur;
+						break;
+				}
+			};
+
+			int fchk = fcheck(0, l.dir.ccw(point[0]));
+			int prev = fchk;
+			int flag = 0;
+			for(int i=1 ; i<nV ; i++) {
+				// 正数が左側、負数は右側
+				const auto& p = point[i];
+				prev = fcheck(prev, l.dir.ccw(p));
+				flag = ((flag<<1) | prev) & 0x03;
+
+				fadd(point[i-1], p, flag);
+			}
+			flag = ((flag<<1) | fchk) & 0x03;
+			fadd(point[nV-1], point[0], flag);
+
+			pt0.resize(pDst0 - &pt0[0]);
+			pt1.resize(pDst1 - &pt1[0]);
+			return std::make_pair(ConvexCore(std::move(pt0)),
+								  ConvexCore(std::move(pt1)));
+		}
+		ConvexCore ConvexCore::split(const StLineCore& l) {
+			auto res = splitTwo(l);
+			std::swap(res.first, *this);
+			return std::move(res.second);
+		}
+		void ConvexCore::splitThis(const StLineCore& l) {
+			split(l);
+		}
+
 		Vec2 Convex::support(const Vec2& dir) const { return ConvexCore::support(dir); }
 		Vec2 Convex::center() const { return ConvexCore::center(); }
 		bool Convex::isInner(const Vec2& pos) const { return ConvexCore::isInner(pos); }
@@ -405,6 +492,139 @@ namespace boom {
 			Vec2 t1 = l.dir + t0;
 			return Vec2((t0.y-t1.y) / (t0.x-t1.x),
 						-t0.ccw(t1) / (t1.x-t0.x));
+		}
+		// ----- 領域の積分計算関数 -----
+		namespace {
+			//! 凸包を三角形に分割して抗力を計算
+			RForce CalcRF_Convex(const RPose& rp, const ConvexCore& cv, const StLineCore& div) {
+				class Tmp {
+					public:
+						struct TmpIn {
+							float height;
+							float velN;
+							float pos;		// 直線に射影した2D頂点は1次元の数値になる
+						};
+
+					private:
+						TmpIn	_tmp[2];
+						int		_swI = 0;
+						const RPose&		_rp;
+						const StLineCore&	_div;
+						Vec2		_nml;
+
+						void _advance(const Vec2& p) {
+							_doSwitch();
+							auto& cur = _current();
+							cur.height = _div.dir.ccw(p);
+							cur.velN = _nml.dot(_rp.getVelocAt(p));
+							cur.pos = _div.dot(p);
+						}
+						void _doSwitch() { _swI ^= 1; }
+						TmpIn& _current() { return _tmp[_swI]; }
+						TmpIn& _prev() { return _tmp[_swI^1]; }
+
+					public:
+						Tmp(const RPose& rp, const StLineCore& div): _rp(rp), _div(div) {
+							// 衝突ライン(2D)の法線
+							_nml = div.dir * cs_mRot90[0];
+							if(_nml.dot(rp.getOffset()) < 0)
+								_nml *= -1.f;
+						}
+						void calcForce(RForce& dst, const ConvexCore& c) {
+							const auto& pts = c.point;
+							int nV = pts.size();
+							if(nV < 3)
+								return;
+
+							float p_lin = 0,
+								p_tor = 0;
+							_advance(pts[0]);
+							for(int i=1 ; i<nV ; i++) {
+								_advance(pts[i]);
+								auto& cur = _current();
+								auto& pre = _prev();
+								// calc spring
+								p_lin += (pre.height + cur.height) * 0.5f;
+								p_tor += (1.f/3) * (pre.pos*pre.height + (pre.pos*cur.height + cur.pos*pre.height)*0.5f + cur.pos*cur.height);
+								// calc dumper
+								p_lin += (pre.velN + cur.velN) * 0.5f;
+								p_tor += (3.f/2)*pre.pos*pre.velN +
+										 (2.f/3)*pre.pos*cur.velN +
+										 cur.pos * cur.velN;
+								// TODO: calc dynamic-friction
+								// TODO: calc static-friction
+							}
+							dst.sdump.linear += _nml * p_lin;
+							dst.sdump.torque += p_tor;
+						}
+				};
+
+				Tmp tmp(rp, div);
+				RForce rf = {};
+				// 平面で2つに切ってそれぞれ計算
+				auto cvt = cv.splitTwo(div);
+				tmp.calcForce(rf, cvt.first);
+				tmp.calcForce(rf, cvt.second);
+				return rf;
+			}
+			//! 円同士
+			RForce CalcOV_Circle2(const Rigid& r0, const Rigid& r1, const Vec2& inner, const StLineCore& div) {
+				// 境界線分を計算して共通領域を2つに分けてそれぞれ積分
+				// 中身がCircleだと分かっているのでポインタの読み替え
+				throw std::runtime_error("not implemented yet");
+			}
+			RForce CalcOV_Convex2(const Rigid& r0, const Rigid& r1, const Vec2& inner, const StLineCore& div) {
+				// 領域算出
+				auto &m0 = r0.getModel(),
+					&m1 = r1.getModel();
+				PointL pt0(m0.getOverlappingPoints(m1, inner)),		// m0がm1にめり込んでいる頂点リストを出力
+						pt1(m1.getOverlappingPoints(m0, inner));	// m1がm0にめり込んでいる頂点リストを出力
+				int nV0 = pt0.size(),
+					nV1 = pt1.size();
+				if(nV0 == 0) {
+					assert(nV1 >= 3);
+					// m1のめり込んだ頂点全部がm0の1つの辺に収まっている
+					return CalcRF_Convex(r0.getPose(), ConvexCore::FromConcave(pt1), div);
+				} else if(nV1 == 0) {
+					assert(nV0 >= 3);
+					// m0のめり込んだ頂点全部がm1の1つの辺に収まっている
+					return CalcRF_Convex(r0.getPose(), ConvexCore::FromConcave(pt0), div);
+				} else {
+					assert(nV0>=3 && nV1>=3);
+					PointL pt(nV0 + nV1 - 2);
+					auto* pDst = &pt[0];
+					for(int i=0 ; i<nV0-1 ; i++)
+						*pDst++ = pt0[i];
+					// 繋ぎ目の処理: m0リストの始点をRayに変換した物とm1の終端で頂点を1つ
+					auto res = LineCore(pt0[nV0-2], pt0[nV0-1]).crossPoint(LineCore(pt1[0], pt1[1]));
+					assert(res.second == LINEPOS::ONLINE);
+					*pDst++ = res.first;
+					for(int i=0 ; i<nV1-1 ; i++)
+						*pDst++ = pt1[i];
+					// m1リストの始点をRayに変換した物とm0の終端で頂点を1つ
+					res = LineCore(pt1[nV1-2], pt1[nV1-1]).crossPoint(LineCore(pt0[0], pt0[1]));
+					assert(res.second == LINEPOS::ONLINE);
+					*pDst = res.first;
+					return CalcRF_Convex(r0.getPose(), ConvexCore::FromConcave(std::move(pt)), div);
+				}
+			}
+			//! 円とBox含む多角形
+			RForce CalcOV_CircleConvex(const Rigid& r0, const Rigid& r1, const Vec2& inner, const StLineCore& div) {
+				PointL _pts;
+				// pts[0]とpts[nV-1]の間は円弧を表す
+				// 円弧部分は弓部で分けて凸包部分は三角形で計算し、残りは独自式で積分
+				throw std::runtime_error("not implemented yet");
+			}
+		}
+
+		RForce CalcForce(const Rigid& r0, const Rigid& r1, const Vec2& inner, const StLineCore& div) {
+			// 実質Convex, Box, Circle専用
+			if(r0.getModel().getCID() == Circle::GetCID()) {
+				if(r1.getModel().getCID() == Circle::GetCID())
+					return CalcOV_Circle2(r0, r1, inner, div);
+				return CalcOV_CircleConvex(r0, r1, inner, div);
+			}
+			return CalcOV_Convex2(r0, r1, inner, div);
 		}
 	}
 }

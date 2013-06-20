@@ -73,6 +73,15 @@ namespace boom {
 
 		using PointL = std::vector<Vec2>;
 		using LineL = std::vector<LineCore>;
+		//! ペナルティ法における抗力と摩擦力
+		struct RForce {
+			struct F {
+				Vec2	linear;
+				float	torque;
+			};
+			F	sdump,	//!< スプリング & ダンパによる力
+				fricD;	//!< 動摩擦力
+		};
 
 		struct IModel {
 			using sptr = std::shared_ptr<IModel>;
@@ -86,21 +95,26 @@ namespace boom {
 			//! 形状毎に一意なコリジョン管理IDを取得
 			virtual uint32_t getCID() const = 0;
 			//! ある座標が図形の内部に入っているか
-			virtual bool isInner(const Vec2& pos) const = 0;
+			virtual bool isInner(const Vec2& pos) const { return false; }
+			//! 外郭を構成する頂点で、mdlにめり込んでいる物を抽出
+			/*! \return 時計回りでmdlにめり込んでいる頂点リスト。前後も含む */
+			virtual PointL getOverlappingPoints(const IModel& mdl, const Vec2& inner) const {
+				throw std::runtime_error("not supported function"); }
 		};
 		template <class T>
 		struct IModelP : IModel {
-			virtual uint32_t getCID() const override { return CTGeo::Find<T>::result; }
+			static uint32_t GetCID() { return CTGeo::Find<T>::result; }
+			virtual uint32_t getCID() const override { return GetCID(); }
 		};
 		#define DEF_IMODEL_FUNCS \
 			Vec2 support(const Vec2& dir) const override; \
-			Vec2 center() const override; \
-			bool isInner(const Vec2& pos) const override; 
+			Vec2 center() const override;
 
 		enum class LINEPOS {
 			BEGIN,
 			END,
-			ONLINE
+			ONLINE,
+			NOTHIT
 		};
 		using LNear = std::pair<Vec2,LINEPOS>;
 
@@ -128,6 +142,9 @@ namespace boom {
 			Vec2x2 nearest(const StLineCore& st) const;
 			Vec2 nearest(const Vec2& p) const;
 			float distance(const Vec2& p) const;
+			//! 点を線分上に置く
+			Vec2 placeOnLine(const Vec2& p) const;
+			float dot(const Vec2& p) const;
 		};
 		//! 半直線
 		struct RayCore {
@@ -156,9 +173,10 @@ namespace boom {
 			/*! \return Vec2(最寄り座標),LINEPOS(最寄り線分位置) */
 			LNear nearest(const Vec2& p) const;
 			//! 線分が交差する位置を調べる
-			/*! \return first: 交差していればtrue
-						second: 交差座標 */
-			std::pair<bool,Vec2> crossPoint(const LineCore& l) const;
+			/*! \return first: 交差座標
+						second: 交差しているライン位置 (ONLINE or NOHIT) */
+			LNear crossPoint(const LineCore& l) const;
+			LNear crossPoint(const StLineCore& l) const;
 			float ratio(const Vec2& p) const;
 			Vec2 support(const Vec2& dir) const;
 			StLineCore toStLine() const;
@@ -193,6 +211,7 @@ namespace boom {
 		struct Circle : CircleCore, IModelP<CircleCore> {
 			using CircleCore::CircleCore;
 			DEF_IMODEL_FUNCS
+			bool isInner(const Vec2& pos) const override;
 		};
 		//! 円の剛体用クラス
 		/*! キャッシュを管理する関係で形状へのアクセスは関数を通す仕様 元クラスはcompososition */
@@ -215,6 +234,7 @@ namespace boom {
 				void setRadius(float r);
 
 				DEF_IMODEL_FUNCS
+				bool isInner(const Vec2& pos) const override;
 		};
 
 		struct PolyCore {
@@ -236,8 +256,8 @@ namespace boom {
 		};
 		struct Poly : PolyCore, IModelP<PolyCore> {
 			using PolyCore::PolyCore;
-			Vec2 support(const Vec2& dir) const override;
-			Vec2 center() const override;
+			DEF_IMODEL_FUNCS
+			bool isInner(const Vec2& pos) const override;
 		};
 		class PolyModel : IModel {
 			PolyCore		_poly;
@@ -266,6 +286,7 @@ namespace boom {
 				void addOffset(const Vec2& ofs);
 
 				DEF_IMODEL_FUNCS
+				bool isInner(const Vec2& pos) const override;
 		};
 
 		//! 多角形基本クラス
@@ -307,6 +328,14 @@ namespace boom {
 			std::tuple<float,float,Vec2> area_inertia_center() const;
 			Vec2 support(const Vec2& dir) const;
 			bool isInner(const Vec2& pos) const;
+			//! 2つに分割
+			/*! \param[out] c0 線分の進行方向左側
+				\param[out] c1 線分の進行方向右側 */
+			std::pair<ConvexCore, ConvexCore> splitTwo(const StLineCore& l) const;
+			//! 2つに分割して左側を自身に適用
+			ConvexCore split(const StLineCore& l);
+			//! 2つに分割して右側は捨てる
+			void splitThis(const StLineCore& l);
 
 			template <class CB>
 			void iterate(CB cb) const {
@@ -328,10 +357,21 @@ namespace boom {
 			};
 			using CPos = std::pair<POSITION, int>;
 			CPos checkPosition(const Vec2& pos) const;
+
+			//! 指定ポイントの内部的な領域ID
+			int getAreaNum(const Vec2& pos) const;
+			//! 内部的な通し番号における外郭ライン
+			LineCore getOuterLine(int n) const;
+			//! 凸包が重なっている領域を求める
+			/*! 重なっている前提
+				\param[in] cnv 他方の物体
+				\param[in] inner 重複領域の内部点 */
+			ConvexCore getOverlapping(const ConvexCore& cnv, const Vec2& inner);
 		};
 		struct Convex : ConvexCore, IModelP<ConvexCore> {
 			using ConvexCore::ConvexCore;
 			DEF_IMODEL_FUNCS
+			bool isInner(const Vec2& pos) const override;
 		};
 		class ConvexModel : public IModelP<ConvexCore> {
 			private:
@@ -359,6 +399,7 @@ namespace boom {
 
 				void addOffset(const Vec2& ofs);
 				DEF_IMODEL_FUNCS
+				bool isInner(const Vec2& pos) const override;
 		};
 
 		//! 剛体制御用
@@ -439,6 +480,7 @@ namespace boom {
 
 				RPose& refPose();
 				const RPose& getPose() const;
+				const IModel& getModel() const;
 		};
 		//! 位置と速度を与えた時にかかる加速度(抵抗力)を計算
 		class IResist : public std::enable_shared_from_this<IResist> {
@@ -578,6 +620,9 @@ namespace boom {
 		bool HitCheck(const IModel& mdl0, const IModel& mdl1);
 		//! 固有のアルゴリズムでmdlFromのmdlToに対する最深点を算出
 		Vec2 HitPos(const IModel& mdlFrom, const IModel& mdlTo);
+		//! ペナルティ法における抗力計算
+		/*! 重なり領域だけを使うことは無くて、抗力の算出とセットなので内部で積分計算 */
+		RForce CalcForce(const Rigid& r0, const Rigid& r1, const Vec2& inner, const StLineCore& div);
 
 		//! DualTransform (point2D -> line2D)
 		StLineCore Dual(const Vec2& v);

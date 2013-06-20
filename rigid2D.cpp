@@ -117,6 +117,9 @@ namespace boom {
 		const RPose& Rigid::getPose() const {
 			return _pose;
 		}
+		const IModel& Rigid::getModel() const {
+			return *_spModel.get();
+		}
 
 		// -------------------------- IResist --------------------------
 		void IResist::addNext(csptr sp) {
