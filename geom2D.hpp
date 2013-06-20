@@ -144,7 +144,8 @@ namespace boom {
 			float distance(const Vec2& p) const;
 			//! 点を線分上に置く
 			Vec2 placeOnLine(const Vec2& p) const;
-			float dot(const Vec2& p) const;
+			//! 基準位置に対する方向ベクトルとの内積
+			float posDot(const Vec2& p) const;
 		};
 		//! 半直線
 		struct RayCore {
@@ -356,22 +357,24 @@ namespace boom {
 				OUTER
 			};
 			using CPos = std::pair<POSITION, int>;
+			//! 指定ポイントの内部的な領域IDと内外位置を取得
+			/*! \return first=内外判定
+						second=領域ID */
 			CPos checkPosition(const Vec2& pos) const;
-
-			//! 指定ポイントの内部的な領域ID
-			int getAreaNum(const Vec2& pos) const;
 			//! 内部的な通し番号における外郭ライン
 			LineCore getOuterLine(int n) const;
-			//! 凸包が重なっている領域を求める
-			/*! 重なっている前提
-				\param[in] cnv 他方の物体
-				\param[in] inner 重複領域の内部点 */
-			ConvexCore getOverlapping(const ConvexCore& cnv, const Vec2& inner);
+			PointL getOverlappingPoints(const IModel& mdl, const Vec2& inner) const;
 		};
 		struct Convex : ConvexCore, IModelP<ConvexCore> {
 			using ConvexCore::ConvexCore;
 			DEF_IMODEL_FUNCS
 			bool isInner(const Vec2& pos) const override;
+			//! 凸包が重なっている領域を求める
+			/*! 既に重なっている事が分かっている前提
+				\param[in] cnv 他方の物体
+				\param[in] inner 重複領域の内部点 */
+			Convex getOverlappingConvex(const Convex& cnv, const Vec2& inner) const;
+			PointL getOverlappingPoints(const IModel &mdl, const Vec2& inner) const override;
 		};
 		class ConvexModel : public IModelP<ConvexCore> {
 			private:
@@ -400,6 +403,7 @@ namespace boom {
 				void addOffset(const Vec2& ofs);
 				DEF_IMODEL_FUNCS
 				bool isInner(const Vec2& pos) const override;
+				PointL getOverlappingPoints(const IModel &mdl, const Vec2& inner) const override;
 		};
 
 		//! 剛体制御用

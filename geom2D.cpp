@@ -84,12 +84,12 @@ namespace boom {
 			return pos + (p-pos).dot(dir);
 		}
 		float StLineCore::distance(const Vec2& p) const {
-			return (p - pos).dot(dir);
+			return std::fabs(dir.ccw(p - pos));
 		}
 		Vec2 StLineCore::placeOnLine(const Vec2& p) const {
-			return pos + dir*dot(p);
+			return pos + dir*posDot(p);
 		}
-		float StLineCore::dot(const Vec2& p) const {
+		float StLineCore::posDot(const Vec2& p) const {
 			Vec2 tv(p-pos);
 			return dir.dot(tv);
 		}
@@ -313,6 +313,82 @@ namespace boom {
 		Vec2 ConvexCore::center() const {
 			return std::get<2>(area_inertia_center());
 		}
+		LineCore ConvexCore::getOuterLine(int n) const {
+			return LineCore(point[(n+1)%point.size()], point[n]);
+		}
+		Convex Convex::getOverlappingConvex(const Convex& cnv, const Vec2& inner) const {
+			PointL pt0(getOverlappingPoints(cnv, inner)),			// m0がm1にめり込んでいる頂点リストを出力
+					pt1(cnv.getOverlappingPoints(*this, inner));	// m1がm0にめり込んでいる頂点リストを出力
+			int nV0 = pt0.size(),
+				nV1 = pt1.size();
+			if(nV0 == 0) {
+				assert(nV1 >= 3);
+				// m1のめり込んだ頂点全部がm0の1つの辺に収まっている
+				return Convex(std::move(pt1));
+			} else if(nV1 == 0) {
+				assert(nV0 >= 3);
+				// m0のめり込んだ頂点全部がm1の1つの辺に収まっている
+				return Convex(std::move(pt0));
+			} else {
+				assert(nV0>=3 && nV1>=3);
+				PointL pt(nV0 + nV1 - 2);
+				auto* pDst = &pt[0];
+				for(int i=0 ; i<nV0-1 ; i++)
+					*pDst++ = pt0[i];
+				// 繋ぎ目の処理: m0リストの始点をRayに変換した物とm1の終端で頂点を1つ
+				auto res = LineCore(pt0[nV0-2], pt0[nV0-1]).crossPoint(LineCore(pt1[0], pt1[1]));
+				assert(res.second == LINEPOS::ONLINE);
+				*pDst++ = res.first;
+				for(int i=0 ; i<nV1-1 ; i++)
+					*pDst++ = pt1[i];
+				// m1リストの始点をRayに変換した物とm0の終端で頂点を1つ
+				res = LineCore(pt1[nV1-2], pt1[nV1-1]).crossPoint(LineCore(pt0[0], pt0[1]));
+				assert(res.second == LINEPOS::ONLINE);
+				*pDst = res.first;
+				return Convex(std::move(pt));
+			}
+		}
+
+		PointL ConvexCore::getOverlappingPoints(const IModel& mdl, const Vec2& inner) const {
+			auto res = checkPosition(inner);
+			if(res.first != POSITION::OUTER) {
+				int nV = point.size();
+				auto fn = std::bind((int (*)(int,int))spn::CndSub, std::placeholders::_1, nV);
+				auto binSearch = [this, &fn, &mdl](int a, int b) -> int {
+					for(;;) {
+						if(a+1 == b)
+							break;
+						int c = (a+b)/2;
+						if(mdl.isInner(point[fn(c)]))
+							b = c;
+						else
+							a = c;
+					}
+					return fn(a);
+				};
+
+				// 2分探索で衝突が始まる地点を探す
+				int a = res.second,
+					b = res.second + nV;
+				int begI = binSearch(a, b);		// 衝突開始インデックス
+
+				// 衝突が終わる地点を探す
+				a = res.second;
+				b = begI;
+				int endI = binSearch(a,b);
+
+				PointL pts(spn::CndRange(endI - begI, nV));
+				auto* pDst = &pts[0];
+				// 開始地点から終了地点までを出力
+				while(begI != endI) {
+					*pDst++ = point[begI];
+					begI = fn(begI+1);
+				}
+				return std::move(pts);
+			}
+			return PointL();
+		}
+
 		ConvexCore::CPos ConvexCore::checkPosition(const Vec2& pos) const {
 			// 適当に内部点を算出
 			Vec2 inner = (point[0] + point[1] + point[2]) * (1.f/3);
@@ -434,6 +510,7 @@ namespace boom {
 		Vec2 Convex::support(const Vec2& dir) const { return ConvexCore::support(dir); }
 		Vec2 Convex::center() const { return ConvexCore::center(); }
 		bool Convex::isInner(const Vec2& pos) const { return ConvexCore::isInner(pos); }
+		PointL Convex::getOverlappingPoints(const IModel& mdl, const Vec2& inner) const { return ConvexCore::getOverlappingPoints(mdl,inner); }
 
 		ConvexModel::ConvexModel(): _rflag(RFL_ALL) {}
 		ConvexModel::ConvexModel(const PointL& pl): _convex(pl), _rflag(RFL_ALL) {}
@@ -468,6 +545,7 @@ namespace boom {
 		Vec2 ConvexModel::support(const Vec2& dir) const { return _convex.support(dir); }
 		Vec2 ConvexModel::center() const { return Vec2(getCenter()); }
 		bool ConvexModel::isInner(const Vec2& pos) const { return _convex.isInner(pos); }
+		PointL ConvexModel::getOverlappingPoints(const IModel& mdl, const Vec2& inner) const { return _convex.getOverlappingPoints(mdl, inner); }
 
 		Vec3 Dual(const Plane& plane) {
 			float d = plane.d;
@@ -496,7 +574,7 @@ namespace boom {
 		// ----- 領域の積分計算関数 -----
 		namespace {
 			//! 凸包を三角形に分割して抗力を計算
-			RForce CalcRF_Convex(const RPose& rp, const ConvexCore& cv, const StLineCore& div) {
+			RForce CalcRF_Convex(const RPose& rp0, const RPose& rp1, const ConvexCore& cv, const StLineCore& div) {
 				class Tmp {
 					public:
 						struct TmpIn {
@@ -508,26 +586,27 @@ namespace boom {
 					private:
 						TmpIn	_tmp[2];
 						int		_swI = 0;
-						const RPose&		_rp;
-						const StLineCore&	_div;
-						Vec2		_nml;
+						const RPose			&_rp0,
+											&_rp1;
+						const StLineCore	&_div;
+						Vec2				_nml;
 
 						void _advance(const Vec2& p) {
 							_doSwitch();
 							auto& cur = _current();
 							cur.height = _div.dir.ccw(p);
-							cur.velN = _nml.dot(_rp.getVelocAt(p));
-							cur.pos = _div.dot(p);
+							cur.velN = _nml.dot(_rp0.getVelocAt(p) - _rp1.getVelocAt(p));
+							cur.pos = _div.posDot(p);
 						}
 						void _doSwitch() { _swI ^= 1; }
 						TmpIn& _current() { return _tmp[_swI]; }
 						TmpIn& _prev() { return _tmp[_swI^1]; }
 
 					public:
-						Tmp(const RPose& rp, const StLineCore& div): _rp(rp), _div(div) {
+						Tmp(const RPose& r0, const RPose& r1, const StLineCore& div): _rp0(r0), _rp1(r1), _div(div) {
 							// 衝突ライン(2D)の法線
 							_nml = div.dir * cs_mRot90[0];
-							if(_nml.dot(rp.getOffset()) < 0)
+							if(_nml.dot(_rp0.getOffset()) < 0)
 								_nml *= -1.f;
 						}
 						void calcForce(RForce& dst, const ConvexCore& c) {
@@ -559,7 +638,7 @@ namespace boom {
 						}
 				};
 
-				Tmp tmp(rp, div);
+				Tmp tmp(rp0, rp1, div);
 				RForce rf = {};
 				// 平面で2つに切ってそれぞれ計算
 				auto cvt = cv.splitTwo(div);
@@ -575,38 +654,9 @@ namespace boom {
 			}
 			RForce CalcOV_Convex2(const Rigid& r0, const Rigid& r1, const Vec2& inner, const StLineCore& div) {
 				// 領域算出
-				auto &m0 = r0.getModel(),
-					&m1 = r1.getModel();
-				PointL pt0(m0.getOverlappingPoints(m1, inner)),		// m0がm1にめり込んでいる頂点リストを出力
-						pt1(m1.getOverlappingPoints(m0, inner));	// m1がm0にめり込んでいる頂点リストを出力
-				int nV0 = pt0.size(),
-					nV1 = pt1.size();
-				if(nV0 == 0) {
-					assert(nV1 >= 3);
-					// m1のめり込んだ頂点全部がm0の1つの辺に収まっている
-					return CalcRF_Convex(r0.getPose(), ConvexCore::FromConcave(pt1), div);
-				} else if(nV1 == 0) {
-					assert(nV0 >= 3);
-					// m0のめり込んだ頂点全部がm1の1つの辺に収まっている
-					return CalcRF_Convex(r0.getPose(), ConvexCore::FromConcave(pt0), div);
-				} else {
-					assert(nV0>=3 && nV1>=3);
-					PointL pt(nV0 + nV1 - 2);
-					auto* pDst = &pt[0];
-					for(int i=0 ; i<nV0-1 ; i++)
-						*pDst++ = pt0[i];
-					// 繋ぎ目の処理: m0リストの始点をRayに変換した物とm1の終端で頂点を1つ
-					auto res = LineCore(pt0[nV0-2], pt0[nV0-1]).crossPoint(LineCore(pt1[0], pt1[1]));
-					assert(res.second == LINEPOS::ONLINE);
-					*pDst++ = res.first;
-					for(int i=0 ; i<nV1-1 ; i++)
-						*pDst++ = pt1[i];
-					// m1リストの始点をRayに変換した物とm0の終端で頂点を1つ
-					res = LineCore(pt1[nV1-2], pt1[nV1-1]).crossPoint(LineCore(pt0[0], pt0[1]));
-					assert(res.second == LINEPOS::ONLINE);
-					*pDst = res.first;
-					return CalcRF_Convex(r0.getPose(), ConvexCore::FromConcave(std::move(pt)), div);
-				}
+				auto &m0 = reinterpret_cast<const Convex&>(r0.getModel()),
+					&m1 = reinterpret_cast<const Convex&>(r1.getModel());
+				return CalcRF_Convex(r0.getPose(), r1.getPose(), m0.getOverlappingConvex(m1, inner), div);
 			}
 			//! 円とBox含む多角形
 			RForce CalcOV_CircleConvex(const Rigid& r0, const Rigid& r1, const Vec2& inner, const StLineCore& div) {
