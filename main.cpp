@@ -44,6 +44,7 @@ void TestRigid() {
 	IModel::sptr spModel(new ConvexModel({Vec2(0,0), Vec2(0,1), Vec2(1,1), Vec2(1,0)}));
 	Rigid::sptr spR(new Rigid(spModel));
 	rm.add(spR);
+	rm.add(spR);
 	rm.add(IResist::sptr(new resist::Gravity(Vec2(0,-9.8f))));
 	for(int i=0 ; i<10 ; i++)
 		rm.simulate(1.f);

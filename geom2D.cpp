@@ -82,6 +82,19 @@ namespace boom {
 		bool CircleCore::hit(const Vec2& pt) const {
 			return center.dist_sq(pt) <= spn::Square(radius);
 		}
+		bool CircleCore::hit(const CircleCore& c) const {
+			return center.dist_sq(c.center) <= spn::Square(radius + c.radius);
+		}
+		CircleCore CircleCore::operator * (const AMat32& m) const {
+			CircleCore c;
+			auto& m2 = reinterpret_cast<const spn::AMat22&>(m);
+			Vec2 tx(center + Vec2(radius,0)),
+				ty(center + Vec2(0,radius));
+			tx = tx * m2 - center;
+			ty = ty * m2 - center;
+			return CircleCore((center.asVec3(1)*m),
+							  spn::_sseSqrt(std::max(tx.len_sq(), ty.len_sq())));
+		}
 
 		Vec2 Circle::support(const Vec2& dir) const { return CircleCore::support(dir); }
 		Vec2 Circle::center() const { return CircleCore::center; }

@@ -311,12 +311,33 @@ namespace boom {
 				}
 			}
 		}
-		ColResult::ColResult(ColResult&& cr): array(std::forward<PtrArray>(cr.array)),
-			cursor(std::forward<CursorArray>(cr.cursor)) {}
+		// -------------------------- ColResult --------------------------
+		ColResult::ColResult(): _curID(-1), _from(0) {}
+		ColResult::ColResult(ColResult&& cr):
+			_array(std::forward<ItemArray>(cr._array)),
+			_cursor(std::forward<CursorMap>(cr._cursor)),
+			_curID(cr._curID),
+			_from(cr._from)
+		{}
 		ColResult& ColResult::operator = (ColResult&& cr) {
-			std::swap(array, cr.array);
-			std::swap(cursor, cr.cursor);
+			std::swap(_array, cr._array);
+			std::swap(_cursor, cr._cursor);
+			_curID = cr._curID;
+			_from = cr._from;
 			return *this;
+		}
+		void ColResult::setCurrent(int id) {
+			if(id != _curID) {
+				int nA = _array.size();
+				if(_from < nA)
+					_cursor.emplace(_curID, std::make_pair(uint16_t(_from), uint16_t(nA)));
+				_curID = id;
+				_from = nA;
+			}
+		}
+		void ColResult::pushItem(const Rigid* r, const Vec2& p) {
+			assert(_curID >= 0);
+			_array.push_back(Item{r, p});
 		}
 
 		// -------------------------- RigidMgr --------------------------
@@ -328,7 +349,35 @@ namespace boom {
 			_res->addNext(sp);
 		}
 		ColResult RigidMgr::checkCollision() const {
-			return ColResult();
+			ColResult result;
+			// TODO: 2分木を使ってマシな動作速度にする
+			int nR = _rlist.size();
+			for(int i=0 ; i<nR-1 ; i++) {
+				const auto* pr0 = _rlist[i].get();
+				const auto& mdl0 = pr0->getModel();
+				auto c0 = mdl0.getBBCircle()
+							* pr0->getPose().getFinal();
+				result.setCurrent(i);
+
+				for(int j=i+1 ; j<nR ; j++) {
+					const auto* pr1 = _rlist[j].get();
+					const auto& mdl1 = pr1->getModel();
+					auto c1 = mdl1.getBBCircle()
+								* pr1->getPose().getFinal();
+
+					// 境界球による判定
+					if(c0.hit(c1)) {
+						// GJKによる判定
+						GSimplex gs(mdl0, mdl1);
+						if(gs.getResult()) {
+							// ついでに内部点も格納
+							result.pushItem(pr1, gs.getInner());
+						}
+					}
+				}
+			}
+			result.setCurrent(-1);
+			return std::move(result);
 		}
 		void RigidMgr::simulate(float dt) {
 			IItg* itg = _itg.get();

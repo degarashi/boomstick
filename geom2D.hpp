@@ -241,8 +241,10 @@ namespace boom {
 
 			Vec2 support(const Vec2& dir) const;
 			bool hit(const Vec2& pt) const;
+			bool hit(const CircleCore& c) const;
 			// radius
 			void getArcPoints(PointL& dst, float ang0, float ang1, float deep) const;
+			CircleCore operator * (const AMat32& m) const;
 		};
 		//! 円の基本クラス
 		/*! 共通クラスを当たり判定対応にラップした物 */
@@ -633,16 +635,27 @@ namespace boom {
 		}
 
 		//! コリジョン判定の結果を参照しやすい形で格納
-		struct ColResult {
-			using PtrArray = std::vector<Rigid*>;
-			using CursorArray = std::unordered_map<int, std::pair<uint16_t,uint16_t>>;
-			PtrArray		array;
-			CursorArray		cursor;
+		class ColResult {
+			struct Item {
+				const Rigid*	rigid;
+				Vec2			inner;
+			};
+			using ItemArray = std::vector<Item>;
+			using CursorMap = std::unordered_map<int, std::pair<uint16_t,uint16_t>>;
+			ItemArray		_array;
+			CursorMap		_cursor;
+			int				_curID,
+							_from;
 
-			ColResult() = default;
-			ColResult(ColResult&& cr);
-			ColResult& operator = (ColResult&& cr);
-			ColResult& operator = (const ColResult& cr) = default;
+			public:
+				ColResult();
+				ColResult(const ColResult& cr) = default;
+				ColResult(ColResult&& cr);
+				ColResult& operator = (ColResult&& cr);
+				ColResult& operator = (const ColResult& cr) = default;
+
+				void setCurrent(int id);
+				void pushItem(const Rigid* r, const Vec2& p);
 		};
 		//! 剛体マネージャ
 		class RigidMgr {
