@@ -43,6 +43,10 @@ namespace boom {
 			return *this;
 		}
 
+		CircleCore IModel::getBBCircle() const {
+			throw std::runtime_error("not supported function");
+		}
+
 		// ---------------------- Point ----------------------
 		float PointCore::distance(const LineCore& l) const {
 			Vec2 dir(l.point[1] - l.point[0]);
@@ -62,6 +66,10 @@ namespace boom {
 		Vec2 Point::center() const {
 			return *this;
 		}
+		CircleCore Point::getBBCircle() const {
+			// 円の半径が0だと点同士の時にヒットしないので微量含める
+			return CircleCore(*this, 1e-6f);
+		}
 
 		// ---------------------- Circle ----------------------
 		CircleCore::CircleCore(const Vec2& c, float r): center(c), radius(r) {}
@@ -78,6 +86,7 @@ namespace boom {
 		Vec2 Circle::support(const Vec2& dir) const { return CircleCore::support(dir); }
 		Vec2 Circle::center() const { return CircleCore::center; }
 		bool Circle::isInner(const Vec2& pos) const { return CircleCore::hit(pos); }
+		CircleCore Circle::getBBCircle() const { return *this; }
 
 		CircleModel::CircleModel(): _rflag(0xff) {}
 		CircleModel::CircleModel(const CircleCore& c): _circle(c), _rflag(0xff) {}
@@ -85,6 +94,7 @@ namespace boom {
 		Vec2 CircleModel::support(const Vec2& dir) const { return _circle.support(dir); }
 		Vec2 CircleModel::center() const { return _circle.center; }
 		bool CircleModel::isInner(const Vec2& pos) const { return _circle.hit(pos); }
+		CircleCore CircleModel::getBBCircle() const { return _circle; }
 
 		// ---------------------- StLine ----------------------
 		StLineCore::StLineCore(const Vec2& p, const Vec2& d): pos(p), dir(d) {}
@@ -190,6 +200,11 @@ namespace boom {
 		Vec2 Line::center() const {
 			return (point[0] + point[1]) * 0.5f;
 		}
+		CircleCore LineCore::getBBCircle() const {
+			return CircleCore(point[0] + point[1] * 0.5f,
+							point[0].distance(point[1]));
+		}
+		CircleCore Line::getBBCircle() const { return LineCore::getBBCircle(); }
 
 		// ---------------------- Poly ----------------------
 		PolyCore::PolyCore(const Vec2& p0, const Vec2& p1, const Vec2& p2): point{p0,p1,p2} {}
@@ -219,10 +234,46 @@ namespace boom {
 			return v1.cw(vt) >= 0 &&
 					vt.cw(v2) >= 0;
 		}
+		int PolyCore::getObtuseCorner() const {
+			AVec2 v01(point[1]-point[0]),
+				v02(point[2]-point[0]),
+				v12(point[2]-point[1]);
+			if(v01.dot(v02) < 0)
+				return 0;
+
+			v01 *= -1;
+			if(v01.dot(v12) < 0)
+				return 1;
+
+			v12 *= -1;
+			v02 *= -1;
+			if(v02.dot(v12) < 0)
+				return 2;
+			return -1;
+		}
+		CircleCore PolyCore::getBBCircle() const {
+			int id = getObtuseCorner();
+			if(id >= 0) {
+				// 鈍角を持っていれば直径を使う
+				const Vec2 &v0 = point[id],
+							&v1 = point[spn::CndSub(id+1, 3)];
+				return CircleCore((v0+v1)*0.5f, v0.distance(v1));
+			} else {
+				// なければ3点の外接円
+				StLineCore line0((point[1]+point[0]) * 0.5f,
+								(point[1]-point[0]) * cs_mRot90[0]),
+							line1((point[2]+point[0]) * 0.5f,
+								(point[2]-point[0]) * cs_mRot90[0]);
+				auto vp = line0.nearest(line1);
+				return CircleCore(vp.first,
+									vp.first.distance(point[0]));
+			}
+		}
 
 		Vec2 Poly::support(const Vec2& dir) const { return PolyCore::support(dir); }
 		Vec2 Poly::center() const { return PolyCore::center(); }
 		bool Poly::isInner(const Vec2& pos) const { return isInTriangle(pos); }
+		CircleCore Poly::getBBCircle() const { return PolyCore::getBBCircle(); }
 
 		PolyModel::PolyModel(): _rflag(RFL_ALL) {}
 		PolyModel::PolyModel(const Vec2& p0, const Vec2& p1, const Vec2& p2): _poly{p0,p1,p2}, _rflag(RFL_ALL) {}
@@ -261,6 +312,7 @@ namespace boom {
 			return Vec2(getCenter());
 		}
 		bool PolyModel::isInner(const Vec2& pos) const { return _poly.isInTriangle(pos); }
+		CircleCore PolyModel::getBBCircle() const { return _poly.getBBCircle(); }
 
 		// ---------------------- Convex ----------------------
 		ConvexCore::ConvexCore(const PointL& pl): point(pl) {}
@@ -518,11 +570,31 @@ namespace boom {
 		void ConvexCore::splitThis(const StLineCore& l) {
 			split(l);
 		}
+		CircleCore ConvexCore::getBBCircle() const {
+			// 多分遅いアルゴリズムだが、今はこれで我慢
+			// 全ての3点の組み合わせを調べる
+			int nV = point.size();
+			assert(nV >= 3);
+			CircleCore c;
+			c.radius = -1;
+			for(int i=0 ; i<nV-2 ; i++) {
+				for(int j=i+1 ; j<nV-1 ; j++) {
+					for(int k=j+1 ; k<nV ; k++) {
+						PolyCore p(point[i], point[j], point[k]);
+						auto tc = p.getBBCircle();
+						if(c.radius < tc.radius)
+							c = tc;
+					}
+				}
+			}
+			return c;
+		}
 
 		Vec2 Convex::support(const Vec2& dir) const { return ConvexCore::support(dir); }
 		Vec2 Convex::center() const { return ConvexCore::center(); }
 		bool Convex::isInner(const Vec2& pos) const { return ConvexCore::isInner(pos); }
 		PointL Convex::getOverlappingPoints(const IModel& mdl, const Vec2& inner) const { return ConvexCore::getOverlappingPoints(mdl,inner); }
+		CircleCore Convex::getBBCircle() const { return ConvexCore::getBBCircle(); }
 
 		ConvexModel::ConvexModel(): _rflag(RFL_ALL) {}
 		ConvexModel::ConvexModel(const PointL& pl): _convex(pl), _rflag(RFL_ALL) {}
@@ -558,6 +630,7 @@ namespace boom {
 		Vec2 ConvexModel::center() const { return Vec2(getCenter()); }
 		bool ConvexModel::isInner(const Vec2& pos) const { return _convex.isInner(pos); }
 		PointL ConvexModel::getOverlappingPoints(const IModel& mdl, const Vec2& inner) const { return _convex.getOverlappingPoints(mdl, inner); }
+		CircleCore ConvexModel::getBBCircle() const { return _convex.getBBCircle(); }
 
 		Vec3 Dual(const Plane& plane) {
 			float d = plane.d;
