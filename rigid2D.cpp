@@ -128,31 +128,195 @@ namespace boom {
 			else
 				_spNext = sp;
 		}
-		IResist::Accel IResist::resist(const RPose::Value& pose) const {
-			Accel acc{Vec2(0),0};
-			resist(acc, pose);
+		RForce::F IResist::resist(int index, const RPose::Value& pose) const {
+			RForce::F acc{Vec2(0),0};
+			resist(acc, index, pose);
 			return acc;
 		}
-		void IResist::_callNext(Accel& acc, const RPose::Value& pose) const {
+		void IResist::_callNext(RForce::F& acc, int index, const RPose::Value& pose) const {
 			if(_spNext)
-				_spNext->resist(acc, pose);
+				_spNext->resist(acc, index, pose);
 		}
-		void IResist::resist(Accel& acc, const RPose::Value& pose) const {
-			_callNext(acc, pose);
+		void IResist::resist(RForce::F& acc, int index, const RPose::Value& pose) const {
+			_callNext(acc, index, pose);
 		}
 
-		// -------------------------- Itg_Eular --------------------------
-		void Itg_Eular::advance(RPose::Value& st, const IResist* pres, float dt) {
-			// 次のフレームの位置
-			st.ofs += st.vel * dt;
-			st.ang += st.rotVel * dt;
-			// 次のフレームの速度
-			st.vel += st.acc * dt;
-			st.rotVel += st.rotAcc * dt;
-			// 次のフレームの加速度
-			auto acc = pres->resist(st);
-			st.acc += acc.linear;
-			st.rotAcc += acc.rot;
+		namespace resist {
+			Gravity::Gravity(const Vec2& v): _grav(v) {}
+			void Gravity::resist(RForce::F& acc, int index, const RPose::Value& pose) const {
+				acc.linear += _grav;
+				_callNext(acc, index, pose);
+			}
+
+			Impact::Impact(RigidMgr& rm): _rmgr(rm) {}
+			void Impact::resist(RForce::F& acc, int index, const RPose::Value& pose) const {
+				acc += _state[index];
+			}
+			void Impact::setNumOfRigid(int n) {
+				_state.resize(n);
+			}
+		}
+
+		namespace itg {
+			// -------------------------- Eular --------------------------
+			int Eular::numOfIteration() const { return 1; }
+			void Eular::advance(int pass, RPoseOPT* value, int nRigid, const IResist* pres, float dt) {
+				for(int i=0 ; i<nRigid ; i++) {
+					auto& st = *value[i];
+					// 次のフレームの位置
+					st.ofs += st.vel * dt;
+					st.ang += st.rotVel * dt;
+					// 次のフレームの速度
+					st.vel += st.acc * dt;
+					st.rotVel += st.rotAcc * dt;
+					// 次のフレームの加速度
+					auto acc = pres->resist(i, st);
+					st.acc += acc.linear;
+					st.rotAcc += acc.torque;
+				}
+			}
+			// -------------------------- ImpEular --------------------------
+			int ImpEular::numOfIteration() const { return 2; }
+			void ImpEular::beginIteration(int n) {
+				// 剛体数分のメモリ*2を確保
+				_tvalue.resize(n * 2);
+			}
+			void ImpEular::endIteration() {
+				// メモリ解放
+				decltype(_tvalue) tmp;
+				std::swap(_tvalue, tmp);
+			}
+			void ImpEular::advance(int pass, RPoseOPT* value, int nRigid, const IResist* pres, float dt) {
+				auto *tv0 = &_tvalue[0];
+				float dth2 = dt/2;
+				if(pass == 0) {
+					// value = 1つ前の(計算上の)状態
+					for(int i=0 ; i<nRigid ; i++) {
+						auto& dat = *value[i];
+						auto& ps = tv0[i];
+
+						// 内部のメモリに書き込むと同時に出力
+						ps = dat;
+						auto acc = pres->resist(i, dat);
+						dat.ofs += dat.vel * dt;
+						dat.vel += dat.acc * dt;
+						dat.ang += dat.rotVel * dt;
+						dat.rotVel += dat.rotAcc * dt;
+						// (衝突判定結果は1フレーム遅れて出る為)
+						ps.acc = acc.linear;
+						ps.rotAcc = acc.torque;
+					}
+				} else {
+					for(int i=0 ; i<nRigid ; i++) {
+						auto& dat = *value[i];
+						auto& ps0 = tv0[i];
+
+						dat.ofs = ps0.ofs + (ps0.vel + dat.vel) * dth2;
+						dat.vel = ps0.vel + (ps0.acc + dat.acc) * dth2;
+						dat.ang = ps0.ang + (ps0.rotVel + dat.rotVel) * dth2;
+						dat.rotVel = ps0.rotVel + (ps0.rotAcc + dat.rotAcc) * dth2;
+						auto acc = pres->resist(i, dat);
+						dat.acc = acc.linear;
+						dat.rotAcc = acc.torque;
+					}
+				}
+			}
+
+			// -------------------------- RK4 --------------------------
+			int RK4::numOfIteration() const { return 4; }
+			void RK4::beginIteration(int n) {
+				_tvalue.resize(n * 4);
+			}
+			void RK4::endIteration() {
+				decltype(_tvalue) tmp;
+				std::swap(_tvalue, tmp);
+			}
+			// TODO: 4回分も当たり判定していたら遅そうなので2回に留める案
+			void RK4::advance(int pass, RPoseOPT* value, int nRigid, const IResist* pres, float dt) {
+				float dt2 = dt/2,
+						dt6 = dt/6;
+				auto *tv0 = &_tvalue[0],
+					*tv1 = &_tvalue[nRigid],
+					*tv2 = &_tvalue[2*nRigid],
+					*tv3 = &_tvalue[3*nRigid];
+				switch(pass) {
+					case 0: {
+						for(int i=0 ; i<nRigid ; i++) {
+							auto& dat = *value[i];
+							auto& ps = tv0[i];
+
+							ps = dat;
+							auto acc = pres->resist(i,dat);		// 処理前の加速度
+							ps.acc = acc.linear;
+							ps.rotAcc = acc.torque;
+							dat.ofs += dat.vel * dt2;
+							dat.vel += ps.acc * dt2;
+							dat.ang += dat.rotVel * dt2;
+							dat.rotVel += ps.rotAcc * dt2;
+						}
+						break; }
+					case 1:
+						for(int i=0 ; i<nRigid ; i++) {
+							auto& dat = *value[i];
+							auto &ps0 = tv0[i],
+								&ps1 = tv1[i];
+
+							ps1 = dat;
+							auto acc = pres->resist(i,dat);		// ps1の加速度
+							ps1.acc = acc.linear;
+							ps1.rotAcc = acc.torque;
+							dat.ofs = ps0.ofs + ps1.vel * dt2;
+							dat.vel = ps0.vel + ps1.acc * dt2;
+							dat.ang = ps0.ang + ps1.rotVel * dt2;
+							dat.rotVel = ps0.rotVel + ps1.rotAcc * dt2;
+						}
+						break;
+					case 2:
+						for(int i=0 ; i<nRigid ; i++) {
+							auto& dat = *value[i];
+							auto &ps0 = tv0[i],
+								&ps2 = tv2[i];
+
+							ps2 = dat;
+							auto acc = pres->resist(i,dat);		// ps2の加速度
+							ps2.acc = acc.linear;
+							ps2.rotAcc = acc.torque;
+							dat.ofs = ps0.ofs + ps2.vel * dt;
+							dat.vel = ps0.vel + ps2.acc * dt;
+							dat.ang = ps0.ang + ps2.rotVel * dt;
+							dat.rotVel = ps0.rotVel + ps2.rotAcc * dt;
+						}
+						break;
+					case 3:
+						for(int i=0 ; i<nRigid ; i++) {
+							auto& dat = *value[i];
+							auto &ps0 = tv0[i],
+								&ps1 = tv1[i],
+								&ps2 = tv2[i],
+								&ps3 = tv3[i];
+
+							ps3 = dat;
+							auto acc = pres->resist(i,dat);
+							ps3.acc = acc.linear;
+							ps3.rotAcc = acc.torque;
+
+							dat.ofs = ps0.ofs + (ps0.vel + ps1.vel*2 + ps2.vel*2 + ps3.vel) * dt6;
+							dat.vel = ps0.vel + (ps0.acc + ps1.acc*2 + ps2.acc*2 + ps3.acc) * dt6;
+							dat.ang = ps0.ang + (ps0.rotVel + ps1.rotVel*2 + ps2.rotVel*2 + ps3.rotVel) * dt6;
+							dat.rotVel = ps0.rotVel + (ps0.rotAcc + ps1.rotAcc*2 + ps2.rotAcc*2 + ps3.rotAcc) * dt6;
+							dat.acc = ps0.acc;
+							dat.rotAcc = ps0.rotAcc;
+						}
+						break;
+				}
+			}
+		}
+		ColResult::ColResult(ColResult&& cr): array(std::forward<PtrArray>(cr.array)),
+			cursor(std::forward<CursorArray>(cr.cursor)) {}
+		ColResult& ColResult::operator = (ColResult&& cr) {
+			std::swap(array, cr.array);
+			std::swap(cursor, cr.cursor);
+			return *this;
 		}
 
 		// -------------------------- RigidMgr --------------------------
@@ -163,13 +327,32 @@ namespace boom {
 		void RigidMgr::add(IResist::csptr sp) {
 			_res->addNext(sp);
 		}
+		ColResult RigidMgr::checkCollision() const {
+			return ColResult();
+		}
 		void RigidMgr::simulate(float dt) {
 			IItg* itg = _itg.get();
 			IResist* res = _res.get();
-			for(auto& r : _rlist) {
-				auto st = r->refPose().refValue();
-				itg->advance(st, res, dt);
+			int nR = _rlist.size(),
+				nItr = itg->numOfIteration();
+			std::vector<RPoseOPT>	value(nR);
+			// 効率悪いが一旦配列に格納
+			for(int i=0 ; i<nR ; i++)
+				value[i] = boost::in_place(_rlist[i].get()->refPose().refValue());
+
+			itg->beginIteration(nR);
+			for(int i=0 ; i<nItr ; i++) {
+				// 当たり判定結果は一回分だけとっておけば良い
+				ColResult cr = checkCollision();
+				itg->advance(i, &value[0], nR, res, dt);
 			}
+			itg->endIteration();
+		}
+		int RigidMgr::getNRigid() const {
+			return _rlist.size();
+		}
+		Rigid::csptr RigidMgr::getRigid(int n) const {
+			return _rlist[n];
 		}
 	}
 }

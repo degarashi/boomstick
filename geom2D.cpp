@@ -31,6 +31,18 @@ namespace boom {
 			return Vec2x2(st0.pos + st0.dir * clip0(m1.x),
 							st1.pos + st1.dir * clip1(m1.y));
 		}
+
+		RForce::F& RForce::F::operator += (const F& f) {
+			linear += f.linear;
+			torque += f.torque;
+			return *this;
+		}
+		RForce& RForce::operator +=(const RForce& rf) {
+			sdump += rf.sdump;
+			fricD += rf.fricD;
+			return *this;
+		}
+
 		// ---------------------- Point ----------------------
 		float PointCore::distance(const LineCore& l) const {
 			Vec2 dir(l.point[1] - l.point[0]);

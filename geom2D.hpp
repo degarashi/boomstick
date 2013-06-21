@@ -8,6 +8,8 @@
 #include <cassert>
 #include <vector>
 #include <memory>
+#include <unordered_map>
+#include <boost/optional.hpp>
 
 namespace boom {
 	using spn::AVec2;
@@ -78,9 +80,13 @@ namespace boom {
 			struct F {
 				Vec2	linear;
 				float	torque;
+
+				F& operator += (const F& f);
 			};
 			F	sdump,	//!< スプリング & ダンパによる力
 				fricD;	//!< 動摩擦力
+
+			RForce& operator += (const RForce& rf);
 		};
 
 		struct IModel {
@@ -100,6 +106,8 @@ namespace boom {
 			/*! \return 時計回りでmdlにめり込んでいる頂点リスト。前後も含む */
 			virtual PointL getOverlappingPoints(const IModel& mdl, const Vec2& inner) const {
 				throw std::runtime_error("not supported function"); }
+			//! 境界ボリューム(円)
+//			virtual CircleCore getBBCircle() const = 0;
 		};
 		template <class T>
 		struct IModelP : IModel {
@@ -109,6 +117,7 @@ namespace boom {
 		#define DEF_IMODEL_FUNCS \
 			Vec2 support(const Vec2& dir) const override; \
 			Vec2 center() const override;
+//			CircleCore getBBCircle() const override;
 
 		enum class LINEPOS {
 			BEGIN,
@@ -130,6 +139,28 @@ namespace boom {
 		struct Point : PointCore, IModelP<PointCore> {
 			using PointCore::PointCore;
 			DEF_IMODEL_FUNCS
+		};
+		//! AxisAlignedBox
+		struct BoxCore {
+			Vec2	minV, maxV;
+
+			BoxCore() = default;
+			BoxCore(const Vec2& min_v, const Vec2& max_v);
+
+			CircleCore bbCircle() const;
+			Vec2 support(const Vec2& dir) const;
+			Vec2 nearest(const Vec2& pos) const;
+		};
+		struct Box : BoxCore, IModelP<BoxCore> {
+			using BoxCore::BoxCore;
+			DEF_IMODEL_FUNCS
+		};
+		class BoxModel : public IModelP<BoxCore> {
+			BoxCore		_box;
+
+			public:
+				BoxModel() = default;
+				BoxModel(const BoxCore& b);
 		};
 
 		//! 直線
@@ -313,6 +344,7 @@ namespace boom {
 				}
 			};
 			PointL	point;
+			const static uint8_t cs_index[1<<8];
 
 			ConvexCore() = default;
 			/*! \param[in] v 凸包と分かっている頂点 */
@@ -420,16 +452,20 @@ namespace boom {
 			protected:
 				void _setAsChanged();
 			public:
-				struct TValue : spn::Pose2D::TValue {
-					Vec2	vel, acc;
-					float	rotVel, rotAcc;
-				};
 				struct Value : spn::Pose2D::Value {
 					Vec2	&vel, &acc;
 					float	&rotVel, &rotAcc;
 
 					Value(RPose& rp);
 					~Value();
+				};
+				struct TValue : spn::Pose2D::TValue {
+					Vec2	vel, acc;
+					float	rotVel, rotAcc;
+
+					TValue() = default;
+					TValue(const Value& v):
+						vel(v.vel), acc(v.acc), rotVel(v.rotVel), rotAcc(v.rotAcc) {}
 				};
 
 				RPose();
@@ -491,26 +527,26 @@ namespace boom {
 			public:
 				using sptr = std::shared_ptr<IResist>;
 				using csptr = const sptr&;
-				struct Accel {
-					Vec2	linear;
-					float	rot;
-				};
 
 			protected:
 				sptr	_spNext;		//!< 次の抵抗力計算インタフェース (null可)
-				void _callNext(Accel& acc, const RPose::Value& pose) const;
+				void _callNext(RForce::F& acc, int index, const RPose::Value& pose) const;
 
 			public:
 				virtual ~IResist() {}
 				void addNext(csptr sp);
 				//! 抵抗力計算の起点
-				Accel resist(const RPose::Value& pose) const;
+				RForce::F resist(int index, const RPose::Value& pose) const;
 				//! 抵抗力を計算
 				/*! \param[in] r 衝突判定クエリの為の剛体マネージャ
 					\param[in] pose 現在の姿勢
 					\param[inout] accum 抵抗ベクトルの出力先(加算) */
-				virtual void resist(Accel& acc, const RPose::Value& pose) const;
+				virtual void resist(RForce::F& acc, int index, const RPose::Value& pose) const;
+				//! 内部で何か変数を蓄える場合に備えて要素数を伝える
+				virtual void setNumOfRigid(int n) {}
 		};
+		using RPoseOPT = boost::optional<RPose::Value>;
+		using TValueA = std::vector<RPose::TValue>;
 		//! 積分インタフェース
 		struct IItg {
 			using sptr = std::shared_ptr<IItg>;
@@ -520,15 +556,77 @@ namespace boom {
 			/*! Resistインタフェースは線形リストでつなげる
 				\param[inout] st 現在の姿勢
 				\param[in] pres 抵抗力計算インタフェース
-				\param[in] r 衝突判定クエリの為の剛体マネージャ for IResist
 				\param[in] dt 前回フレームからの時間(sec) */
-			virtual void advance(RPose::Value& st, const IResist* pres, float dt) = 0;
-		};
-		//! オイラー積分
-		struct Itg_Eular : IItg {
-			void advance(RPose::Value& st, const IResist* pres, float dt) override;
-		};
+			virtual void advance(int pass, RPoseOPT* value, int nRigid, const IResist* pres, float dt) = 0;
+			//! 1回分の時間を進めるのに必要なステップ数
+			virtual int numOfIteration() const = 0;
 
+			virtual void beginIteration(int n) {}
+			virtual void endIteration() {}
+		};
+		// ---------------------- 積分アルゴリズム ----------------------
+		namespace itg {
+			#define DEF_IITG_FUNCS \
+				void advance(int pass, RPoseOPT* value, int nRigid, const IResist* pres, float dt) override; \
+				int numOfIteration() const override;
+			//! オイラー法
+			struct Eular : IItg {
+				DEF_IITG_FUNCS
+			};
+			//! 改良版オイラー法
+			class ImpEular : public IItg {
+				TValueA		_tvalue;
+				public:
+					DEF_IITG_FUNCS
+					void beginIteration(int n) override;
+					void endIteration() override;
+			};
+			//! 4次のルンゲ・クッタ法
+			class RK4 : public IItg {
+				// 計算途中で必要になる一時変数 [nRigid * 4]
+				// Rigid0[0,1,2,3], Rigid1[0,1,2,3] ... と続ける
+				TValueA		_tvalue;
+				public:
+					DEF_IITG_FUNCS
+					void beginIteration(int n) override;
+					void endIteration() override;
+			};
+		}
+		class RigidMgr;
+		// ---------------------- 抵抗力計算 ----------------------
+		namespace resist {
+			//! 衝突による加速度
+			class Impact : public IResist {
+				RigidMgr&	_rmgr;
+				// 必ず剛体は0番から順に走査するので内部でカウンタを持つ
+				std::vector<RForce::F>	_state;
+
+				public:
+					Impact(RigidMgr& rm);
+					void resist(RForce::F& acc, int index, const RPose::Value &pose) const override;
+					void setNumOfRigid(int n) override;
+			};
+			//! 重力による加速度
+			class Gravity : public IResist {
+				Vec2	_grav;
+				public:
+					Gravity(const Vec2& v);
+					void resist(RForce::F& acc, int index, const RPose::Value &pose) const override;
+			};
+		}
+
+		//! コリジョン判定の結果を参照しやすい形で格納
+		struct ColResult {
+			using PtrArray = std::vector<Rigid*>;
+			using CursorArray = std::unordered_map<int, std::pair<uint16_t,uint16_t>>;
+			PtrArray		array;
+			CursorArray		cursor;
+
+			ColResult() = default;
+			ColResult(ColResult&& cr);
+			ColResult& operator = (ColResult&& cr);
+			ColResult& operator = (const ColResult& cr) = default;
+		};
 		//! 剛体マネージャ
 		class RigidMgr {
 			using RList = std::vector<Rigid::sptr>;
@@ -542,6 +640,11 @@ namespace boom {
 				void add(Rigid::csptr sp);
 				void add(IResist::csptr sp);
 				void simulate(float dt);
+
+				int getNRigid() const;
+				Rigid::csptr getRigid(int n) const;
+
+				ColResult checkCollision() const;	// コリジョンチェックして内部変数に格納
 		};
 		//! ヒットチェックだけ
 		class GSimplex {
