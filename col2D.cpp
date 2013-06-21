@@ -49,7 +49,14 @@ namespace boom {
 				_nVtx = 1;
 				return false;
 			}
-			dir = _vtx[0].normalization() * -1.f;
+			// 原点と重なっていたら終了 = 内部点
+			float lens = _vtx[0].len_sq();
+			if(lens < DIST_THRESHOLD) {
+				_nVtx = 1;
+				_inner = _posB[0];
+				return true;
+			}
+			dir = _vtx[0] * spn::_sseRSqrt(lens) * -1.f;
 			_minkowskiSub(dir, 1);
 
 			const Vec2 ori(0);
@@ -61,7 +68,7 @@ namespace boom {
 				return false;
 			tmp = _vtx[0] + tmp*r;
 
-			float lens = tmp.len_sq();
+			lens = tmp.len_sq();
 			if(lens < DIST_THRESHOLD) {
 				// ライン上に原点がある
 				_inner =_posB[0].l_intp(_posB[1], r * spn::_sseRcp22Bit(tmpLen));
