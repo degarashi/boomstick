@@ -718,13 +718,14 @@ namespace boom {
 		// ----- 領域の積分計算関数 -----
 		namespace {
 			//! 凸包を三角形に分割して抗力を計算
-			RForce CalcRF_Convex(const RPose& rp0, const RPose& rp1, const ConvexCore& cv, const StLineCore& div) {
+			RForce CalcRF_Convex(const RPose& rp0, const RPose& rp1, const RCoeff& coeff, const ConvexCore& cv, const StLineCore& div) {
 				class Tmp {
 					public:
 						struct TmpIn {
-							float height;
-							float velN;
-							float pos;		// 直線に射影した2D頂点は1次元の数値になる
+							float height;		// 深度
+							float velN, velT;	// 衝突断面の相対速度の垂直、水平成分
+							float pos;			// 直線に射影した2D頂点は1次元の数値になる
+							float fricD;
 						};
 
 					private:
@@ -739,8 +740,12 @@ namespace boom {
 							_doSwitch();
 							auto& cur = _current();
 							cur.height = _div.dir.ccw(p);
-							cur.velN = _nml.dot(_rp0.getVelocAt(p) - _rp1.getVelocAt(p));
+
+							Vec2 vel = _rp1.getVelocAt(p) - _rp0.getVelocAt(p);
+							cur.velN = _nml.dot(vel);
+							cur.velT = _div.dir.dot(vel);
 							cur.pos = _div.posDot(p);
+							cur.fricD = 0;
 						}
 						void _doSwitch() { _swI ^= 1; }
 						TmpIn& _current() { return _tmp[_swI]; }
@@ -760,50 +765,56 @@ namespace boom {
 								return;
 
 							float p_lin = 0,
-								p_tor = 0;
+								p_tor = 0,
+								p_fdLin = 0,
+								p_fdTor = 0;
 							_advance(pts[0]);
 							for(int i=1 ; i<nV ; i++) {
 								_advance(pts[i]);
 								auto& cur = _current();
 								auto& pre = _prev();
 								// calc spring
-								p_lin += (pre.height + cur.height) * 0.5f;
+								cur.fricD = (pre.height + cur.height) * 0.5f;
 								p_tor += (1.f/3) * (pre.pos*pre.height + (pre.pos*cur.height + cur.pos*pre.height)*0.5f + cur.pos*cur.height);
 								// calc dumper
-								p_lin += (pre.velN + cur.velN) * 0.5f;
-								p_tor += (3.f/2)*pre.pos*pre.velN +
-										 (2.f/3)*pre.pos*cur.velN +
-										 cur.pos * cur.velN;
-								// TODO: calc dynamic-friction
+								cur.fricD += (pre.velN + cur.velN) * 0.5f;
+								p_lin += cur.fricD;
+								p_tor += (1.f/3) * (pre.pos*pre.velN + (pre.pos*cur.velN + cur.pos*pre.velN)*0.5f + cur.pos*cur.velN);
+								// dynamic-friction
+								cur.fricD = (pre.velT + cur.velT) * 0.5f * cur.fricD;
+								p_fdLin += cur.fricD;
+								p_fdTor += (1.f/3) * (pre.pos*pre.fricD + (pre.pos*cur.fricD + cur.pos*pre.fricD)*0.5f + cur.pos*cur.fricD);
 								// TODO: calc static-friction
 							}
 							dst.sdump.linear += _nml * p_lin;
 							dst.sdump.torque += p_tor;
+							dst.fricD.linear += _div.dir * p_fdLin;
+							dst.fricD.torque += p_fdTor;
 						}
 				};
 
 				Tmp tmp(rp0, rp1, div);
 				RForce rf = {};
-				// 平面で2つに切ってそれぞれ計算
+				// 直線(断面)で2つに切ってそれぞれ計算
 				auto cvt = cv.splitTwo(div);
 				tmp.calcForce(rf, cvt.first);
 				tmp.calcForce(rf, cvt.second);
 				return rf;
 			}
 			//! 円同士
-			RForce CalcOV_Circle2(const Rigid& r0, const Rigid& r1, const Vec2& inner, const StLineCore& div) {
+			RForce CalcOV_Circle2(const Rigid& r0, const Rigid& r1, const Vec2& inner, const RCoeff& coeff, const StLineCore& div) {
 				// 境界線分を計算して共通領域を2つに分けてそれぞれ積分
 				// 中身がCircleだと分かっているのでポインタの読み替え
 				throw std::runtime_error("not implemented yet");
 			}
-			RForce CalcOV_Convex2(const Rigid& r0, const Rigid& r1, const Vec2& inner, const StLineCore& div) {
+			RForce CalcOV_Convex2(const Rigid& r0, const Rigid& r1, const Vec2& inner, const RCoeff& coeff, const StLineCore& div) {
 				// 領域算出
 				auto &m0 = reinterpret_cast<const Convex&>(r0.getModel()),
 					&m1 = reinterpret_cast<const Convex&>(r1.getModel());
-				return CalcRF_Convex(r0.getPose(), r1.getPose(), m0.getOverlappingConvex(m1, inner), div);
+				return CalcRF_Convex(r0.getPose(), r1.getPose(), coeff, m0.getOverlappingConvex(m1, inner), div);
 			}
 			//! 円とBox含む多角形
-			RForce CalcOV_CircleConvex(const Rigid& r0, const Rigid& r1, const Vec2& inner, const StLineCore& div) {
+			RForce CalcOV_CircleConvex(const Rigid& r0, const Rigid& r1, const Vec2& inner, const RCoeff& coeff, const StLineCore& div) {
 				PointL _pts;
 				// pts[0]とpts[nV-1]の間は円弧を表す
 				// 円弧部分は弓部で分けて凸包部分は三角形で計算し、残りは独自式で積分
@@ -811,14 +822,14 @@ namespace boom {
 			}
 		}
 
-		RForce CalcForce(const Rigid& r0, const Rigid& r1, const Vec2& inner, const StLineCore& div) {
+		RForce CalcForce(const Rigid& r0, const Rigid& r1, const Vec2& inner, const RCoeff& coeff, const StLineCore& div) {
 			// 実質Convex, Box, Circle専用
 			if(r0.getModel().getCID() == Circle::GetCID()) {
 				if(r1.getModel().getCID() == Circle::GetCID())
-					return CalcOV_Circle2(r0, r1, inner, div);
-				return CalcOV_CircleConvex(r0, r1, inner, div);
+					return CalcOV_Circle2(r0, r1, inner, coeff, div);
+				return CalcOV_CircleConvex(r0, r1, inner, coeff, div);
 			}
-			return CalcOV_Convex2(r0, r1, inner, div);
+			return CalcOV_Convex2(r0, r1, inner, coeff, div);
 		}
 	}
 }

@@ -121,58 +121,63 @@ namespace boom {
 			return *_spModel.get();
 		}
 
-		// -------------------------- IResist --------------------------
-		void IResist::addNext(csptr sp) {
-			if(_spNext)
-				_spNext->addNext(sp);
-			else
-				_spNext = sp;
+		void Rigid::addR(const SPResist& sp) {
+			for(int i=0 ; i<4 ; i++) {
+				if(!_resist[i]) {
+					_resist[i] = sp;
+					return;
+				}
+			}
+			assert(false);
 		}
-		RForce::F IResist::resist(int index, const RPose::Value& pose) const {
-			RForce::F acc{Vec2(0),0};
-			resist(acc, index, pose);
-			return acc;
-		}
-		void IResist::_callNext(RForce::F& acc, int index, const RPose::Value& pose) const {
-			if(_spNext)
-				_spNext->resist(acc, index, pose);
-		}
-		void IResist::resist(RForce::F& acc, int index, const RPose::Value& pose) const {
-			_callNext(acc, index, pose);
+		RForce::F Rigid::resist(ColResult::CItrP itr) const {
+			RForce::F res = {};
+			for(auto& sp : _resist) {
+				if(!sp)
+					break;
+				sp->resist(res, itr, *this);
+			}
+			return res;
 		}
 
+		// -------------------------- IResist --------------------------
 		namespace resist {
 			Gravity::Gravity(const Vec2& v): _grav(v) {}
-			void Gravity::resist(RForce::F& acc, int index, const RPose::Value& pose) const {
+			void Gravity::resist(RForce::F& acc, ColResult::CItrP itr, const Rigid& r) const {
 				acc.linear += _grav;
-				_callNext(acc, index, pose);
 			}
 
-			Impact::Impact(RigidMgr& rm): _rmgr(rm) {}
-			void Impact::resist(RForce::F& acc, int index, const RPose::Value& pose) const {
-				acc += _state[index];
-			}
-			void Impact::setNumOfRigid(int n) {
-				_state.resize(n);
+			Impact::Impact(const RCoeff& rc): _coeff(rc) {}
+			void Impact::resist(RForce::F& acc, ColResult::CItrP itr, const Rigid& r) const {
+				while(itr.first != itr.second) {
+					//TODO: 衝突平面の計算
+					auto f = CalcForce(r, *(itr.first->rigid),
+									   itr.second->inner, _coeff, StLineCore(Vec2(0,0), Vec2(0,1)));
+					acc += f.sdump;
+					acc += f.fricD;
+					++itr.first;
+				}
 			}
 		}
 
 		namespace itg {
 			// -------------------------- Eular --------------------------
 			int Eular::numOfIteration() const { return 1; }
-			void Eular::advance(int pass, RPoseOPT* value, int nRigid, const IResist* pres, float dt) {
-				for(int i=0 ; i<nRigid ; i++) {
-					auto& st = *value[i];
+			void Eular::advance(int pass, const RList& rlist, const ColResult& cr, float dt) {
+				int nR = rlist.size();
+				for(int i=0 ; i<nR ; i++) {
+					auto* ptr = rlist[i].get();
+					auto st = ptr->refPose().refValue();
+					// 現フレームの加速度
+					auto acc = ptr->resist(cr.getItem(i));
+					st.acc += acc.linear;
+					st.rotAcc += acc.torque;
 					// 次のフレームの位置
 					st.ofs += st.vel * dt;
 					st.ang += st.rotVel * dt;
 					// 次のフレームの速度
 					st.vel += st.acc * dt;
 					st.rotVel += st.rotAcc * dt;
-					// 次のフレームの加速度
-					auto acc = pres->resist(i, st);
-					st.acc += acc.linear;
-					st.rotAcc += acc.torque;
 				}
 			}
 			// -------------------------- ImpEular --------------------------
@@ -186,18 +191,20 @@ namespace boom {
 				decltype(_tvalue) tmp;
 				std::swap(_tvalue, tmp);
 			}
-			void ImpEular::advance(int pass, RPoseOPT* value, int nRigid, const IResist* pres, float dt) {
+			void ImpEular::advance(int pass, const RList& rlist, const ColResult& cr, float dt) {
 				auto *tv0 = &_tvalue[0];
 				float dth2 = dt/2;
+				int nR = rlist.size();
 				if(pass == 0) {
 					// value = 1つ前の(計算上の)状態
-					for(int i=0 ; i<nRigid ; i++) {
-						auto& dat = *value[i];
+					for(int i=0 ; i<nR ; i++) {
+						auto* ptr = rlist[i].get();
+						auto dat = ptr->refPose().refValue();
 						auto& ps = tv0[i];
 
 						// 内部のメモリに書き込むと同時に出力
 						ps = dat;
-						auto acc = pres->resist(i, dat);
+						auto acc = ptr->resist(cr.getItem(i));
 						dat.ofs += dat.vel * dt;
 						dat.vel += dat.acc * dt;
 						dat.ang += dat.rotVel * dt;
@@ -207,21 +214,21 @@ namespace boom {
 						ps.rotAcc = acc.torque;
 					}
 				} else {
-					for(int i=0 ; i<nRigid ; i++) {
-						auto& dat = *value[i];
+					for(int i=0 ; i<nR ; i++) {
+						auto* ptr = rlist[i].get();
+						auto dat = ptr->refPose().refValue();
 						auto& ps0 = tv0[i];
 
 						dat.ofs = ps0.ofs + (ps0.vel + dat.vel) * dth2;
 						dat.vel = ps0.vel + (ps0.acc + dat.acc) * dth2;
 						dat.ang = ps0.ang + (ps0.rotVel + dat.rotVel) * dth2;
 						dat.rotVel = ps0.rotVel + (ps0.rotAcc + dat.rotAcc) * dth2;
-						auto acc = pres->resist(i, dat);
+						auto acc = ptr->resist(cr.getItem(i));
 						dat.acc = acc.linear;
 						dat.rotAcc = acc.torque;
 					}
 				}
 			}
-
 			// -------------------------- RK4 --------------------------
 			int RK4::numOfIteration() const { return 4; }
 			void RK4::beginIteration(int n) {
@@ -232,21 +239,24 @@ namespace boom {
 				std::swap(_tvalue, tmp);
 			}
 			// TODO: 4回分も当たり判定していたら遅そうなので2回に留める案
-			void RK4::advance(int pass, RPoseOPT* value, int nRigid, const IResist* pres, float dt) {
+			void RK4::advance(int pass, const RList& rlist, const ColResult& cr, float dt) {
 				float dt2 = dt/2,
 						dt6 = dt/6;
+				int nR = rlist.size();
 				auto *tv0 = &_tvalue[0],
-					*tv1 = &_tvalue[nRigid],
-					*tv2 = &_tvalue[2*nRigid],
-					*tv3 = &_tvalue[3*nRigid];
+					*tv1 = &_tvalue[nR],
+					*tv2 = &_tvalue[2*nR],
+					*tv3 = &_tvalue[3*nR];
+
 				switch(pass) {
-					case 0: {
-						for(int i=0 ; i<nRigid ; i++) {
-							auto& dat = *value[i];
+					case 0:
+						for(int i=0 ; i<nR ; i++) {
+							auto* ptr = rlist[i].get();
+							auto dat = ptr->refPose().refValue();
 							auto& ps = tv0[i];
 
 							ps = dat;
-							auto acc = pres->resist(i,dat);		// 処理前の加速度
+							auto acc = ptr->resist(cr.getItem(i));		// 処理前の加速度
 							ps.acc = acc.linear;
 							ps.rotAcc = acc.torque;
 							dat.ofs += dat.vel * dt2;
@@ -254,15 +264,16 @@ namespace boom {
 							dat.ang += dat.rotVel * dt2;
 							dat.rotVel += ps.rotAcc * dt2;
 						}
-						break; }
+						break;
 					case 1:
-						for(int i=0 ; i<nRigid ; i++) {
-							auto& dat = *value[i];
+						for(int i=0 ; i<nR ; i++) {
+							auto* ptr = rlist[i].get();
+							auto dat = ptr->refPose().refValue();
 							auto &ps0 = tv0[i],
 								&ps1 = tv1[i];
 
 							ps1 = dat;
-							auto acc = pres->resist(i,dat);		// ps1の加速度
+							auto acc = ptr->resist(cr.getItem(i));		// ps1の加速度
 							ps1.acc = acc.linear;
 							ps1.rotAcc = acc.torque;
 							dat.ofs = ps0.ofs + ps1.vel * dt2;
@@ -272,13 +283,14 @@ namespace boom {
 						}
 						break;
 					case 2:
-						for(int i=0 ; i<nRigid ; i++) {
-							auto& dat = *value[i];
+						for(int i=0 ; i<nR ; i++) {
+							auto* ptr = rlist[i].get();
+							auto dat = ptr->refPose().refValue();
 							auto &ps0 = tv0[i],
 								&ps2 = tv2[i];
 
 							ps2 = dat;
-							auto acc = pres->resist(i,dat);		// ps2の加速度
+							auto acc = ptr->resist(cr.getItem(i));		// ps2の加速度
 							ps2.acc = acc.linear;
 							ps2.rotAcc = acc.torque;
 							dat.ofs = ps0.ofs + ps2.vel * dt;
@@ -288,15 +300,16 @@ namespace boom {
 						}
 						break;
 					case 3:
-						for(int i=0 ; i<nRigid ; i++) {
-							auto& dat = *value[i];
+						for(int i=0 ; i<nR ; i++) {
+							auto* ptr = rlist[i].get();
+							auto dat = ptr->refPose().refValue();
 							auto &ps0 = tv0[i],
 								&ps1 = tv1[i],
 								&ps2 = tv2[i],
 								&ps3 = tv3[i];
 
 							ps3 = dat;
-							auto acc = pres->resist(i,dat);
+							auto acc = ptr->resist(cr.getItem(i));
 							ps3.acc = acc.linear;
 							ps3.rotAcc = acc.torque;
 
@@ -312,7 +325,9 @@ namespace boom {
 			}
 		}
 		// -------------------------- ColResult --------------------------
-		ColResult::ColResult(): _curID(-1), _from(0) {}
+		ColResult::ColResult() {
+			clear();
+		}
 		ColResult::ColResult(ColResult&& cr):
 			_array(std::forward<ItemArray>(cr._array)),
 			_cursor(std::forward<CursorMap>(cr._cursor)),
@@ -339,25 +354,35 @@ namespace boom {
 			assert(_curID >= 0);
 			_array.push_back(Item{r, p});
 		}
+		ColResult::CItrP ColResult::getItem(int id) const {
+			auto itr = _cursor.find(id);
+			if(itr == _cursor.end())
+				return CItrP();
+			auto pitr = _array.begin()+itr->second.first;
+			return CItrP(pitr, pitr+itr->second.second);
+		}
+		void ColResult::clear() {
+			_array.clear();
+			_cursor.clear();
+			_curID = -1;
+			_from = 0;
+		}
 
 		// -------------------------- RigidMgr --------------------------
-		RigidMgr::RigidMgr(IItg::csptr itg): _itg(itg), _res(new IResist()) {}
+		RigidMgr::RigidMgr(IItg::csptr itg): _itg(itg) {}
 		void RigidMgr::add(Rigid::csptr sp) {
 			_rlist.push_back(sp);
 		}
-		void RigidMgr::add(IResist::csptr sp) {
-			_res->addNext(sp);
-		}
-		ColResult RigidMgr::checkCollision() const {
-			ColResult result;
-			// TODO: 2分木を使ってマシな動作速度にする
+		void RigidMgr::_checkCollision() {
+			_cresult.clear();
+			// TODO: 4分木を使ってマシな動作速度にする
 			int nR = _rlist.size();
 			for(int i=0 ; i<nR-1 ; i++) {
 				const auto* pr0 = _rlist[i].get();
 				const auto& mdl0 = pr0->getModel();
 				auto c0 = mdl0.getBCircle()
 							* pr0->getPose().getFinal();
-				result.setCurrent(i);
+				_cresult.setCurrent(i);
 
 				for(int j=i+1 ; j<nR ; j++) {
 					const auto* pr1 = _rlist[j].get();
@@ -371,29 +396,23 @@ namespace boom {
 						GSimplex gs(mdl0, mdl1);
 						if(gs.getResult()) {
 							// ついでに内部点も格納
-							result.pushItem(pr1, gs.getInner());
+							_cresult.pushItem(pr1, gs.getInner());
 						}
 					}
 				}
 			}
-			result.setCurrent(-1);
-			return std::move(result);
+			_cresult.setCurrent(-1);
 		}
 		void RigidMgr::simulate(float dt) {
 			IItg* itg = _itg.get();
-			IResist* res = _res.get();
 			int nR = _rlist.size(),
 				nItr = itg->numOfIteration();
-			std::vector<RPoseOPT>	value(nR);
-			// 効率悪いが一旦配列に格納
-			for(int i=0 ; i<nR ; i++)
-				value[i] = boost::in_place(_rlist[i].get()->refPose().refValue());
 
 			itg->beginIteration(nR);
 			for(int i=0 ; i<nItr ; i++) {
 				// 当たり判定結果は一回分だけとっておけば良い
-				ColResult cr = checkCollision();
-				itg->advance(i, &value[0], nR, res, dt);
+				_checkCollision();
+				itg->advance(i, _rlist, _cresult, dt);
 			}
 			itg->endIteration();
 		}

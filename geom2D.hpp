@@ -525,14 +525,50 @@ namespace boom {
 				Value refValue();
 		};
 
+		class Rigid;
+		//! コリジョン判定の結果を参照しやすい形で格納
+		class ColResult {
+			using CursorMap = std::unordered_map<int, std::pair<uint16_t,uint16_t>>;
+			struct Item {
+				const Rigid*	rigid;
+				Vec2			inner;
+			};
+			using ItemArray = std::vector<Item>;
+
+			public:
+				using CItrP = std::pair<ItemArray::const_iterator, ItemArray::const_iterator>;
+
+			private:
+				ItemArray		_array;
+				CursorMap		_cursor;
+				int				_curID,
+								_from;
+
+			public:
+				ColResult();
+				ColResult(const ColResult& cr) = default;
+				ColResult(ColResult&& cr);
+				ColResult& operator = (ColResult&& cr);
+				ColResult& operator = (const ColResult& cr) = default;
+
+				void clear();
+				void setCurrent(int id);
+				void pushItem(const Rigid* r, const Vec2& p);
+				//! オブジェクトのIDをキーにして衝突したオブジェクトのリストを参照
+				CItrP getItem(int id) const;
+		};
+		struct IResist;
 		//! 剛体ラッパ (形状 + 姿勢)
 		class Rigid : public IModel {
 			public:
+				constexpr static int NUM_RESIST = 4;
 				using sptr = std::shared_ptr<Rigid>;
 				using csptr = const sptr&;
+				using SPResist = std::shared_ptr<IResist>;
 			private:
-				IModel::sptr	_spModel;	//!< 形状
-				RPose			_pose;		//!< 姿勢
+				IModel::sptr	_spModel;				//!< 形状
+				RPose			_pose;					//!< 姿勢
+				SPResist		_resist[NUM_RESIST];	//!< 抵抗計算用
 
 			public:
 				Rigid(IModel::csptr sp);
@@ -547,31 +583,27 @@ namespace boom {
 				RPose& refPose();
 				const RPose& getPose() const;
 				const IModel& getModel() const;
+
+				void addR(const SPResist& sp);
+				//! 抵抗力を計算
+				/*! \param itr 衝突判定結果のイテレータ */
+				RForce::F resist(ColResult::CItrP itr) const;
 		};
 		//! 位置と速度を与えた時にかかる加速度(抵抗力)を計算
-		class IResist : public std::enable_shared_from_this<IResist> {
-			public:
-				using sptr = std::shared_ptr<IResist>;
-				using csptr = const sptr&;
+		struct IResist : std::enable_shared_from_this<IResist> {
+			using sptr = std::shared_ptr<IResist>;
+			using csptr = const sptr&;
 
-			protected:
-				sptr	_spNext;		//!< 次の抵抗力計算インタフェース (null可)
-				void _callNext(RForce::F& acc, int index, const RPose::Value& pose) const;
-
-			public:
-				virtual ~IResist() {}
-				void addNext(csptr sp);
-				//! 抵抗力計算の起点
-				RForce::F resist(int index, const RPose::Value& pose) const;
-				//! 抵抗力を計算
-				/*! \param[in] r 衝突判定クエリの為の剛体マネージャ
-					\param[in] pose 現在の姿勢
-					\param[inout] accum 抵抗ベクトルの出力先(加算) */
-				virtual void resist(RForce::F& acc, int index, const RPose::Value& pose) const;
-				//! 内部で何か変数を蓄える場合に備えて要素数を伝える
-				virtual void setNumOfRigid(int n) {}
+			//! 抵抗力を計算
+			/*! \param[in] index オブジェクトインデックス
+				\param[in] rigid 剛体リスト
+				\param[in] cr 当たり判定結果
+				\param[in] index 自分のID
+				\return 抵抗ベクトル(加速度) */
+			virtual void resist(RForce::F& acc, ColResult::CItrP itr, const Rigid& r) const = 0;
 		};
-		using RPoseOPT = boost::optional<RPose::Value>;
+
+		using RList = std::vector<Rigid::sptr>;
 		using TValueA = std::vector<RPose::TValue>;
 		//! 積分インタフェース
 		struct IItg {
@@ -583,17 +615,26 @@ namespace boom {
 				\param[inout] st 現在の姿勢
 				\param[in] pres 抵抗力計算インタフェース
 				\param[in] dt 前回フレームからの時間(sec) */
-			virtual void advance(int pass, RPoseOPT* value, int nRigid, const IResist* pres, float dt) = 0;
+			virtual void advance(int pass, const RList& rlist, const ColResult& cr, float dt) = 0;
 			//! 1回分の時間を進めるのに必要なステップ数
 			virtual int numOfIteration() const = 0;
 
 			virtual void beginIteration(int n) {}
 			virtual void endIteration() {}
 		};
+		//! 剛体シミュレーションで使用する係数
+		struct RCoeff {
+			float	spring,	//!< スプリング係数
+					dumper,	//!< ダンパ係数
+					fricD,	//!< 動摩擦係数
+					fricS,	//!< 静止摩擦係数
+					fricMS;	//!< 最大静止摩擦係数
+		};
+
 		// ---------------------- 積分アルゴリズム ----------------------
 		namespace itg {
 			#define DEF_IITG_FUNCS \
-				void advance(int pass, RPoseOPT* value, int nRigid, const IResist* pres, float dt) override; \
+				void advance(int pass, const RList& rlist, const ColResult& cr, float dt) override; \
 				int numOfIteration() const override;
 			//! オイラー法
 			struct Eular : IItg {
@@ -618,70 +659,42 @@ namespace boom {
 					void endIteration() override;
 			};
 		}
-		class RigidMgr;
 		// ---------------------- 抵抗力計算 ----------------------
 		namespace resist {
 			//! 衝突による加速度
 			class Impact : public IResist {
-				RigidMgr&	_rmgr;
-				// 必ず剛体は0番から順に走査するので内部でカウンタを持つ
-				std::vector<RForce::F>	_state;
+				// NOTE: ひとまずは反発係数固定での実装
+				RCoeff		_coeff;
 
 				public:
-					Impact(RigidMgr& rm);
-					void resist(RForce::F& acc, int index, const RPose::Value &pose) const override;
-					void setNumOfRigid(int n) override;
+					Impact(const RCoeff& rc);
+					void resist(RForce::F& acc, ColResult::CItrP itr, const Rigid& r) const override;
 			};
 			//! 重力による加速度
 			class Gravity : public IResist {
 				Vec2	_grav;
 				public:
 					Gravity(const Vec2& v);
-					void resist(RForce::F& acc, int index, const RPose::Value &pose) const override;
+					void resist(RForce::F& acc, ColResult::CItrP itr, const Rigid& r) const override;
 			};
 		}
 
-		//! コリジョン判定の結果を参照しやすい形で格納
-		class ColResult {
-			struct Item {
-				const Rigid*	rigid;
-				Vec2			inner;
-			};
-			using ItemArray = std::vector<Item>;
-			using CursorMap = std::unordered_map<int, std::pair<uint16_t,uint16_t>>;
-			ItemArray		_array;
-			CursorMap		_cursor;
-			int				_curID,
-							_from;
-
-			public:
-				ColResult();
-				ColResult(const ColResult& cr) = default;
-				ColResult(ColResult&& cr);
-				ColResult& operator = (ColResult&& cr);
-				ColResult& operator = (const ColResult& cr) = default;
-
-				void setCurrent(int id);
-				void pushItem(const Rigid* r, const Vec2& p);
-		};
 		//! 剛体マネージャ
 		class RigidMgr {
-			using RList = std::vector<Rigid::sptr>;
 			RList			_rlist;
-			IItg::sptr		_itg;	//!< 適用する積分アルゴリズム
-			IResist::sptr	_res;	//!< 重力などの力
+			IItg::sptr		_itg;		//!< 適用する積分アルゴリズム
+			ColResult		_cresult;	//!< 衝突判定結果を一時的に格納
+
+			void _checkCollision();		//! コリジョンチェックして内部変数に格納
 
 			public:
 				RigidMgr(IItg::csptr itg);
 
 				void add(Rigid::csptr sp);
-				void add(IResist::csptr sp);
 				void simulate(float dt);
 
 				int getNRigid() const;
 				Rigid::csptr getRigid(int n) const;
-
-				ColResult checkCollision() const;	// コリジョンチェックして内部変数に格納
 		};
 		//! ヒットチェックだけ
 		class GSimplex {
@@ -766,7 +779,7 @@ namespace boom {
 		Vec2 HitPos(const IModel& mdlFrom, const IModel& mdlTo);
 		//! ペナルティ法における抗力計算
 		/*! 重なり領域だけを使うことは無くて、抗力の算出とセットなので内部で積分計算 */
-		RForce CalcForce(const Rigid& r0, const Rigid& r1, const Vec2& inner, const StLineCore& div);
+		RForce CalcForce(const Rigid& r0, const Rigid& r1, const Vec2& inner, const RCoeff& coeff, const StLineCore& div);
 
 		//! DualTransform (point2D -> line2D)
 		StLineCore Dual(const Vec2& v);

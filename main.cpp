@@ -45,7 +45,9 @@ void TestRigid() {
 	Rigid::sptr spR(new Rigid(spModel));
 	rm.add(spR);
 	rm.add(spR);
-	rm.add(IResist::sptr(new resist::Gravity(Vec2(0,-9.8f))));
+	spR->addR(IResist::sptr(new resist::Gravity(Vec2(0,-9.8f))));
+	RCoeff rc = {1,1,1,1,1};
+	spR->addR(IResist::sptr(new resist::Impact(rc)));
 	for(int i=0 ; i<10 ; i++)
 		rm.simulate(1.f);
 }
