@@ -21,6 +21,7 @@ namespace boom {
 	using spn::_sseRcp22Bit;
 	using spn::CType;
 	using Float2 = std::pair<float,float>;
+	using uint2 = std::pair<uint32_t,uint32_t>;
 	using Vec2x2 = std::pair<Vec2,Vec2>;
 
 	//! 90度回転行列(2D)
@@ -68,10 +69,11 @@ namespace boom {
 	namespace geo2d {
 		struct PointCore;
 		struct LineCore;
+		struct BoxCore;
 		struct PolyCore;
 		struct CircleCore;
 		struct ConvexCore;
-		using CTGeo = CType<PointCore, LineCore, PolyCore, CircleCore, ConvexCore>;
+		using CTGeo = CType<PointCore, LineCore, BoxCore, PolyCore, CircleCore, ConvexCore>;
 
 		using PointL = std::vector<Vec2>;
 		using LineL = std::vector<LineCore>;
@@ -107,7 +109,7 @@ namespace boom {
 			virtual PointL getOverlappingPoints(const IModel& mdl, const Vec2& inner) const {
 				throw std::runtime_error("not supported function"); }
 			//! 境界ボリューム(円)
-			virtual CircleCore getBBCircle() const;
+			virtual CircleCore getBCircle() const;
 		};
 		template <class T>
 		struct IModelP : IModel {
@@ -138,7 +140,7 @@ namespace boom {
 		struct Point : PointCore, IModelP<PointCore> {
 			using PointCore::PointCore;
 			DEF_IMODEL_FUNCS
-			CircleCore getBBCircle() const override;
+			CircleCore getBCircle() const override;
 		};
 		//! AxisAlignedBox
 		struct BoxCore {
@@ -147,15 +149,16 @@ namespace boom {
 			BoxCore() = default;
 			BoxCore(const Vec2& min_v, const Vec2& max_v);
 
-			CircleCore bbCircle() const;
 			Vec2 support(const Vec2& dir) const;
 			Vec2 nearest(const Vec2& pos) const;
-			CircleCore getBBCircle() const;
+			bool hit(const LineCore& l) const;
+			CircleCore getBCircle() const;
+			Vec2 center() const;
 		};
 		struct Box : BoxCore, IModelP<BoxCore> {
 			using BoxCore::BoxCore;
 			DEF_IMODEL_FUNCS
-			CircleCore getBBCircle() const override;
+			CircleCore getBCircle() const override;
 		};
 		class BoxModel : public IModelP<BoxCore> {
 			BoxCore		_box;
@@ -164,7 +167,7 @@ namespace boom {
 				BoxModel() = default;
 				BoxModel(const BoxCore& b);
 				DEF_IMODEL_FUNCS
-				CircleCore getBBCircle() const override;
+				CircleCore getBCircle() const override;
 		};
 
 		//! 直線
@@ -217,12 +220,12 @@ namespace boom {
 			Vec2 support(const Vec2& dir) const;
 			StLineCore toStLine() const;
 			bool online(const Vec2& p) const;
-			CircleCore getBBCircle() const;
+			CircleCore getBCircle() const;
 		};
 		struct Line : LineCore, IModelP<LineCore> {
 			using LineCore::LineCore;
 			DEF_IMODEL_FUNCS
-			CircleCore getBBCircle() const override;
+			CircleCore getBCircle() const override;
 		};
 
 		//! 円の共通クラス
@@ -252,7 +255,7 @@ namespace boom {
 			using CircleCore::CircleCore;
 			DEF_IMODEL_FUNCS
 			bool isInner(const Vec2& pos) const override;
-			CircleCore getBBCircle() const override;
+			CircleCore getBCircle() const override;
 		};
 		//! 円の剛体用クラス
 		/*! キャッシュを管理する関係で形状へのアクセスは関数を通す仕様 元クラスはcompososition */
@@ -276,7 +279,7 @@ namespace boom {
 
 				DEF_IMODEL_FUNCS
 				bool isInner(const Vec2& pos) const override;
-				CircleCore getBBCircle() const override;
+				CircleCore getBCircle() const override;
 		};
 
 		struct PolyCore {
@@ -295,7 +298,7 @@ namespace boom {
 			void addOffset(const Vec2& ofs);
 			static float CalcArea(const Vec2& p0, const Vec2& p1, const Vec2& p2);
 			static float CalcArea(const Vec2& p0, const Vec2& p1);
-			CircleCore getBBCircle() const;
+			CircleCore getBCircle() const;
 			//! 鈍角を探す
 			/*! \return 鈍角の番号 (負数は該当なし) */
 			int getObtuseCorner() const;
@@ -304,18 +307,20 @@ namespace boom {
 			using PolyCore::PolyCore;
 			DEF_IMODEL_FUNCS
 			bool isInner(const Vec2& pos) const override;
-			CircleCore getBBCircle() const override;
+			CircleCore getBCircle() const override;
 		};
 		class PolyModel : IModel {
 			PolyCore		_poly;
 			mutable float	_area,
 							_inertia;
+			mutable CircleCore	_bbCircle;
 			mutable AVec2	_center;
 
 			enum REFLAG {
 				RFL_CENTER = 0x01,
 				RFL_AREA = 0x02,
 				RFL_INERTIA = 0x04,
+				RFL_BBCIRCLE = 0x08,
 				RFL_ALL = 0xff
 			};
 			mutable uint32_t	_rflag;
@@ -334,7 +339,7 @@ namespace boom {
 
 				DEF_IMODEL_FUNCS
 				bool isInner(const Vec2& pos) const override;
-				CircleCore getBBCircle() const override;
+				CircleCore getBCircle() const override;
 		};
 
 		//! 多角形基本クラス
@@ -412,7 +417,7 @@ namespace boom {
 			//! 内部的な通し番号における外郭ライン
 			LineCore getOuterLine(int n) const;
 			PointL getOverlappingPoints(const IModel& mdl, const Vec2& inner) const;
-			CircleCore getBBCircle() const;
+			CircleCore getBCircle() const;
 		};
 		struct Convex : ConvexCore, IModelP<ConvexCore> {
 			using ConvexCore::ConvexCore;
@@ -424,16 +429,18 @@ namespace boom {
 				\param[in] inner 重複領域の内部点 */
 			Convex getOverlappingConvex(const Convex& cnv, const Vec2& inner) const;
 			PointL getOverlappingPoints(const IModel &mdl, const Vec2& inner) const override;
-			CircleCore getBBCircle() const override;
+			CircleCore getBCircle() const override;
 		};
 		class ConvexModel : public IModelP<ConvexCore> {
 			private:
 				ConvexCore		_convex;
 				mutable AVec2	_center;
+				mutable CircleCore	_bbCircle;
 				mutable float	_area,
 								_inertia;
 				enum REFLAG {
 					RFL_CENTER_INERTIA = 0x01,
+					RFL_BBCIRCLE = 0x02,
 					RFL_ALL = 0xff
 				};
 				mutable uint32_t _rflag;
@@ -454,7 +461,7 @@ namespace boom {
 				DEF_IMODEL_FUNCS
 				bool isInner(const Vec2& pos) const override;
 				PointL getOverlappingPoints(const IModel &mdl, const Vec2& inner) const override;
-				CircleCore getBBCircle() const override;
+				CircleCore getBCircle() const override;
 		};
 
 		//! 剛体制御用

@@ -355,14 +355,14 @@ namespace boom {
 			for(int i=0 ; i<nR-1 ; i++) {
 				const auto* pr0 = _rlist[i].get();
 				const auto& mdl0 = pr0->getModel();
-				auto c0 = mdl0.getBBCircle()
+				auto c0 = mdl0.getBCircle()
 							* pr0->getPose().getFinal();
 				result.setCurrent(i);
 
 				for(int j=i+1 ; j<nR ; j++) {
 					const auto* pr1 = _rlist[j].get();
 					const auto& mdl1 = pr1->getModel();
-					auto c1 = mdl1.getBBCircle()
+					auto c1 = mdl1.getBCircle()
 								* pr1->getPose().getFinal();
 
 					// 境界球による判定
