@@ -21,6 +21,8 @@ namespace boom {
 	using spn::_sseRcp22Bit;
 	using spn::CType;
 	using Float2 = std::pair<float,float>;
+	using int2 = std::pair<int,int>;
+	using int2x2 = std::pair<int2,int2>;
 	using uint2 = std::pair<uint32_t,uint32_t>;
 	using Vec2x2 = std::pair<Vec2,Vec2>;
 
@@ -372,6 +374,8 @@ namespace boom {
 			ConvexCore(std::initializer_list<Vec2> v);
 			ConvexCore(const PointL& pl);
 			ConvexCore(PointL&& pl);
+			ConvexCore(ConvexCore&& c);
+			ConvexCore& operator = (ConvexCore&& c);
 
 			static ConvexCore FromConcave(const PointL& src);
 
@@ -418,9 +422,17 @@ namespace boom {
 			LineCore getOuterLine(int n) const;
 			PointL getOverlappingPoints(const IModel& mdl, const Vec2& inner) const;
 			CircleCore getBCircle() const;
+			// 凸包が直線と交差している箇所を2点計算
+			std::tuple<bool,Vec2,Vec2> checkCrossingLine(const StLineCore& l) const;
+			// 直線がヒットしてるか判定後、始点と終点のチェック
+			bool hit(const LineCore& l) const;
 		};
+		std::ostream& operator << (std::ostream& os, const ConvexCore& c);
+
 		struct Convex : ConvexCore, IModelP<ConvexCore> {
 			using ConvexCore::ConvexCore;
+			Convex() = default;
+			Convex(ConvexCore&& c);
 			DEF_IMODEL_FUNCS
 			bool isInner(const Vec2& pos) const override;
 			//! 凸包が重なっている領域を求める

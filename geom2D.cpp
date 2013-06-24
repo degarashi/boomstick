@@ -46,6 +46,12 @@ namespace boom {
 		CircleCore IModel::getBCircle() const {
 			throw std::runtime_error("not supported function");
 		}
+		std::ostream& operator << (std::ostream& os, const ConvexCore& c) {
+			for(auto& p : c.point)
+				std::cout << '[' << p.x << ',' << p.y << ']' << std::endl;
+			std::cout << std::endl;
+			return os;
+		}
 
 		// ---------------------- Point ----------------------
 		float PointCore::distance(const LineCore& l) const {
@@ -379,6 +385,12 @@ namespace boom {
 			while(itr != v.end())
 				*itrD++ = *itr++;
 		}
+		ConvexCore::ConvexCore(ConvexCore&& c): point(std::forward<PointL>(c.point)) {}
+		ConvexCore& ConvexCore::operator = (ConvexCore&& c) {
+			point = std::move(c.point);
+			return *this;
+		}
+
 		ConvexCore ConvexCore::FromConcave(const PointL& src) {
 			int nV = src.size();
 			assert(nV >= 3);
@@ -436,36 +448,70 @@ namespace boom {
 		LineCore ConvexCore::getOuterLine(int n) const {
 			return LineCore(point[(n+1)%point.size()], point[n]);
 		}
+		auto Func(const Convex& c0, const Convex& c1, const Vec2& inner) -> Convex {
+			auto ip = c0.checkPosition(inner);
+			const auto &p0 = c0.point[ip.second],
+						&p1 = c0.point[spn::CndSub(ip.second+1, c0.point.size())];
+			StLineCore line(p0, (p1-p0).normalization());
+			return Convex(c1.splitTwo(line).second);
+		};
+
+		Convex::Convex(ConvexCore&& c): ConvexCore(std::forward<ConvexCore>(c)) {}
 		Convex Convex::getOverlappingConvex(const Convex& cnv, const Vec2& inner) const {
-			PointL pt0(getOverlappingPoints(cnv, inner)),			// m0がm1にめり込んでいる頂点リストを出力
-					pt1(cnv.getOverlappingPoints(*this, inner));	// m1がm0にめり込んでいる頂点リストを出力
+			auto fn0 = [](const Convex& c0, const Convex& c1, const Vec2& inner) -> std::pair<bool,PointL> {
+				PointL pt0(c0.getOverlappingPoints(c1, inner));
+				int nV0 = pt0.size();
+				if(nV0 == c0.point.size()) {
+					if(nV0 == 3) {
+						for(int i=0 ; i<3 ; i++) {
+							if(!c1.isInner(pt0[i]))
+								return std::make_pair(false, std::move(pt0));
+						}
+					}
+					// m1が全部m0に収まっている
+					return std::make_pair(true, std::move(pt0));
+				}
+				return std::make_pair(false, std::move(pt0));
+			};
+			// m0がm1にめり込んでいる頂点リストを出力
+			auto res0 = fn0(*this, cnv, inner);
+			if(res0.first)
+				return Convex(std::move(res0.second));
+			// m1がm0にめり込んでいる頂点リストを出力
+			auto res1 = fn0(cnv, *this, inner);
+			if(res1.first)
+				return Convex(std::move(res1.second));
+
+			const PointL &pt0 = res0.second,
+						&pt1 = res1.second;
 			int nV0 = pt0.size(),
 				nV1 = pt1.size();
 			if(nV0 == 0) {
 				assert(nV1 >= 3);
 				// m1のめり込んだ頂点全部がm0の1つの辺に収まっている
-				return Convex(std::move(pt1));
+				return Func(*this, cnv, inner);
 			} else if(nV1 == 0) {
 				assert(nV0 >= 3);
 				// m0のめり込んだ頂点全部がm1の1つの辺に収まっている
-				return Convex(std::move(pt0));
+				return Func(cnv, *this, inner);
 			} else {
 				assert(nV0>=3 && nV1>=3);
-				PointL pt(nV0 + nV1 - 2);
-				auto* pDst = &pt[0];
-				for(int i=0 ; i<nV0-1 ; i++)
-					*pDst++ = pt0[i];
+				PointL ptDst(nV0 + nV1 - 2);
+
+				auto* pDst = &ptDst[0];
 				// 繋ぎ目の処理: m0リストの始点をRayに変換した物とm1の終端で頂点を1つ
-				auto res = LineCore(pt0[nV0-2], pt0[nV0-1]).crossPoint(LineCore(pt1[0], pt1[1]));
+				auto res = LineCore(pt0[0], pt0[1]).crossPoint(LineCore(pt1[nV1-2], pt1[nV1-1]));
 				assert(res.second == LINEPOS::ONLINE);
 				*pDst++ = res.first;
-				for(int i=0 ; i<nV1-1 ; i++)
-					*pDst++ = pt1[i];
+				for(int i=1 ; i<nV0-1 ; i++)
+					*pDst++ = pt0[i];
 				// m1リストの始点をRayに変換した物とm0の終端で頂点を1つ
-				res = LineCore(pt1[nV1-2], pt1[nV1-1]).crossPoint(LineCore(pt0[0], pt0[1]));
+				res = LineCore(pt0[nV0-2], pt0[nV0-1]).crossPoint(LineCore(pt1[0], pt1[1]));
 				assert(res.second == LINEPOS::ONLINE);
-				*pDst = res.first;
-				return Convex(std::move(pt));
+				*pDst++ = res.first;
+				for(int i=1 ; i<nV1-1 ; i++)
+					*pDst++ = pt1[i];
+				return Convex(std::move(ptDst));
 			}
 		}
 
@@ -473,36 +519,49 @@ namespace boom {
 			auto res = checkPosition(inner);
 			if(res.first != POSITION::OUTER) {
 				int nV = point.size();
-				auto fn = std::bind((int (*)(int,int))spn::CndSub, std::placeholders::_1, nV);
-				auto binSearch = [this, &fn, &mdl](int a, int b) -> int {
+				auto binSearch = [this, nV, &mdl](int a, int b, bool flip) -> int {
 					for(;;) {
-						if(a+1 == b)
+						if(a+1 >= b)
 							break;
 						int c = (a+b)/2;
-						if(mdl.isInner(point[fn(c)]))
+						if(mdl.isInner(point[spn::CndRange(c, nV)]) ^ flip)
 							b = c;
 						else
 							a = c;
 					}
-					return fn(a);
+					return spn::CndRange(a, nV);
 				};
 
+				int a,b, begI;
 				// 2分探索で衝突が始まる地点を探す
-				int a = res.second,
-					b = res.second + nV;
-				int begI = binSearch(a, b);		// 衝突開始インデックス
+				if(mdl.isInner(point[res.second])) {
+					a = res.second - nV;
+					b = a + nV;
+					// 衝突開始インデックス(これ自体は衝突していない)
+					begI = binSearch(a, b, false);
+				} else {
+					begI = res.second;
+					if(!mdl.isInner(point[spn::CndSub(res.second+1, nV)]))
+						return PointL();
+				}
 
 				// 衝突が終わる地点を探す
-				a = res.second;
-				b = begI;
-				int endI = binSearch(a,b);
+				a = begI + 1;
+				b = a + nV;
+				int endI = binSearch(a,b, true);		// 衝突終了インデックス(これ自体衝突している)
 
-				PointL pts(spn::CndRange(endI - begI, nV));
+				if(begI == endI) {
+					// 全部出力
+					return point;
+				}
+				endI = spn::CndSub(endI+1, nV);
+				endI = spn::CndAdd(endI, begI, nV)+1;
+				PointL pts(endI - begI);
 				auto* pDst = &pts[0];
 				// 開始地点から終了地点までを出力
 				while(begI != endI) {
-					*pDst++ = point[begI];
-					begI = fn(begI+1);
+					*pDst++ = point[spn::CndSub(begI,nV)];
+					++begI;
 				}
 				return std::move(pts);
 			}
@@ -519,28 +578,62 @@ namespace boom {
 			}
 
 			// 内部のどの三角形に該当するか2分探索
-			int nV = point.size(),
-				a = 0,
-				b = nV;
-			while(a+1 < b) {
-				int c = (b-a) / 2;
-				float dA = (point[a]-inner).cw(toP),
-					dB = (point[(b%nV)]-inner).cw(toP),
-					dC = (point[c]-inner).cw(toP);
-				if(dA >= 0 && dB < 0)
-					b = c;
-				else if(dB>=0 && dC < 0)
-					a = c;
+			int nV = point.size();
+			struct Tmp {
+				GAP_VECTOR(vec, 2,
+						   (int index)
+						   (float cw))
+
+				Tmp& operator = (const Tmp& t) {
+					_mm_store_ps(vec.m, _mm_load_ps(t.vec.m));
+					return *this;
+				}
+			};
+			Tmp tmpA, tmpB, tmpC;
+			tmpA.vec = point[0]-inner;
+			tmpA.index = 0;
+			tmpA.cw = tmpA.vec.cw(toP);
+			tmpB.index = nV;
+			tmpB.vec = tmpA.vec;
+			tmpB.cw = tmpA.cw;
+
+			while(tmpA.index+1 < tmpB.index) {
+				tmpC.index = (tmpA.index+tmpB.index) / 2;
+				tmpC.vec = point[tmpC.index] - inner;
+				tmpC.cw = tmpC.vec.cw(toP);
+				float crAC = tmpA.vec.cw(tmpC.vec);
+
+				if(tmpA.cw >= 0) {
+					if(crAC >= 0) {
+						if(tmpC.cw <= 0)
+							tmpB = tmpC;
+						else
+							tmpA = tmpC;
+					} else
+						tmpA = tmpC;
+				} else {
+					if(crAC >= 0)
+						tmpA = tmpC;
+					else {
+						if(tmpC.cw >= 0)
+							tmpA = tmpC;
+						else
+							tmpB = tmpC;
+					}
+				}
 			}
-			float d = (point[b] - point[a]).cw(pos - point[a]);
+			tmpB.index = spn::CndSub(tmpB.index, nV);
+			float d = (point[tmpB.index] - point[tmpA.index]).cw(pos - point[tmpA.index]);
+			auto pA = point[tmpA.index],
+					pB = point[tmpB.index];
 			POSITION posf;
-			if(d > 0)
+			if(d > 1e-6f)
 				posf = POSITION::INNER;
-			else if(d < 0)
+			else if(d < -1e-6f)
 				posf = POSITION::OUTER;
 			else
 				posf = POSITION::ONLINE;
-			return CPos(posf, a);
+			return CPos(posf, tmpA.index);
 		}
 		bool ConvexCore::isInner(const Vec2& pos) const {
 			return checkPosition(pos).first != POSITION::OUTER;
@@ -646,6 +739,21 @@ namespace boom {
 				}
 			}
 			return c;
+		}
+		std::tuple<bool,Vec2,Vec2> ConvexCore::checkCrossingLine(const StLineCore& l) const {
+			//TODO: 効率の良い算出方法を探す
+			Vec2 pt[2];
+			Vec2* ppt = pt;
+			int nV = point.size();
+			for(int i=0 ; i<nV ; i++) {
+				auto res = LineCore(point[i], point[spn::CndSub(i+1, nV)]).crossPoint(l);
+				if(res.second != LINEPOS::NOTHIT) {
+					*ppt++ = res.first;
+					if(ppt == pt+2)
+						break;
+				}
+			}
+			return std::make_tuple(ppt == pt+2, pt[0], pt[1]);
 		}
 
 		Vec2 Convex::support(const Vec2& dir) const { return ConvexCore::support(dir); }

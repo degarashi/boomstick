@@ -32,8 +32,14 @@ void TestAssoc() {
 }
 void TestConvex() {
 	Convex cnv0{Vec2(0,0), Vec2(0,1), Vec2(1,1), Vec2(1,0)},
-			cnv1{Vec2(0,0.5f), Vec2(0.5f,1), Vec2(1,1), Vec2(1,0)};
-	cnv1.addOffset(Vec2(1.2f,0));
+			cnv1{Vec2(0.5f,0.5f), Vec2(3,1), Vec2(3,0)};
+//	cnv1.addOffset(Vec2(0.5f,0.5f));
+	GSimplex gs(cnv0, cnv1);
+	auto bHit = gs.getResult();
+	auto inner = gs.getInner();
+	auto cnv = cnv0.getOverlappingConvex(cnv1, inner);
+	std::cout << cnv;
+
 	GEpa ga(cnv0, cnv1);
 	auto np = ga.getNearestPair();
 	auto ip = ga.getInner();
@@ -53,8 +59,7 @@ void TestRigid() {
 }
 
 int main(int argc, char **argv) {
-	auto sz = sizeof(RPose);
-	auto sz2 = sz * 128;
+	TestConvex();
 	TestRigid();
 	return 0;
 }
