@@ -245,9 +245,8 @@ namespace boom {
 			if(c0*c1 <= 0) {
 				Vec2 dir(point[1]-point[0]);
 				dir.normalize();
-				c0 = std::fabs(c0);
-				float d = c0 / (c0+std::fabs(c1));
-				return LNear(l.pos + l.dir*d, LINEPOS::ONLINE);
+				float d = c0 / (c0+c1);
+				return LNear(point[0] + dir*d, LINEPOS::ONLINE);
 			}
 			return LNear(Vec2(), LINEPOS::NOTHIT);
 		}
@@ -672,35 +671,33 @@ namespace boom {
 			auto fadd = [&pDst0, &pDst1, &l](const Vec2& pPrev, const Vec2& pCur, int flg) {
 				switch(flg) {
 					case 0x03:		// Left -> Left
-						*pDst0++ = pPrev;
+						*pDst0++ = pCur;
 						break;
 					case 0x02: {	// Left -> Right
 						auto res = LineCore(pPrev, pCur).crossPoint(l);
 						assert(res.second == LINEPOS::ONLINE);
-						*pDst0++ = pPrev;
 						*pDst0++ = res.first;
-						*pDst1++ = res.first;
+						*pDst1++ = pCur;
 						break; }
 					case 0x01: {	// Right -> Left
 						auto res = LineCore(pPrev, pCur).crossPoint(l);
 						assert(res.second == LINEPOS::ONLINE);
-						*pDst1++ = pPrev;
 						*pDst1++ = res.first;
-						*pDst0++ = res.first;
+						*pDst0++ = pCur;
 						break; }
 					case 0x00:		// Right -> Right
-						*pDst1++ = pPrev;
+						*pDst1++ = pCur;
 						break;
 				}
 			};
 
-			int fchk = fcheck(0, l.dir.ccw(point[0] - l.pos)),
-				prev = fchk,
-				flag = prev;
+			int fchk = fcheck(0, l.dir.ccw(point[0]));
+			int prev = fchk;
+			int flag = 0;
 			for(int i=1 ; i<nV ; i++) {
 				// 正数が左側、負数は右側
 				const auto& p = point[i];
-				prev = fcheck(prev, l.dir.ccw(p-l.pos));
+				prev = fcheck(prev, l.dir.ccw(p));
 				flag = ((flag<<1) | prev) & 0x03;
 
 				fadd(point[i-1], p, flag);
