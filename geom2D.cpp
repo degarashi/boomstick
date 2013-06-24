@@ -671,33 +671,35 @@ namespace boom {
 			auto fadd = [&pDst0, &pDst1, &l](const Vec2& pPrev, const Vec2& pCur, int flg) {
 				switch(flg) {
 					case 0x03:		// Left -> Left
-						*pDst0++ = pCur;
+						*pDst0++ = pPrev;
 						break;
 					case 0x02: {	// Left -> Right
 						auto res = LineCore(pPrev, pCur).crossPoint(l);
 						assert(res.second == LINEPOS::ONLINE);
+						*pDst0++ = pPrev;
 						*pDst0++ = res.first;
-						*pDst1++ = pCur;
+						*pDst1++ = res.first;
 						break; }
 					case 0x01: {	// Right -> Left
 						auto res = LineCore(pPrev, pCur).crossPoint(l);
 						assert(res.second == LINEPOS::ONLINE);
+						*pDst1++ = pPrev;
 						*pDst1++ = res.first;
-						*pDst0++ = pCur;
+						*pDst0++ = res.first;
 						break; }
 					case 0x00:		// Right -> Right
-						*pDst1++ = pCur;
+						*pDst1++ = pPrev;
 						break;
 				}
 			};
 
-			int fchk = fcheck(0, l.dir.ccw(point[0]));
-			int prev = fchk;
-			int flag = 0;
+			int fchk = fcheck(0, l.dir.ccw(point[0] - l.pos)),
+				prev = fchk,
+				flag = prev;
 			for(int i=1 ; i<nV ; i++) {
 				// 正数が左側、負数は右側
 				const auto& p = point[i];
-				prev = fcheck(prev, l.dir.ccw(p));
+				prev = fcheck(prev, l.dir.ccw(p-l.pos));
 				flag = ((flag<<1) | prev) & 0x03;
 
 				fadd(point[i-1], p, flag);
