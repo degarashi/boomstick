@@ -243,10 +243,10 @@ namespace boom {
 			float c0 = l.dir.ccw(point[0]-l.pos),
 				c1 = l.dir.ccw(point[1]-l.pos);
 			if(c0*c1 <= 0) {
-				Vec2 dir(point[1]-point[0]);
-				dir.normalize();
-				float d = c0 / (c0+c1);
-				return LNear(point[0] + dir*d, LINEPOS::ONLINE);
+				Vec2 diff(point[1]-point[0]);
+				c0 = std::fabs(c0);
+				float d = c0 / (c0+std::fabs(c1));
+				return LNear(point[0] + diff*d, LINEPOS::ONLINE);
 			}
 			return LNear(Vec2(), LINEPOS::NOTHIT);
 		}
