@@ -11,7 +11,7 @@ namespace boom {
 		}
 
 		RPose::RPose(): _finalInv() {
-			_velAccum = _invAccum = getAccum()-1;
+			_identitySingle();
 		}
 		RPose::RPose(const RPose& rp): _finalInv() {
 			// trivialなctorなのでベタコピー
@@ -19,10 +19,14 @@ namespace boom {
 		}
 		void RPose::identity() {
 			Pose2D::identity();
+			_identitySingle();
+		}
+		void RPose::_identitySingle() {
 			_vel = _acc = Vec2(0);
 			_rotVel = _rotAcc = 0;
 			_setAsChanged();
 		}
+
 		void RPose::_setAsChanged() {
 			_velAccum = _invAccum = getAccum()-1;
 		}
@@ -47,7 +51,7 @@ namespace boom {
 
 		Vec2 RPose::getVelocAt(const Vec2& at) const {
 			Vec2 ret(at - getOffset());
-			return _vel + ret * cs_mRot90[0];
+			return _vel + ret * cs_mRot90[0] * _rotVel;
 		}
 		Vec2x2 RPose::getVelocities(const Vec2& at) const {
 			return {_vel, getVelocAt(at)};

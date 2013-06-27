@@ -485,8 +485,8 @@ namespace boom {
 			   ((float _rotAcc))
 			   ((mutable uint32_t _invAccum))	//!< 逆行列キャッシュを作った時のカウンタ値
 			)
-			//! Pose2Dのaccumカウンタとは別で速度に関する変数が書き換えられた際にインクリメント
-			uint32_t		_velAccum;
+			void _identitySingle();
+
 			protected:
 				void _setAsChanged();
 			public:
