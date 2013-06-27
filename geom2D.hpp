@@ -88,16 +88,28 @@ namespace boom {
 				float	torque;
 
 				F& operator += (const F& f);
+				friend std::ostream& operator << (std::ostream& os, const F& f);
 			};
 			F	sdump,	//!< スプリング & ダンパによる力
 				fricD;	//!< 動摩擦力
 
 			RForce& operator += (const RForce& rf);
+			friend std::ostream& operator << (std::ostream& os, const RForce& f);
 		};
 
+		struct StLineCore;
+		struct Convex;
+		using Convex2 = std::pair<Convex,Convex>;
+		using ConvexCore2 = std::pair<ConvexCore, ConvexCore>;
 		struct IModel {
 			using sptr = std::shared_ptr<IModel>;
 			using csptr = const sptr&;
+			enum class POSITION {
+				INNER,
+				ONLINE,
+				OUTER
+			};
+			using CPos = std::pair<POSITION, int>;
 
 			//! サポート射像
 			/*! 均等でないスケーリングは対応しない、移動は後でオフセット、回転はdirを逆にすれば代用可
@@ -114,7 +126,19 @@ namespace boom {
 				throw std::runtime_error("not supported function"); }
 			//! 境界ボリューム(円)
 			virtual CircleCore getBCircle() const;
+
+			// ---------- Convex専用 ----------
+			//! 物体を構成する頂点数を取得
+			/*! Circle, Lineなど物によってはサポートしていない */
+			virtual int getNPoints() const {
+				throw std::runtime_error("not supported function"); }
+			virtual Vec2 getPoint(int n) const {
+				throw std::runtime_error("not supported function"); }
+			virtual CPos checkPosition(const Vec2& pos) const {
+				throw std::runtime_error("not supported function"); }
+			virtual Convex2 splitTwo(const StLineCore& line) const;
 		};
+
 		template <class T>
 		struct IModelP : IModel {
 			static uint32_t GetCID() { return CTGeo::Find<T>::result; }
@@ -313,7 +337,7 @@ namespace boom {
 			bool isInner(const Vec2& pos) const override;
 			CircleCore getBCircle() const override;
 		};
-		class PolyModel : IModel {
+		class PolyModel : public IModel, public spn::CheckAlign<16,PolyModel> {
 			PolyCore		_poly;
 			mutable float	_area,
 							_inertia;
@@ -391,7 +415,7 @@ namespace boom {
 			//! 2つに分割
 			/*! \param[out] c0 線分の進行方向左側
 				\param[out] c1 線分の進行方向右側 */
-			std::pair<ConvexCore, ConvexCore> splitTwo(const StLineCore& l) const;
+			ConvexCore2 splitTwo(const StLineCore& l) const;
 			//! 2つに分割して左側を自身に適用
 			ConvexCore split(const StLineCore& l);
 			//! 2つに分割して右側は捨てる
@@ -410,42 +434,44 @@ namespace boom {
 			}
 			void addOffset(const Vec2& ofs);
 
-			enum class POSITION {
-				INNER,
-				ONLINE,
-				OUTER
-			};
-			using CPos = std::pair<POSITION, int>;
 			//! 指定ポイントの内部的な領域IDと内外位置を取得
 			/*! \return first=内外判定
 						second=領域ID */
-			CPos checkPosition(const Vec2& pos) const;
+			IModel::CPos checkPosition(const Vec2& pos) const;
 			//! 内部的な通し番号における外郭ライン
 			LineCore getOuterLine(int n) const;
+			StLineCore getOuterStLine(int n) const;
 			PointL getOverlappingPoints(const IModel& mdl, const Vec2& inner) const;
 			CircleCore getBCircle() const;
 			// 凸包が直線と交差している箇所を2点計算
 			std::tuple<bool,Vec2,Vec2> checkCrossingLine(const StLineCore& l) const;
 			// 直線がヒットしてるか判定後、始点と終点のチェック
 			bool hit(const LineCore& l) const;
-		};
-		std::ostream& operator << (std::ostream& os, const ConvexCore& c);
+			ConvexCore& operator *= (const AMat32& m);
 
+			friend std::ostream& operator << (std::ostream& os, const ConvexCore& c);
+		};
 		struct Convex : ConvexCore, IModelP<ConvexCore> {
 			using ConvexCore::ConvexCore;
 			Convex() = default;
 			Convex(ConvexCore&& c);
 			DEF_IMODEL_FUNCS
 			bool isInner(const Vec2& pos) const override;
-			//! 凸包が重なっている領域を求める
-			/*! 既に重なっている事が分かっている前提
-				\param[in] cnv 他方の物体
-				\param[in] inner 重複領域の内部点 */
-			Convex getOverlappingConvex(const Convex& cnv, const Vec2& inner) const;
 			PointL getOverlappingPoints(const IModel &mdl, const Vec2& inner) const override;
 			CircleCore getBCircle() const override;
+			int getNPoints() const override;
+			Vec2 getPoint(int n) const override;
+			CPos checkPosition(const Vec2& pos) const override;
+			Convex2 splitTwo(const StLineCore& l) const override;
+			Convex& operator *= (const AMat32& m);
+			//! 凸包が重なっている領域を求める
+			/*! 既に重なっている事が分かっている前提
+				\param[in] m0 モデルその1(Convexとみなす)
+				\param[in] m1 モデルその2(Convexとみなす)
+				\param[in] inner 重複領域の内部点 */
+			static Convex GetOverlappingConvex(const IModel& m0, const IModel& m1, const Vec2& inner);
 		};
-		class ConvexModel : public IModelP<ConvexCore> {
+		class ConvexModel : public IModelP<ConvexCore>, public spn::CheckAlign<16,ConvexModel> {
 			private:
 				ConvexCore		_convex;
 				mutable AVec2	_center;
@@ -462,6 +488,7 @@ namespace boom {
 
 			public:
 				ConvexModel();
+				ConvexModel(std::initializer_list<Vec2> v);
 				ConvexModel(const PointL& pl);
 				ConvexModel(PointL&& pl);
 
@@ -470,21 +497,26 @@ namespace boom {
 				const AVec2& getCenter() const;
 				const PointL& getPoint() const;
 				PointL& refPoint();
+				const ConvexCore& getConvex() const;
 
 				void addOffset(const Vec2& ofs);
 				DEF_IMODEL_FUNCS
 				bool isInner(const Vec2& pos) const override;
 				PointL getOverlappingPoints(const IModel &mdl, const Vec2& inner) const override;
 				CircleCore getBCircle() const override;
+				int getNPoints() const override;
+				Vec2 getPoint(int n) const override;
+				CPos checkPosition(const Vec2& pos) const override;
+				Convex2 splitTwo(const StLineCore& line) const override;
 		};
 
 		//! 剛体制御用
 		class RPose : public spn::Pose2D {
 			Vec2			_vel,
 							_acc;
-			GAP_MATRIX_DEF(mutable, _finalInv, 3,3,
-			   ((float _rotVel))
-			   ((float _rotAcc))
+			GAP_MATRIX_DEF(mutable, _finalInv, 3,2,
+			   ((float _rotVel, float _rotAcc))
+			   ((uint32_t _velAccum))			//!< Pose2Dのaccumカウンタとは別で速度に関する変数が書き換えられた際にインクリメント
 			   ((mutable uint32_t _invAccum))	//!< 逆行列キャッシュを作った時のカウンタ値
 			)
 			void _identitySingle();
@@ -622,36 +654,28 @@ namespace boom {
 		using TModelR = TModel<const IModel&, BASE>;
 
 		//! 剛体ラッパ (形状 + 姿勢)
-		class Rigid : public IModel {
+		class Rigid : public TModelSP<RPose> {
 			public:
 				constexpr static int NUM_RESIST = 4;
 				using sptr = std::shared_ptr<Rigid>;
 				using csptr = const sptr&;
 				using SPResist = std::shared_ptr<IResist>;
 			private:
-				IModel::sptr	_spModel;				//!< 形状
-				RPose			_pose;					//!< 姿勢
 				SPResist		_resist[NUM_RESIST];	//!< 抵抗計算用
 
 			public:
-				Rigid(IModel::csptr sp);
-				Rigid(IModel::csptr sp, const RPose& pose);
+				using TModelSP<RPose>::TModelSP;
 
 				// --- シミュレーションに関する関数など ---
-				Vec2 support(const Vec2& dir) const override;
-				Vec2 center() const override;
-				uint32_t getCID() const override;
-				bool isInner(const Vec2& pos) const override;
-
 				RPose& refPose();
 				const RPose& getPose() const;
-				const IModel& getModel() const;
 
 				void addR(const SPResist& sp);
 				//! 抵抗力を計算
 				/*! \param itr 衝突判定結果のイテレータ */
 				RForce::F resist(ColResult::CItrP itr) const;
 		};
+
 		//! 位置と速度を与えた時にかかる加速度(抵抗力)を計算
 		struct IResist : std::enable_shared_from_this<IResist> {
 			using sptr = std::shared_ptr<IResist>;

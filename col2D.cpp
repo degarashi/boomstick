@@ -125,7 +125,6 @@ namespace boom {
 
 		// ---------------------- GEpa ----------------------
 		const Vec2x2& GEpa::_minkowskiSub(const Vec2& dir, int n) {
-			int nV = _vl.size();
 			auto* vp = new Vec2x2;
 			vp->second = _m1.support(-dir);
 			vp->first = _m0.support(dir) - vp->second;
@@ -381,7 +380,7 @@ namespace boom {
 
 		//! 固有のアルゴリズムによる衝突判定
 		bool HitCheck(const IModel& mdl0, const IModel& mdl1) {
-			uint32_t id = (mdl0.getCID() << spn::NBits<CTGeo::size>::result) | mdl1.getCID();
+//			uint32_t id = (mdl0.getCID() << spn::NBits<CTGeo::size>::result) | mdl1.getCID();
 			throw std::runtime_error("not implemented yet");
 		}
 		//! 固有のアルゴリズムでmdlFromのmdlToに対する最深点を算出

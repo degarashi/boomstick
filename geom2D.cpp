@@ -42,16 +42,19 @@ namespace boom {
 			fricD += rf.fricD;
 			return *this;
 		}
+		std::ostream& operator << (std::ostream& os, const RForce::F& f) {
+			return os << "linear: " << f.linear << std::endl
+					  << "torque: " << f.torque;
+		}
+		std::ostream& operator << (std::ostream& os, const RForce& f) {
+			return os << "sdump: " << f.sdump << std::endl
+					  << "fricD: " << f.fricD;
+		}
 
 		CircleCore IModel::getBCircle() const {
-			throw std::runtime_error("not supported function");
-		}
-		std::ostream& operator << (std::ostream& os, const ConvexCore& c) {
-			for(auto& p : c.point)
-				std::cout << '[' << p.x << ',' << p.y << ']' << std::endl;
-			std::cout << std::endl;
-			return os;
-		}
+			throw std::runtime_error("not supported function"); }
+		Convex2 IModel::splitTwo(const StLineCore& line) const {
+			throw std::runtime_error("not supported function"); }
 
 		// ---------------------- Point ----------------------
 		float PointCore::distance(const LineCore& l) const {
@@ -130,7 +133,6 @@ namespace boom {
 			return center.dist_sq(c.center) <= spn::Square(radius + c.radius);
 		}
 		CircleCore CircleCore::operator * (const AMat32& m) const {
-			CircleCore c;
 			auto& m2 = reinterpret_cast<const spn::AMat22&>(m);
 			Vec2 tx(center + Vec2(radius,0)),
 				ty(center + Vec2(0,radius));
@@ -447,20 +449,47 @@ namespace boom {
 		LineCore ConvexCore::getOuterLine(int n) const {
 			return LineCore(point[(n+1)%point.size()], point[n]);
 		}
-		auto Func(const Convex& c0, const Convex& c1, const Vec2& inner) -> Convex {
-			auto ip = c0.checkPosition(inner);
-			const auto &p0 = c0.point[ip.second],
-						&p1 = c0.point[spn::CndSub(ip.second+1, c0.point.size())];
-			StLineCore line(p0, (p1-p0).normalization());
-			return Convex(c1.splitTwo(line).second);
-		};
+		StLineCore ConvexCore::getOuterStLine(int n) const {
+			return StLineCore(point[n], (point[spn::CndSub(n+1, point.size())] - point[n]).normalization());
+		}
+		std::ostream& operator << (std::ostream& os, const ConvexCore& c) {
+			for(auto& p : c.point)
+				os << '[' << p.x << ',' << p.y << ']' << std::endl;
+			return os;
+		}
 
 		Convex::Convex(ConvexCore&& c): ConvexCore(std::forward<ConvexCore>(c)) {}
-		Convex Convex::getOverlappingConvex(const Convex& cnv, const Vec2& inner) const {
-			auto fn0 = [](const Convex& c0, const Convex& c1, const Vec2& inner) -> std::pair<bool,PointL> {
+		Convex2 Convex::splitTwo(const StLineCore& l) const {
+			return Convex2(std::move(ConvexCore::splitTwo(l)));
+		}
+		Convex2 ConvexModel::splitTwo(const StLineCore& l) const {
+			return Convex2(std::move(_convex.splitTwo(l)));
+		}
+		ConvexCore& ConvexCore::operator *= (const AMat32& m) {
+			for(auto& p : point)
+				p = p.asVec3(1) * m;
+			return *this;
+		}
+		Convex& Convex::operator *= (const AMat32& m) {
+			((ConvexCore&)*this) *= m;
+			return *this;
+		}
+
+		namespace {
+			//! c0の1領域に対してc1がめり込んでいる場合の領域抽出
+			auto Func(const IModel& c0, const IModel& c1, const Vec2& inner) -> Convex {
+				// innerをc0ローカルにして判定
+				auto ip = c0.checkPosition(inner);
+				const Vec2 &p0 = c0.getPoint(ip.second),
+							&p1 = c0.getPoint(spn::CndSub(ip.second+1, c0.getNPoints()));
+				// lineをc1ローカルにして分割 -> ワールド座標系に変換
+				StLineCore line(p0, (p1-p0).normalization());
+				return c1.splitTwo(line).second;
+			};
+			auto Func2(const IModel& c0, const IModel& c1, const Vec2& inner) -> std::pair<bool,PointL> {
 				PointL pt0(c0.getOverlappingPoints(c1, inner));
 				int nV0 = pt0.size();
-				if(nV0 == c0.point.size()) {
+				if(nV0 == c0.getNPoints()) {
 					if(nV0 == 3) {
 						for(int i=0 ; i<3 ; i++) {
 							if(!c1.isInner(pt0[i]))
@@ -472,12 +501,14 @@ namespace boom {
 				}
 				return std::make_pair(false, std::move(pt0));
 			};
+		}
+		Convex Convex::GetOverlappingConvex(const IModel& m0, const IModel& m1, const Vec2& inner) {
 			// m0がm1にめり込んでいる頂点リストを出力
-			auto res0 = fn0(*this, cnv, inner);
+			auto res0 = Func2(m0, m1, inner);
 			if(res0.first)
 				return Convex(std::move(res0.second));
 			// m1がm0にめり込んでいる頂点リストを出力
-			auto res1 = fn0(cnv, *this, inner);
+			auto res1 = Func2(m1, m0, inner);
 			if(res1.first)
 				return Convex(std::move(res1.second));
 
@@ -486,13 +517,13 @@ namespace boom {
 			int nV0 = pt0.size(),
 				nV1 = pt1.size();
 			if(nV0 == 0) {
-				assert(nV1 >= 3);
+				assert(nV1 >= 3);	// これがfalseなら、2つのConvexは重なっていない可能性がある
 				// m1のめり込んだ頂点全部がm0の1つの辺に収まっている
-				return Func(*this, cnv, inner);
+				return Func(m0, m1, inner);
 			} else if(nV1 == 0) {
-				assert(nV0 >= 3);
+				assert(nV0 >= 3);	// これがfalseなら、2つのConvexは重なっていない可能性がある
 				// m0のめり込んだ頂点全部がm1の1つの辺に収まっている
-				return Func(cnv, *this, inner);
+				return Func(m1, m0, inner);
 			} else {
 				assert(nV0>=3 && nV1>=3);
 				PointL ptDst(nV0 + nV1 - 2);
@@ -513,10 +544,13 @@ namespace boom {
 				return Convex(std::move(ptDst));
 			}
 		}
+		int Convex::getNPoints() const { return point.size(); }
+		Vec2 Convex::getPoint(int n) const { return point[n]; }
+		IModel::CPos Convex::checkPosition(const Vec2& pos) const { return ConvexCore::checkPosition(pos); }
 
 		PointL ConvexCore::getOverlappingPoints(const IModel& mdl, const Vec2& inner) const {
 			auto res = checkPosition(inner);
-			if(res.first != POSITION::OUTER) {
+			if(res.first != IModel::POSITION::OUTER) {
 				int nV = point.size();
 				auto binSearch = [this, nV, &mdl](int a, int b, bool flip) -> int {
 					for(;;) {
@@ -567,7 +601,7 @@ namespace boom {
 			return PointL();
 		}
 
-		ConvexCore::CPos ConvexCore::checkPosition(const Vec2& pos) const {
+		IModel::CPos ConvexCore::checkPosition(const Vec2& pos) const {
 			// 適当に内部点を算出
 			Vec2 inner = (point[0] + point[1] + point[2]) * (1.f/3);
 			Vec2 toP(pos - inner);
@@ -625,17 +659,17 @@ namespace boom {
 			float d = (point[tmpB.index] - point[tmpA.index]).cw(pos - point[tmpA.index]);
 			auto pA = point[tmpA.index],
 					pB = point[tmpB.index];
-			POSITION posf;
+			IModel::POSITION posf;
 			if(d > 1e-6f)
-				posf = POSITION::INNER;
+				posf = IModel::POSITION::INNER;
 			else if(d < -1e-6f)
-				posf = POSITION::OUTER;
+				posf = IModel::POSITION::OUTER;
 			else
-				posf = POSITION::ONLINE;
-			return CPos(posf, tmpA.index);
+				posf = IModel::POSITION::ONLINE;
+			return IModel::CPos(posf, tmpA.index);
 		}
 		bool ConvexCore::isInner(const Vec2& pos) const {
-			return checkPosition(pos).first != POSITION::OUTER;
+			return checkPosition(pos).first != IModel::POSITION::OUTER;
 		}
 		std::tuple<float,float,Vec2> ConvexCore::area_inertia_center() const {
 			int nL = point.size();
@@ -653,7 +687,7 @@ namespace boom {
 			inertia -= center.len_sq();
 			return std::make_tuple(al.sum, inertia, center);
 		}
-		std::pair<ConvexCore,ConvexCore> ConvexCore::splitTwo(const StLineCore& l) const {
+		ConvexCore2 ConvexCore::splitTwo(const StLineCore& l) const {
 			int nV = point.size();
 			PointL pt0(nV+1), pt1(nV+1);		// 最初に最大容量確保しておき、後で縮める
 			auto *pDst0 = &pt0[0],
@@ -762,6 +796,7 @@ namespace boom {
 		CircleCore Convex::getBCircle() const { return ConvexCore::getBCircle(); }
 
 		ConvexModel::ConvexModel(): _rflag(RFL_ALL) {}
+		ConvexModel::ConvexModel(std::initializer_list<Vec2> v): _convex(v), _rflag(RFL_ALL) {}
 		ConvexModel::ConvexModel(const PointL& pl): _convex(pl), _rflag(RFL_ALL) {}
 		ConvexModel::ConvexModel(PointL&& pl): _convex(pl), _rflag(RFL_ALL) {}
 
@@ -790,7 +825,7 @@ namespace boom {
 			_rflag = RFL_ALL;
 			return _convex.point;
 		}
-		void ConvexModel::addOffset(const Vec2& ofs) { _convex.addOffset(ofs); }
+		const ConvexCore& ConvexModel::getConvex() const { return _convex; }
 		Vec2 ConvexModel::support(const Vec2& dir) const { return _convex.support(dir); }
 		Vec2 ConvexModel::center() const { return Vec2(getCenter()); }
 		bool ConvexModel::isInner(const Vec2& pos) const { return _convex.isInner(pos); }
@@ -800,6 +835,15 @@ namespace boom {
 				_bbCircle = _convex.getBCircle();
 			return _bbCircle;
 		}
+		void ConvexModel::addOffset(const Vec2& ofs) {
+			_convex.addOffset(ofs);
+			// 中心座標をずらす
+			_center += ofs;
+			_bbCircle.center += ofs;
+		}
+		int ConvexModel::getNPoints() const { return _convex.point.size(); }
+		Vec2 ConvexModel::getPoint(int n) const { return _convex.point[n]; }
+		IModel::CPos ConvexModel::checkPosition(const Vec2& pos) const { return _convex.checkPosition(pos); }
 
 		Vec3 Dual(const Plane& plane) {
 			float d = plane.d;
@@ -827,88 +871,101 @@ namespace boom {
 		}
 		// ----- 領域の積分計算関数 -----
 		namespace {
+			//! 引数がプラスなら1, マイナスなら-1を返す
+			float PlusMinus1(float val) {
+				auto ival = spn::ReinterpretValue<uint32_t>(val);
+				constexpr uint32_t one = 0x3f800000;
+				return spn::ReinterpretValue<float>(one | (ival & 0x80000000));
+			}
+			class Tmp {
+				public:
+					struct TmpIn {
+						float height;		// 深度
+						float velN, velT;	// 衝突断面の相対速度の垂直、水平成分
+						float pos;			// 直線に射影した2D頂点は1次元の数値になる
+						float fricD;
+					};
+
+				private:
+					TmpIn	_tmp[2];
+					int		_swI = 0;
+					const RPose			&_rp0,
+										&_rp1;
+					const StLineCore	&_div;
+					const RCoeff		&_coeff;
+					Vec2				_nml;
+
+					void _advance(const Vec2& p) {
+						_doSwitch();
+						auto& cur = _current();
+						cur.height = std::fabs(_div.dir.ccw(p-_div.pos));
+
+						// 物体Bから見た物体Aの相対速度
+						Vec2 vel = _rp1.getVelocAt(p) - _rp0.getVelocAt(p);
+						cur.velN = _nml.dot(vel);
+						cur.velT = _div.dir.dot(vel);
+						// 物体Aの重心からの相対座標 (直線方向に対して)
+						cur.pos = _div.dir.dot(p) - _div.dir.dot(_rp0.getOffset());
+						cur.fricD = 0;
+					}
+					void _doSwitch() { _swI ^= 1; }
+					TmpIn& _current() { return _tmp[_swI]; }
+					TmpIn& _prev() { return _tmp[_swI^1]; }
+
+				public:
+					Tmp(const RPose& r0, const RPose& r1, const StLineCore& div, const RCoeff& coeff): _swI(0), _rp0(r0), _rp1(r1), _div(div), _coeff(coeff) {
+						// 衝突ライン(2D)の法線
+						_nml = div.dir * cs_mRot90[0];
+						if(_nml.dot(_rp0.getOffset() - div.pos) < 0)
+							_nml *= -1.f;
+					}
+					void calcForce(RForce& dst, const ConvexCore& c, float sign0) {
+						const auto& pts = c.point;
+						int nV = pts.size();
+						if(nV < 3)
+							return;
+
+						float p_lin = 0,
+							p_tor = 0,
+							p_fdLin = 0,
+							p_fdTor = 0;
+						_advance(pts[0]);
+						for(int i=1 ; i<=nV ; i++) {
+							int idx = spn::CndSub(i,nV);
+							_advance(pts[idx]);
+							auto& cur = _current();
+							auto& pre = _prev();
+							float sign = PlusMinus1((pts[idx] - pts[i-1]).dot(_div.dir)) * sign0;
+							// calc spring
+							cur.fricD = (pre.height + cur.height) * 0.5f * sign * _coeff.spring;
+							p_tor += (1.f/3) * (pre.pos*pre.height + (pre.pos*cur.height + cur.pos*pre.height)*0.5f + cur.pos*cur.height) * sign * _coeff.spring;
+							// calc dumper
+							cur.fricD += (pre.velN + cur.velN) * 0.5f * sign * _coeff.dumper;
+							p_lin += cur.fricD;
+							p_tor += (1.f/3) * (pre.pos*pre.velN + (pre.pos*cur.velN + cur.pos*pre.velN)*0.5f + cur.pos*cur.velN) * sign * _coeff.dumper;
+							// dynamic-friction
+							cur.fricD = (pre.velT + cur.velT) * 0.5f * cur.fricD;
+							cur.fricD *= _coeff.fricD;
+							p_fdLin += cur.fricD;
+							p_fdTor += (1.f/3) * (pre.pos*pre.fricD + (pre.pos*cur.fricD + cur.pos*pre.fricD)*0.5f + cur.pos*cur.fricD) * sign * _coeff.fricD;
+							// TODO: calc static-friction
+						}
+						dst.sdump.linear += _nml * p_lin;
+						dst.sdump.torque += p_tor;
+						dst.fricD.linear += _div.dir * p_fdLin;
+						dst.fricD.torque += p_fdTor;
+					}
+			};
 			//! 凸包を三角形に分割して抗力を計算
 			RForce CalcRF_Convex(const RPose& rp0, const RPose& rp1, const RCoeff& coeff, const ConvexCore& cv, const StLineCore& div) {
-				class Tmp {
-					public:
-						struct TmpIn {
-							float height;		// 深度
-							float velN, velT;	// 衝突断面の相対速度の垂直、水平成分
-							float pos;			// 直線に射影した2D頂点は1次元の数値になる
-							float fricD;
-						};
-
-					private:
-						TmpIn	_tmp[2];
-						int		_swI = 0;
-						const RPose			&_rp0,
-											&_rp1;
-						const StLineCore	&_div;
-						Vec2				_nml;
-
-						void _advance(const Vec2& p) {
-							_doSwitch();
-							auto& cur = _current();
-							cur.height = _div.dir.ccw(p);
-
-							Vec2 vel = _rp1.getVelocAt(p) - _rp0.getVelocAt(p);
-							cur.velN = _nml.dot(vel);
-							cur.velT = _div.dir.dot(vel);
-							cur.pos = _div.posDot(p);
-							cur.fricD = 0;
-						}
-						void _doSwitch() { _swI ^= 1; }
-						TmpIn& _current() { return _tmp[_swI]; }
-						TmpIn& _prev() { return _tmp[_swI^1]; }
-
-					public:
-						Tmp(const RPose& r0, const RPose& r1, const StLineCore& div): _rp0(r0), _rp1(r1), _div(div) {
-							// 衝突ライン(2D)の法線
-							_nml = div.dir * cs_mRot90[0];
-							if(_nml.dot(_rp0.getOffset()) < 0)
-								_nml *= -1.f;
-						}
-						void calcForce(RForce& dst, const ConvexCore& c) {
-							const auto& pts = c.point;
-							int nV = pts.size();
-							if(nV < 3)
-								return;
-
-							float p_lin = 0,
-								p_tor = 0,
-								p_fdLin = 0,
-								p_fdTor = 0;
-							_advance(pts[0]);
-							for(int i=1 ; i<nV ; i++) {
-								_advance(pts[i]);
-								auto& cur = _current();
-								auto& pre = _prev();
-								// calc spring
-								cur.fricD = (pre.height + cur.height) * 0.5f;
-								p_tor += (1.f/3) * (pre.pos*pre.height + (pre.pos*cur.height + cur.pos*pre.height)*0.5f + cur.pos*cur.height);
-								// calc dumper
-								cur.fricD += (pre.velN + cur.velN) * 0.5f;
-								p_lin += cur.fricD;
-								p_tor += (1.f/3) * (pre.pos*pre.velN + (pre.pos*cur.velN + cur.pos*pre.velN)*0.5f + cur.pos*cur.velN);
-								// dynamic-friction
-								cur.fricD = (pre.velT + cur.velT) * 0.5f * cur.fricD;
-								p_fdLin += cur.fricD;
-								p_fdTor += (1.f/3) * (pre.pos*pre.fricD + (pre.pos*cur.fricD + cur.pos*pre.fricD)*0.5f + cur.pos*cur.fricD);
-								// TODO: calc static-friction
-							}
-							dst.sdump.linear += _nml * p_lin;
-							dst.sdump.torque += p_tor;
-							dst.fricD.linear += _div.dir * p_fdLin;
-							dst.fricD.torque += p_fdTor;
-						}
-				};
-
-				Tmp tmp(rp0, rp1, div);
+				// 直線方向に向かって左側が表で、右が裏
+				// st.dot(line)がプラスなら足し、逆なら引く
+				Tmp tmp(rp0, rp1, div, coeff);
 				RForce rf = {};
 				// 直線(断面)で2つに切ってそれぞれ計算
 				auto cvt = cv.splitTwo(div);
-				tmp.calcForce(rf, cvt.first);
-				tmp.calcForce(rf, cvt.second);
+				tmp.calcForce(rf, cvt.first, 1.f);
+				tmp.calcForce(rf, cvt.second, -1.f);
 				return rf;
 			}
 			//! 円同士
@@ -919,9 +976,9 @@ namespace boom {
 			}
 			RForce CalcOV_Convex2(const Rigid& r0, const Rigid& r1, const Vec2& inner, const RCoeff& coeff, const StLineCore& div) {
 				// 領域算出
-				auto &m0 = reinterpret_cast<const Convex&>(r0.getModel()),
-					&m1 = reinterpret_cast<const Convex&>(r1.getModel());
-				return CalcRF_Convex(r0.getPose(), r1.getPose(), coeff, m0.getOverlappingConvex(m1, inner), div);
+				Convex cnv = Convex::GetOverlappingConvex(r0, r1, inner);
+				std::cout << cnv << std::endl;
+				return CalcRF_Convex(r0.getPose(), r1.getPose(), coeff, cnv, div);
 			}
 			//! 円とBox含む多角形
 			RForce CalcOV_CircleConvex(const Rigid& r0, const Rigid& r1, const Vec2& inner, const RCoeff& coeff, const StLineCore& div) {
@@ -934,8 +991,8 @@ namespace boom {
 
 		RForce CalcForce(const Rigid& r0, const Rigid& r1, const Vec2& inner, const RCoeff& coeff, const StLineCore& div) {
 			// 実質Convex, Box, Circle専用
-			if(r0.getModel().getCID() == Circle::GetCID()) {
-				if(r1.getModel().getCID() == Circle::GetCID())
+			if(r0.getCID() == Circle::GetCID()) {
+				if(r1.getCID() == Circle::GetCID())
 					return CalcOV_Circle2(r0, r1, inner, coeff, div);
 				return CalcOV_CircleConvex(r0, r1, inner, coeff, div);
 			}

@@ -17,6 +17,7 @@ namespace boom {
 			// trivialなctorなのでベタコピー
 			std::memcpy(this, &rp, sizeof(rp));
 		}
+
 		void RPose::identity() {
 			Pose2D::identity();
 			_identitySingle();
@@ -98,38 +99,12 @@ namespace boom {
 		RPose::Value RPose::refValue() {
 			return Value(*this);
 		}
+
 		// -------------------------- TR_Mat --------------------------
 		TR_Mat::TR_Mat(const RPose& rp): _mToLocal(rp.getToLocal()), _mToWorld(rp.getToWorld()) {}
 		TR_Mat::TR_Mat(const TR_Mat& t, tagInverse): _mToLocal(t._mToWorld), _mToWorld(t._mToLocal) {}
 		TR_Mat::TR_Mat(const RPose& rp, tagInverse): _mToLocal(rp.getToWorld()), _mToWorld(rp.getToLocal()) {}
 
-		// -------------------------- Rigid --------------------------
-		Rigid::Rigid(IModel::csptr sp): _spModel(sp) {}
-		Rigid::Rigid(IModel::csptr sp, const RPose& pose): _spModel(sp), _pose(pose) {}
-
-		Vec2 Rigid::support(const Vec2& dir) const {
-			// dirを座標変換
-			Vec2 tdir = _pose.toLocalDir(dir);
-			return _spModel->support(tdir);
-		}
-		Vec2 Rigid::center() const {
-			return _spModel->center();
-		}
-		uint32_t Rigid::getCID() const {
-			return _spModel->getCID();
-		}
-		bool Rigid::isInner(const Vec2& pos) const {
-			return false;
-		}
-		RPose& Rigid::refPose() {
-			return _pose;
-		}
-		const RPose& Rigid::getPose() const {
-			return _pose;
-		}
-		const IModel& Rigid::getModel() const {
-			return *_spModel.get();
-		}
 		Vec2 TR_Mat::toLocal(const Vec2& v) const { return v.asVec3(1) * _mToLocal; }
 		Vec2 TR_Mat::toLocalDir(const Vec2& v) const { return v.asVec3(0) * _mToLocal; }
 		Vec2 TR_Mat::toWorld(const Vec2& v) const { return v.asVec3(1) * _mToWorld; }
@@ -198,6 +173,10 @@ namespace boom {
 		template class TModel<const IModel&, TR_Mat>;
 		template class TModel<IModel::sptr, RPose>;
 		template class TModel<const IModel&, RPose>;
+
+		// -------------------------- Rigid --------------------------
+		RPose& Rigid::refPose() { return *this; }
+		const RPose& Rigid::getPose() const { return *this; }
 
 		void Rigid::addR(const SPResist& sp) {
 			for(int i=0 ; i<4 ; i++) {
@@ -457,21 +436,17 @@ namespace boom {
 			int nR = _rlist.size();
 			for(int i=0 ; i<nR-1 ; i++) {
 				const auto* pr0 = _rlist[i].get();
-				const auto& mdl0 = pr0->getModel();
-				auto c0 = mdl0.getBCircle()
-							* pr0->getPose().getFinal();
+				auto c0 = pr0->getBCircle();
 				_cresult.setCurrent(i);
 
 				for(int j=i+1 ; j<nR ; j++) {
 					const auto* pr1 = _rlist[j].get();
-					const auto& mdl1 = pr1->getModel();
-					auto c1 = mdl1.getBCircle()
-								* pr1->getPose().getFinal();
+					auto c1 = pr1->getBCircle();
 
 					// 境界球による判定
 					if(c0.hit(c1)) {
 						// GJKによる判定
-						GSimplex gs(mdl0, mdl1);
+						GSimplex gs(*pr0, *pr1);
 						if(gs.getResult()) {
 							// ついでに内部点も格納
 							_cresult.pushItem(pr1, gs.getInner());
