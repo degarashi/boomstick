@@ -9,10 +9,10 @@
 
 namespace boom {
 	const spn::AMat22 cs_mRot90[2] = {
-		{spn::COS90, spn::SIN90,
-		-spn::SIN90, spn::COS90},
 		{spn::COS90, -spn::SIN90,
-		spn::SIN90, spn::COS90}
+		spn::SIN90, spn::COS90},
+		{spn::COS90, spn::SIN90,
+		-spn::SIN90, spn::COS90}
 	};
 	float Area_x2(const Vec2& v0, const Vec2& v1) {
 		return std::fabs(v0.cw(v1));
@@ -42,7 +42,11 @@ namespace boom {
 		}
 		bool GSimplex::_gjkMethod() {
 			Vec2 dir(_m1.center() - _m0.center());
-			dir.normalize();
+			float lens = dir.len_sq();
+			if(lens < DIST_THRESHOLD)
+				dir = Vec2(1,0);
+			else
+				dir *= spn::_sseRSqrt(lens);
 
 			_minkowskiSub(dir, 0);
 			if(dir.dot(_vtx[0]) < -DOT_THRESHOLD) {
@@ -50,7 +54,7 @@ namespace boom {
 				return false;
 			}
 			// 原点と重なっていたら終了 = 内部点
-			float lens = _vtx[0].len_sq();
+			lens = _vtx[0].len_sq();
 			if(lens < DIST_THRESHOLD) {
 				_nVtx = 1;
 				_inner = _posB[0];
