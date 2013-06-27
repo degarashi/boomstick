@@ -57,7 +57,7 @@ namespace boom {
 			return {_vel, getVelocAt(at)};
 		}
 		Vec2 RPose::toLocal(const Vec2& wpos) const {
-			const auto& m = getFinalInv();
+			const auto& m = getToLocal();
 			auto v = wpos.asVec3(1) * m;
 			return Vec2(v.x, v.y);
 		}
@@ -65,7 +65,7 @@ namespace boom {
 			return wdir * spn::AMat22::Rotation(-getAngle());
 		}
 		Vec2 RPose::toWorld(const Vec2& lpos) const {
-			const auto& m = getFinal();
+			const auto& m = getToWorld();
 			return lpos.asVec3(1) * m;
 		}
 		Vec2 RPose::toWorldDir(const Vec2& ldir) const {
@@ -75,11 +75,13 @@ namespace boom {
 			return _velAccum;
 		}
 
-		const AMat33& RPose::getFinalInv() const {
+		const AMat32& RPose::getToLocal() const {
 			auto ac = getAccum();
 			if(_invAccum != ac) {
 				_invAccum = ac;
-				getFinal().convertA33().inversion(_finalInv);
+				AMat33 tmp(getToWorld().convertA33());
+				tmp.invert();
+				_finalInv = tmp.convertA32();
 			}
 			return _finalInv;
 		}
@@ -96,6 +98,10 @@ namespace boom {
 		RPose::Value RPose::refValue() {
 			return Value(*this);
 		}
+		// -------------------------- TR_Mat --------------------------
+		TR_Mat::TR_Mat(const RPose& rp): _mToLocal(rp.getToLocal()), _mToWorld(rp.getToWorld()) {}
+		TR_Mat::TR_Mat(const TR_Mat& t, tagInverse): _mToLocal(t._mToWorld), _mToWorld(t._mToLocal) {}
+		TR_Mat::TR_Mat(const RPose& rp, tagInverse): _mToLocal(rp.getToWorld()), _mToWorld(rp.getToLocal()) {}
 
 		// -------------------------- Rigid --------------------------
 		Rigid::Rigid(IModel::csptr sp): _spModel(sp) {}
@@ -124,6 +130,74 @@ namespace boom {
 		const IModel& Rigid::getModel() const {
 			return *_spModel.get();
 		}
+		Vec2 TR_Mat::toLocal(const Vec2& v) const { return v.asVec3(1) * _mToLocal; }
+		Vec2 TR_Mat::toLocalDir(const Vec2& v) const { return v.asVec3(0) * _mToLocal; }
+		Vec2 TR_Mat::toWorld(const Vec2& v) const { return v.asVec3(1) * _mToWorld; }
+		Vec2 TR_Mat::toWorldDir(const Vec2& v) const { return v.asVec3(0) * _mToWorld; }
+		const AMat32& TR_Mat::getToLocal() const { return _mToLocal; }
+		const AMat32& TR_Mat::getToWorld() const { return _mToWorld; }
+
+		// -------------------------- TModel --------------------------
+		template <class MDL, class BASE>
+		TModel<MDL,BASE>::TModel(const MDL& mdl, const BASE& base): BASE(base), _model(mdl) {}
+		template <class MDL, class BASE>
+		TModel<MDL,BASE>::TModel(const MDL &mdl): _model(mdl) {}
+
+		#define DEF_TMODEL(typ)	template <class MDL,class BASE> typ TModel<MDL,BASE>
+		DEF_TMODEL(const IModel&)::_getModel(const IModel& mdl) const { return mdl; }
+		DEF_TMODEL(const IModel&)::_getModel(IModel::csptr sp) const { return *sp.get(); }
+		DEF_TMODEL(Vec2)::support(const Vec2& dir) const {
+			// dirをローカルに座標変換してサポート写像した後、またワールド座標系に戻す
+			Vec2 pos = _getModel(_model).support(BASE::toLocalDir(dir));
+			return BASE::toWorld(pos);
+		}
+		DEF_TMODEL(Vec2)::center() const {
+			Vec2 res = _getModel(_model).center();
+			return BASE::toWorld(res);
+		}
+		DEF_TMODEL(bool)::isInner(const Vec2& pos) const {
+			Vec2 tpos = BASE::toLocal(pos);
+			return _getModel(_model).isInner(tpos);
+		}
+		DEF_TMODEL(const MDL&)::getModel() const {
+			return _model;
+		}
+		DEF_TMODEL(uint32_t)::getCID() const {
+			return _getModel(_model).getCID();
+		}
+		DEF_TMODEL(CircleCore)::getBCircle() const {
+			CircleCore c = _getModel(_model).getBCircle();
+			return c * BASE::getToWorld();
+		}
+		DEF_TMODEL(PointL)::getOverlappingPoints(const IModel& mdl, const Vec2& inner) const {
+			// innerとmdlをこちらのローカル座標系に変換
+			TModelR<TR_Mat> t_mdl(mdl, (const BASE&)*this);
+			Vec2 t_inner(BASE::toLocal(inner));
+			return _getModel(_model).getOverlappingPoints(t_mdl, t_inner);
+		}
+		DEF_TMODEL(int)::getNPoints() const { return _getModel(_model).getNPoints(); }
+		DEF_TMODEL(Vec2)::getPoint(int n) const {
+			Vec2 p = _getModel(_model).getPoint(n);
+			return BASE::toWorld(p);
+		}
+		DEF_TMODEL(IModel::CPos)::checkPosition(const Vec2& pos) const {
+			// posをローカル座標系に変換
+			Vec2 tpos = BASE::toLocal(pos);
+			return _getModel(_model).checkPosition(tpos);
+		}
+		DEF_TMODEL(Convex2)::splitTwo(const StLineCore& line) const {
+			StLineCore tline(BASE::toLocal(line.pos),
+							BASE::toLocalDir(line.dir));
+			auto res = _getModel(_model).splitTwo(tline);
+			res.first *= BASE::getToWorld();
+			res.second *= BASE::getToWorld();
+			return std::move(res);
+		}
+		#undef DEF_TMODEL
+		template class TModel<IModel::sptr, TR_Mat>;
+		template class TModel<const IModel&, TR_Mat>;
+		template class TModel<IModel::sptr, RPose>;
+		template class TModel<const IModel&, RPose>;
 
 		void Rigid::addR(const SPResist& sp) {
 			for(int i=0 ; i<4 ; i++) {

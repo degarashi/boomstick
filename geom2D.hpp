@@ -17,6 +17,8 @@ namespace boom {
 	using spn::Vec3;
 	using spn::Plane;
 	using spn::AMat32;
+	using spn::Mat32;
+	using spn::Mat33;
 	using spn::AMat33;
 	using spn::_sseRcp22Bit;
 	using spn::CType;
@@ -532,7 +534,7 @@ namespace boom {
 				Vec2 toWorldDir(const Vec2& ldir) const;
 				uint32_t getVelocityAccum() const;
 
-				const AMat33& getFinalInv() const;
+				const AMat32& getToLocal() const;
 				RPose lerp(const RPose& p1, float t) const;
 				Value refValue();
 		};
@@ -570,6 +572,55 @@ namespace boom {
 				CItrP getItem(int id) const;
 		};
 		struct IResist;
+		//! 座標変換ありのモデル基底
+		/*! 既存のモデルに被せる形で使う */
+		template <class MDL, class BASE>
+		class TModel : public IModel, public BASE {
+			MDL				_model;		//!< 形状
+
+			const IModel& _getModel(IModel::csptr sp) const;
+			const IModel& _getModel(const IModel& mdl) const;
+
+			public:
+				TModel(const TModel& t) = default;
+				TModel(const MDL& mdl);
+				TModel(const MDL& mdl, const BASE& base);
+				const MDL& getModel() const;
+
+				uint32_t getCID() const override;
+				Vec2 support(const Vec2& dir) const override;
+				Vec2 center() const override;
+				bool isInner(const Vec2& pos) const override;
+				PointL getOverlappingPoints(const IModel& mdl, const Vec2& inner) const override;
+				CircleCore getBCircle() const override;
+				int getNPoints() const override;
+				Vec2 getPoint(int n) const override;
+				CPos checkPosition(const Vec2& pos) const override;
+				Convex2 splitTwo(const StLineCore& line) const override;
+		};
+
+		class TR_Mat {
+			AMat32	_mToLocal,
+					_mToWorld;
+			public:
+				static struct tagInverse {} TagInverse;
+				TR_Mat() = default;
+				TR_Mat(const TR_Mat& t) = default;
+				TR_Mat(const TR_Mat& t, tagInverse);
+				TR_Mat(const RPose& rp);
+				TR_Mat(const RPose& rp, tagInverse);
+				Vec2 toLocal(const Vec2& v) const;
+				Vec2 toLocalDir(const Vec2& v) const;
+				Vec2 toWorld(const Vec2& v) const;
+				Vec2 toWorldDir(const Vec2& v) const;
+				const AMat32& getToLocal() const;
+				const AMat32& getToWorld() const;
+		};
+		template <class BASE>
+		using TModelSP = TModel<IModel::sptr, BASE>;
+		template <class BASE>
+		using TModelR = TModel<const IModel&, BASE>;
+
 		//! 剛体ラッパ (形状 + 姿勢)
 		class Rigid : public IModel {
 			public:
