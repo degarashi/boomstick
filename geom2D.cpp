@@ -37,11 +37,31 @@ namespace boom {
 			torque += f.torque;
 			return *this;
 		}
+		RForce::F& RForce::F::operator *= (float s) {
+			linear *= s;
+			torque *= s;
+			return *this;
+		}
+		RForce::F RForce::F::operator * (float s) const {
+			F ret(*this);
+			return ret *= s;
+		}
+
 		RForce& RForce::operator +=(const RForce& rf) {
 			sdump += rf.sdump;
 			fricD += rf.fricD;
 			return *this;
 		}
+		RForce& RForce::operator *= (float s) {
+			sdump *= s;
+			fricD *= s;
+			return *this;
+		}
+		RForce RForce::operator * (float s) const {
+			RForce ret(*this);
+			return ret *= s;
+		}
+
 		std::ostream& operator << (std::ostream& os, const RForce::F& f) {
 			return os << "linear: " << f.linear << std::endl
 					  << "torque: " << f.torque;
@@ -871,12 +891,6 @@ namespace boom {
 		}
 		// ----- 領域の積分計算関数 -----
 		namespace {
-			//! 引数がプラスなら1, マイナスなら-1を返す
-			float PlusMinus1(float val) {
-				auto ival = spn::ReinterpretValue<uint32_t>(val);
-				constexpr uint32_t one = 0x3f800000;
-				return spn::ReinterpretValue<float>(one | (ival & 0x80000000));
-			}
 			class Tmp {
 				public:
 					struct TmpIn {
@@ -905,7 +919,7 @@ namespace boom {
 						cur.velN = _nml.dot(vel);
 						cur.velT = _div.dir.dot(vel);
 						// 物体Aの重心からの相対座標 (直線方向に対して)
-						cur.pos = _div.dir.dot(p) - _div.dir.dot(_rp0.getOffset());
+						cur.pos = _div.dir.dot(p);
 						cur.fricD = 0;
 					}
 					void _doSwitch() { _swI ^= 1; }
@@ -916,7 +930,7 @@ namespace boom {
 					Tmp(const RPose& r0, const RPose& r1, const StLineCore& div, const RCoeff& coeff): _swI(0), _rp0(r0), _rp1(r1), _div(div), _coeff(coeff) {
 						// 衝突ライン(2D)の法線
 						_nml = div.dir * cs_mRot90[0];
-						if(_nml.dot(_rp0.getOffset() - div.pos) < 0)
+						if(_nml.dot(_rp0.getOffset() - div.pos) > 0)
 							_nml *= -1.f;
 					}
 					void calcForce(RForce& dst, const ConvexCore& c, float sign0) {
@@ -935,19 +949,19 @@ namespace boom {
 							_advance(pts[idx]);
 							auto& cur = _current();
 							auto& pre = _prev();
-							float sign = PlusMinus1((pts[idx] - pts[i-1]).dot(_div.dir)) * sign0;
+							float area = (cur.pos - pre.pos) * sign0;		// マイナスの場合も有り得る
 							// calc spring
-							cur.fricD = (pre.height + cur.height) * 0.5f * sign * _coeff.spring;
-							p_tor += (1.f/3) * (pre.pos*pre.height + (pre.pos*cur.height + cur.pos*pre.height)*0.5f + cur.pos*cur.height) * sign * _coeff.spring;
+							cur.fricD = (pre.height + cur.height) * 0.5f * area * _coeff.spring;
+							p_tor += (1.f/3) * (pre.pos*pre.height + (pre.pos*cur.height + cur.pos*pre.height)*0.5f + cur.pos*cur.height) * area * _coeff.spring;
 							// calc dumper
-							cur.fricD += (pre.velN + cur.velN) * 0.5f * sign * _coeff.dumper;
+							cur.fricD += (pre.velN + cur.velN) * 0.5f * area * _coeff.dumper;
 							p_lin += cur.fricD;
-							p_tor += (1.f/3) * (pre.pos*pre.velN + (pre.pos*cur.velN + cur.pos*pre.velN)*0.5f + cur.pos*cur.velN) * sign * _coeff.dumper;
+							p_tor += (1.f/3) * (pre.pos*pre.velN + (pre.pos*cur.velN + cur.pos*pre.velN)*0.5f + cur.pos*cur.velN) * area * _coeff.dumper;
 							// dynamic-friction
 							cur.fricD = (pre.velT + cur.velT) * 0.5f * cur.fricD;
 							cur.fricD *= _coeff.fricD;
 							p_fdLin += cur.fricD;
-							p_fdTor += (1.f/3) * (pre.pos*pre.fricD + (pre.pos*cur.fricD + cur.pos*pre.fricD)*0.5f + cur.pos*cur.fricD) * sign * _coeff.fricD;
+							p_fdTor += (1.f/3) * (pre.pos*pre.fricD + (pre.pos*cur.fricD + cur.pos*pre.fricD)*0.5f + cur.pos*cur.fricD) * area * _coeff.fricD;
 							// TODO: calc static-friction
 						}
 						dst.sdump.linear += _nml * p_lin;
