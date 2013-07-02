@@ -4,6 +4,7 @@
 #include <cassert>
 #include <boost/optional.hpp>
 #include "spinner/layerbit.hpp"
+#include "spinner/noseq.hpp"
 
 namespace boom {
 	//! ColResultで使用: ダミー情報クラス
@@ -222,6 +223,91 @@ namespace boom {
 			}
 			const INFO& getInfo() const {
 				return _info;
+			}
+	};
+
+	//! broad-phase collision manager (round robin)
+	/*! A->A, A->Bでは判定が行われるが B->Bはされない */
+	template <class NODE>
+	class BroadC_RoundRobin {
+		public:
+			enum TYPE {
+				TYPE_A,
+				TYPE_B,
+				NUM_TYPE
+			};
+		private:
+			using SPNode = std::shared_ptr<NODE>;
+			using Nodes = spn::noseq_list<SPNode>;
+			Nodes	_node[NUM_TYPE];
+
+		public:
+			using const_iterator = typename Nodes::const_iterator;
+			using id_type = typename Nodes::id_type;
+			int getNum(TYPE typ) const { return _node[typ].size(); }
+			int getNumObj() const { return getNum(TYPE_A) + getNum(TYPE_B); }
+
+			id_type add(TYPE typ, const SPNode& sp) {
+				return _node[typ].add(sp);
+			}
+			void rem(TYPE typ, id_type id) {
+				_node[typ].rem(id);
+			}
+			const_iterator cbegin(TYPE typ) const {
+				return _node[typ].cbegin();
+			}
+			const_iterator cend(TYPE typ) const {
+				return _node[typ].cend();
+			}
+			template <class CRes>
+			int collision(CRes& cr) const {
+				int nA = _node[TYPE_A].size(),
+					nB = _node[TYPE_B].size(),
+					count = 0;
+				typename CRes::narrow_type nchk;
+				cr.clear();
+				cr.setNumObjects(nA + nB);
+				// A -> A
+				auto itrB_a = _node[TYPE_A].begin(),
+					itrE_a = _node[TYPE_A].end(),
+					itrE_a1 = itrE_a;
+				--itrE_a1;
+
+				int iCur=0;
+				for(auto itr=itrB_a ; itr!=itrE_a1 ; ++itr,++iCur) {
+					const NODE& nodeA = *itr->value;
+
+					auto itr2 = itr;
+					++itr2;
+					for(int jCur=iCur+1; itr2!=itrE_a ; ++itr2,++jCur) {
+						const NODE& nodeA2 = *itr2->value;
+						if(nchk(nodeA, nodeA2)) {
+							cr(iCur, jCur, nodeA, nodeA2, nchk.getInfo());
+							++count;
+						}
+					}
+				}
+				// A -> B
+				if(!_node[TYPE_B].empty()) {
+					auto itrB_b = _node[TYPE_B].begin(),
+							itrE_b = _node[TYPE_B].end(),
+							itrE_b1 = itrE_b;
+					--itrE_b1;
+
+					iCur=0;
+					for(auto itr=itrB_a ; itr!=itrE_a ; ++itr,++iCur) {
+						const NODE& nodeA = *itr->value;
+						int jCur=0;
+						for(auto itr2=itrB_b ; itr2!=itrE_b ; ++itr2,++jCur) {
+							const NODE& nodeB = *itr2->value;
+							if(nchk(nodeA,nodeB)) {
+								cr(iCur, jCur, nodeA, nodeB, nchk.getInfo());
+								++count;
+							}
+						}
+					}
+				}
+				return count;
 			}
 	};
 }
