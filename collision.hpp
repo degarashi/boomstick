@@ -226,6 +226,15 @@ namespace boom {
 			}
 	};
 
+	//! 剛体シミュレーションで使用する係数
+	struct RCoeff {
+		float	spring,	//!< スプリング係数
+				dumper,	//!< ダンパ係数
+				fricD,	//!< 動摩擦係数
+				fricS,	//!< 静止摩擦係数
+				fricMS;	//!< 最大静止摩擦係数
+	};
+
 	//! broad-phase collision manager (round robin)
 	/*! A->A, A->Bでは判定が行われるが B->Bはされない */
 	template <class NODE>

@@ -31,7 +31,8 @@ void TestAssoc() {
 	std::cout << std::endl;
 }
 void TestRigid() {
-	RigidMgr rm(IItg::sptr(new itg::Eular));
+	boom::RCoeff rc = {1,1,1,1,1};
+	RigidMgr rm(IItg::sptr(new itg::Eular), rc);
 	// 頂点を定義して、重心を求めそこを中心にして座標を変換
 	ConvexModel *c0 = ConvexModel::New({Vec2(0,0), Vec2(0,1), Vec2(1,1), Vec2(1,0)}),
 				*c1 = ConvexModel::New({Vec2(0.5f,0.5f), Vec2(3,1), Vec2(3,0)});
@@ -49,12 +50,10 @@ void TestRigid() {
 	pp[0]->setVelocity(Vec2(1,0));
 	pp[1]->setVelocity(Vec2(-1,0));
 
-	RCoeff rc = {1,1,1,1,1};
-	rm.setCoeff(rc);
 	auto spGrav = IResist::sptr(new resist::Gravity(Vec2(0,-9.8f)));
 	auto spCol = IResist::sptr(new resist::Impact);
 	for(int i=0 ; i<2 ; i++) {
-		rm.add(rg[i]);
+		rm.addA(rg[i]);
 		rg[i]->addR(spGrav);
 		rg[i]->addR(spCol);
 	}

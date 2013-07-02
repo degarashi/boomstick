@@ -101,6 +101,7 @@ namespace boom {
 		}
 
 		// -------------------------- TR_Mat --------------------------
+		TR_Mat::tagInverse TR_Mat::TagInverse;
 		TR_Mat::TR_Mat(const RPose& rp): _mToLocal(rp.getToLocal()), _mToWorld(rp.getToWorld()) {}
 		TR_Mat::TR_Mat(const TR_Mat& t, tagInverse): _mToLocal(t._mToWorld), _mToWorld(t._mToLocal) {}
 		TR_Mat::TR_Mat(const RPose& rp, tagInverse): _mToLocal(rp.getToWorld()), _mToWorld(rp.getToLocal()) {}
@@ -113,8 +114,6 @@ namespace boom {
 		const AMat32& TR_Mat::getToWorld() const { return _mToWorld; }
 
 		// -------------------------- TModel --------------------------
-		template <class MDL, class BASE>
-		TModel<MDL,BASE>::TModel(const MDL& mdl, const BASE& base): BASE(base), _model(mdl) {}
 		template <class MDL, class BASE>
 		TModel<MDL,BASE>::TModel(const MDL &mdl): _model(mdl) {}
 
@@ -146,7 +145,7 @@ namespace boom {
 		}
 		DEF_TMODEL(PointL)::getOverlappingPoints(const IModel& mdl, const Vec2& inner) const {
 			// innerとmdlをこちらのローカル座標系に変換
-			TModelR<TR_Mat> t_mdl(mdl, (const BASE&)*this);
+			TModelR<TR_Mat> t_mdl(mdl, (const BASE&)*this, TR_Mat::TagInverse);
 			Vec2 t_inner(BASE::toLocal(inner));
 			return _getModel(_model).getOverlappingPoints(t_mdl, t_inner);
 		}
@@ -196,7 +195,7 @@ namespace boom {
 			}
 			assert(false);
 		}
-		RForce::F Rigid::resist(int index, const RigidMgr::CRes& cr) const {
+		RForce::F Rigid::resist(int index, const RigidCR& cr) const {
 			RForce::F res = {};
 			for(auto& sp : _resist) {
 				if(!sp)
@@ -209,11 +208,11 @@ namespace boom {
 		// -------------------------- IResist --------------------------
 		namespace resist {
 			Gravity::Gravity(const Vec2& v): _grav(v) {}
-			void Gravity::resist(RForce::F& acc, const Rigid& /*r*/, int /*index*/, const RigidMgr::CRes& /*cr*/) const {
+			void Gravity::resist(RForce::F& acc, const Rigid& /*r*/, int /*index*/, const RigidCR& /*cr*/) const {
 				acc.linear += _grav;
 			}
 
-			void Impact::resist(RForce::F& acc, const Rigid& r, int index, const RigidMgr::CRes& cr) const {
+			void Impact::resist(RForce::F& acc, const Rigid& r, int index, const RigidCR& cr) const {
 				auto fc = cr.getInfo().getInfo(index, 0);
 				auto& ff = fc->sdump;
 				auto& ff2 = fc->fricD;
@@ -224,10 +223,9 @@ namespace boom {
 		namespace itg {
 			// -------------------------- Eular --------------------------
 			int Eular::numOfIteration() const { return 1; }
-			void Eular::advance(int pass, const RList& rlist, const RigidMgr::CRes& cr, float dt) {
-				int nR = rlist.size();
-				for(int i=0 ; i<nR ; i++) {
-					auto* ptr = rlist[i].get();
+			void Eular::advance(int pass, RItr itr, RItr itrE, const RigidCR& cr, float dt) {
+				for(int i=0 ; itr!=itrE ; ++i,++itr) {
+					auto* ptr = itr->value.get();
 					auto st = ptr->refPose().refValue();
 					// 現フレームの加速度
 					auto acc = ptr->resist(i, cr);
@@ -252,20 +250,20 @@ namespace boom {
 				decltype(_tvalue) tmp;
 				std::swap(_tvalue, tmp);
 			}
-			void ImpEular::advance(int pass, const RList& rlist, const RigidMgr::CRes& cr, float dt) {
+			void ImpEular::advance(int pass, RItr itr, RItr itrE, const RigidCR& cr, float dt) {
 				auto *tv0 = &_tvalue[0];
 				float dth2 = dt/2;
-				int nR = rlist.size();
+				int cur = 0;
 				if(pass == 0) {
 					// value = 1つ前の(計算上の)状態
-					for(int i=0 ; i<nR ; i++) {
-						auto* ptr = rlist[i].get();
+					while(itr != itrE) {
+						auto* ptr = itr->value.get();
 						auto dat = ptr->refPose().refValue();
-						auto& ps = tv0[i];
+						auto& ps = tv0[cur];
 
 						// 内部のメモリに書き込むと同時に出力
 						ps = dat;
-						auto acc = ptr->resist(i, cr);
+						auto acc = ptr->resist(cur, cr);
 						dat.ofs += dat.vel * dt;
 						dat.vel += dat.acc * dt;
 						dat.ang += dat.rotVel * dt;
@@ -273,20 +271,26 @@ namespace boom {
 						// (衝突判定結果は1フレーム遅れて出る為)
 						ps.acc = acc.linear;
 						ps.rotAcc = acc.torque;
+
+						++itr;
+						++cur;
 					}
 				} else {
-					for(int i=0 ; i<nR ; i++) {
-						auto* ptr = rlist[i].get();
+					while(itr != itrE) {
+						auto* ptr = itr->value.get();
 						auto dat = ptr->refPose().refValue();
-						auto& ps0 = tv0[i];
+						auto& ps0 = tv0[cur];
 
 						dat.ofs = ps0.ofs + (ps0.vel + dat.vel) * dth2;
 						dat.vel = ps0.vel + (ps0.acc + dat.acc) * dth2;
 						dat.ang = ps0.ang + (ps0.rotVel + dat.rotVel) * dth2;
 						dat.rotVel = ps0.rotVel + (ps0.rotAcc + dat.rotAcc) * dth2;
-						auto acc = ptr->resist(i, cr);
+						auto acc = ptr->resist(cur, cr);
 						dat.acc = acc.linear;
 						dat.rotAcc = acc.torque;
+
+						++itr;
+						++cur;
 					}
 				}
 			}
@@ -300,10 +304,11 @@ namespace boom {
 				std::swap(_tvalue, tmp);
 			}
 			// TODO: 4回分も当たり判定していたら遅そうなので2回に留める案
-			void RK4::advance(int pass, const RList& rlist, const RigidMgr::CRes& cr, float dt) {
+			void RK4::advance(int pass, RItr itr, RItr itrE, const RigidCR& cr, float dt) {
 				float dt2 = dt/2,
 						dt6 = dt/6;
-				int nR = rlist.size();
+				int cur = 0,
+					nR = itrE-itr;
 				auto *tv0 = &_tvalue[0],
 					*tv1 = &_tvalue[nR],
 					*tv2 = &_tvalue[2*nR],
@@ -311,66 +316,75 @@ namespace boom {
 
 				switch(pass) {
 					case 0:
-						for(int i=0 ; i<nR ; i++) {
-							auto* ptr = rlist[i].get();
+						while(itr != itrE) {
+							auto* ptr = itr->value.get();
 							auto dat = ptr->refPose().refValue();
-							auto& ps = tv0[i];
+							auto& ps = tv0[cur];
 
 							ps = dat;
-							auto acc = ptr->resist(i, cr);		// 処理前の加速度
+							auto acc = ptr->resist(cur, cr);		// 処理前の加速度
 							ps.acc = acc.linear;
 							ps.rotAcc = acc.torque;
 							dat.ofs += dat.vel * dt2;
 							dat.vel += ps.acc * dt2;
 							dat.ang += dat.rotVel * dt2;
 							dat.rotVel += ps.rotAcc * dt2;
+
+							++itr;
+							++cur;
 						}
 						break;
 					case 1:
-						for(int i=0 ; i<nR ; i++) {
-							auto* ptr = rlist[i].get();
+						while(itr != itrE) {
+							auto* ptr = itr->value.get();
 							auto dat = ptr->refPose().refValue();
-							auto &ps0 = tv0[i],
-								&ps1 = tv1[i];
+							auto &ps0 = tv0[cur],
+								&ps1 = tv1[cur];
 
 							ps1 = dat;
-							auto acc = ptr->resist(i, cr);		// ps1の加速度
+							auto acc = ptr->resist(cur, cr);		// ps1の加速度
 							ps1.acc = acc.linear;
 							ps1.rotAcc = acc.torque;
 							dat.ofs = ps0.ofs + ps1.vel * dt2;
 							dat.vel = ps0.vel + ps1.acc * dt2;
 							dat.ang = ps0.ang + ps1.rotVel * dt2;
 							dat.rotVel = ps0.rotVel + ps1.rotAcc * dt2;
+
+							++itr;
+							++cur;
 						}
 						break;
 					case 2:
-						for(int i=0 ; i<nR ; i++) {
-							auto* ptr = rlist[i].get();
+						while(itr != itrE) {
+							auto* ptr = itr->value.get();
 							auto dat = ptr->refPose().refValue();
-							auto &ps0 = tv0[i],
-								&ps2 = tv2[i];
+							auto &ps0 = tv0[cur],
+								&ps2 = tv2[cur];
 
 							ps2 = dat;
-							auto acc = ptr->resist(i, cr);		// ps2の加速度
+							auto acc = ptr->resist(cur, cr);		// ps2の加速度
 							ps2.acc = acc.linear;
 							ps2.rotAcc = acc.torque;
 							dat.ofs = ps0.ofs + ps2.vel * dt;
 							dat.vel = ps0.vel + ps2.acc * dt;
 							dat.ang = ps0.ang + ps2.rotVel * dt;
 							dat.rotVel = ps0.rotVel + ps2.rotAcc * dt;
+
+							++itr;
+							++cur;
 						}
 						break;
 					case 3:
-						for(int i=0 ; i<nR ; i++) {
-							auto* ptr = rlist[i].get();
+						while(itr != itrE) {
+							auto* ptr = itr->value.get();
 							auto dat = ptr->refPose().refValue();
-							auto &ps0 = tv0[i],
-								&ps1 = tv1[i],
-								&ps2 = tv2[i],
-								&ps3 = tv3[i];
+							auto &ps0 = tv0[cur],
+								&ps1 = tv1[cur],
+								&ps2 = tv2[cur],
+								&ps3 = tv3[cur];
 
 							ps3 = dat;
-							auto acc = ptr->resist(i, cr);
+							auto acc = ptr->resist(cur, cr);
 							ps3.acc = acc.linear;
 							ps3.rotAcc = acc.torque;
 
@@ -380,6 +394,9 @@ namespace boom {
 							dat.rotVel = ps0.rotVel + (ps0.rotAcc + ps1.rotAcc*2 + ps2.rotAcc*2 + ps3.rotAcc) * dt6;
 							dat.acc = ps0.acc;
 							dat.rotAcc = ps0.rotAcc;
+
+							++itr;
+							++cur;
 						}
 						break;
 				}
@@ -387,59 +404,39 @@ namespace boom {
 		}
 
 		// -------------------------- RigidMgr --------------------------
-		RigidMgr::RigidMgr(IItg::csptr itg): _itg(itg) {}
-		void RigidMgr::add(Rigid::csptr sp) {
-			_rlist.push_back(sp);
-		}
+		RigidMgr::RigidMgr(IItg::csptr itg, const RCoeff& coeff): RigidCR(coeff), _itg(itg) {}
 		void RigidMgr::_checkCollision() {
-			_cresult.clear();
-			// TODO: 4分木を使ってマシな動作速度にする
-			int nR = _rlist.size();
-			_cresult.setNumObjects(nR);
-			for(int i=0 ; i<nR-1 ; i++) {
-				const auto* pr0 = _rlist[i].get();
-				auto c0 = pr0->getBCircle();
-
-				for(int j=i+1 ; j<nR ; j++) {
-					const auto* pr1 = _rlist[j].get();
-					auto c1 = pr1->getBCircle();
-
-					// 境界球による判定
-					if(c0.hit(c1)) {
-						// GJKによる判定
-						GSimplex gs(*pr0, *pr1);
-						if(gs.getResult()) {
-							// ついでに内部点も格納
-							//TODO: 衝突平面の計算
-							auto f = CalcForce(*pr0, *pr1,
-											   gs.getInner(), _coeff, StLineCore(Vec2(0,0), Vec2(0,1)));
-							_cresult.setFlagWithInfo(i,j, f);
-						}
-					}
-				}
-			}
+			RigidCR::clear();
+			RigidCR::setNumObjects(_broadC.getNumObj());
+			_broadC.collision(*this);
+		}
+		RigidMgr::id_type RigidMgr::addA(const SPRigid& sp) {
+			return _broadC.add(BroadC::TYPE_A, sp);
+		}
+		RigidMgr::id_type RigidMgr::addB(const SPRigid& sp) {
+			return _broadC.add(BroadC::TYPE_B, sp);
+		}
+		void RigidMgr::remA(id_type id) {
+			_broadC.rem(BroadC::TYPE_A, id);
+		}
+		void RigidMgr::remB(id_type id) {
+			_broadC.rem(BroadC::TYPE_B, id);
 		}
 		void RigidMgr::simulate(float dt) {
 			IItg* itg = _itg.get();
-			int nR = _rlist.size(),
+			int nR = _broadC.getNumObj(),
 				nItr = itg->numOfIteration();
 
 			itg->beginIteration(nR);
 			for(int i=0 ; i<nItr ; i++) {
 				// 当たり判定結果は一回分だけとっておけば良い
 				_checkCollision();
-				itg->advance(i, _rlist, _cresult, dt);
+				for(int j=0 ; j<BroadC::NUM_TYPE ; j++) {
+					auto typ = static_cast<BroadC::TYPE>(j);
+					itg->advance(i, _broadC.cbegin(typ), _broadC.cend(typ), *this, dt);
+				}
 			}
 			itg->endIteration();
-		}
-		void RigidMgr::setCoeff(const RCoeff& c) {
-			_coeff = c;
-		}
-		int RigidMgr::getNRigid() const {
-			return _rlist.size();
-		}
-		Rigid::csptr RigidMgr::getRigid(int n) const {
-			return _rlist[n];
 		}
 	}
 }
