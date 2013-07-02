@@ -658,35 +658,44 @@ namespace boom {
 					return *this;
 				}
 			};
+			// tmpA = point[0]へのベクトル
 			Tmp tmpA, tmpB, tmpC;
 			tmpA.vec = point[0]-inner;
 			tmpA.index = 0;
 			tmpA.cw = tmpA.vec.cw(toP);
+			// tmpB = point[nV]へのベクトル
 			tmpB.index = nV;
 			tmpB.vec = tmpA.vec;
 			tmpB.cw = tmpA.cw;
 
 			while(tmpA.index+1 < tmpB.index) {
+				// 捜査対象範囲の半分で区切る => tmpC
 				tmpC.index = (tmpA.index+tmpB.index) / 2;
 				tmpC.vec = point[tmpC.index] - inner;
 				tmpC.cw = tmpC.vec.cw(toP);
 				float crAC = tmpA.vec.cw(tmpC.vec);
 
 				if(tmpA.cw >= 0) {
+					// posはtmpAの右側
 					if(crAC >= 0) {
-						if(tmpC.cw <= 0)
+						// tmpCはtmpAの右側
+						if(tmpC.cw <= 0) {
+							// posはtmpCの左側
 							tmpB = tmpC;
-						else
+						} else
 							tmpA = tmpC;
 					} else
-						tmpA = tmpC;
+						tmpB = tmpC;
 				} else {
-					if(crAC >= 0)
+					// posはtmpAの左側
+					if(crAC >= 0) {
+						// tmpCはtmpAの右側
 						tmpA = tmpC;
-					else {
-						if(tmpC.cw >= 0)
+					} else {
+						if(tmpC.cw >= 0) {
+							// posはtmpCの右側
 							tmpA = tmpC;
-						else
+						} else
 							tmpB = tmpC;
 					}
 				}
