@@ -257,9 +257,9 @@ namespace boom {
 			return spn::IsNear(toV1.dot(toP), toP.length(), 1e-5f);
 		}
 		LNear LineCore::crossPoint(const LineCore& l) const {
-			auto fn = [](float f){ return spn::Saturate(f, 0.f,1.f); };
-			Vec2 cp = NearestPoint(l.toStLine(), point[0], fn);
-			return LNear(cp, online(cp) ? LINEPOS::ONLINE : LINEPOS::NOTHIT);
+			auto fn = [](float f){ return f; };
+			Vec2x2 v2 = NearestPoint(toStLine(), l.toStLine(), fn, fn);
+			return LNear(v2.first, online(v2.first) ? LINEPOS::ONLINE : LINEPOS::NOTHIT);
 		}
 		LNear LineCore::crossPoint(const StLineCore& l) const {
 			float c0 = l.dir.ccw(point[0]-l.pos),
