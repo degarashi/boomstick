@@ -143,11 +143,16 @@ namespace boom {
 			CircleCore c = _getModel(_model).getBCircle();
 			return c * BASE::getToWorld();
 		}
-		DEF_TMODEL(PointL)::getOverlappingPoints(const IModel& mdl, const Vec2& inner) const {
+		DEF_TMODEL(IModel::PosL)::getOverlappingPoints(const IModel& mdl, const Vec2& inner) const {
 			// innerとmdlをこちらのローカル座標系に変換
 			TModelR<TR_Mat> t_mdl(mdl, (const BASE&)*this, TR_Mat::TagInverse);
 			Vec2 t_inner(BASE::toLocal(inner));
-			return _getModel(_model).getOverlappingPoints(t_mdl, t_inner);
+			// 結果をグローバル座標系へ変換
+			auto ret = _getModel(_model).getOverlappingPoints(t_mdl, t_inner);
+			const auto& mat = BASE::getToWorld();
+			for(auto& p : ret.second)
+				p = p.asVec3(1) * mat;
+			return std::move(ret);
 		}
 		DEF_TMODEL(int)::getNPoints() const { return _getModel(_model).getNPoints(); }
 		DEF_TMODEL(Vec2)::getPoint(int n) const {
@@ -163,8 +168,9 @@ namespace boom {
 			StLineCore tline(BASE::toLocal(line.pos),
 							BASE::toLocalDir(line.dir));
 			auto res = _getModel(_model).splitTwo(tline);
-			res.first *= BASE::getToWorld();
-			res.second *= BASE::getToWorld();
+			const auto& mat = BASE::getToWorld();
+			res.first *= mat;
+			res.second *= mat;
 			return std::move(res);
 		}
 		DEF_TMODEL(std::ostream&)::dbgPrint(std::ostream& os) const {

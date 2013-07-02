@@ -119,6 +119,7 @@ namespace boom {
 				OUTER
 			};
 			using CPos = std::pair<POSITION, int>;
+			using PosL = std::pair<bool, PointL>;
 
 			//! サポート射像
 			/*! 均等でないスケーリングは対応しない、移動は後でオフセット、回転はdirを逆にすれば代用可
@@ -131,7 +132,7 @@ namespace boom {
 			virtual bool isInner(const Vec2& pos) const { return false; }
 			//! 外郭を構成する頂点で、mdlにめり込んでいる物を抽出
 			/*! \return 時計回りでmdlにめり込んでいる頂点リスト。前後も含む */
-			virtual PointL getOverlappingPoints(const IModel& mdl, const Vec2& inner) const {
+			virtual PosL getOverlappingPoints(const IModel& mdl, const Vec2& inner) const {
 				throw std::runtime_error("not supported function"); }
 			//! 境界ボリューム(円)
 			virtual CircleCore getBCircle() const;
@@ -412,6 +413,7 @@ namespace boom {
 			const static uint8_t cs_index[1<<8];
 
 			ConvexCore() = default;
+			ConvexCore(const ConvexCore& c) = default;
 			/*! \param[in] v 凸包と分かっている頂点 */
 			ConvexCore(std::initializer_list<Vec2> v);
 			ConvexCore(const PointL& pl);
@@ -457,7 +459,7 @@ namespace boom {
 			//! 内部的な通し番号における外郭ライン
 			LineCore getOuterLine(int n) const;
 			StLineCore getOuterStLine(int n) const;
-			PointL getOverlappingPoints(const IModel& mdl, const Vec2& inner) const;
+			IModel::PosL getOverlappingPoints(const IModel& mdl, const Vec2& inner) const;
 			CircleCore getBCircle() const;
 			// 凸包が直線と交差している箇所を2点計算
 			std::tuple<bool,Vec2,Vec2> checkCrossingLine(const StLineCore& l) const;
@@ -473,7 +475,7 @@ namespace boom {
 			Convex(ConvexCore&& c);
 			DEF_IMODEL_FUNCS
 			bool isInner(const Vec2& pos) const override;
-			PointL getOverlappingPoints(const IModel &mdl, const Vec2& inner) const override;
+			PosL getOverlappingPoints(const IModel &mdl, const Vec2& inner) const override;
 			CircleCore getBCircle() const override;
 			int getNPoints() const override;
 			Vec2 getPoint(int n) const override;
@@ -505,6 +507,7 @@ namespace boom {
 
 			public:
 				ConvexModel();
+				ConvexModel(const ConvexModel& m) = default;
 				ConvexModel(std::initializer_list<Vec2> v);
 				ConvexModel(const PointL& pl);
 				ConvexModel(PointL&& pl);
@@ -519,7 +522,7 @@ namespace boom {
 				void addOffset(const Vec2& ofs);
 				DEF_IMODEL_FUNCS
 				bool isInner(const Vec2& pos) const override;
-				PointL getOverlappingPoints(const IModel &mdl, const Vec2& inner) const override;
+				PosL getOverlappingPoints(const IModel &mdl, const Vec2& inner) const override;
 				CircleCore getBCircle() const override;
 				int getNPoints() const override;
 				Vec2 getPoint(int n) const override;
@@ -610,7 +613,7 @@ namespace boom {
 				Vec2 support(const Vec2& dir) const override;
 				Vec2 center() const override;
 				bool isInner(const Vec2& pos) const override;
-				PointL getOverlappingPoints(const IModel& mdl, const Vec2& inner) const override;
+				PosL getOverlappingPoints(const IModel& mdl, const Vec2& inner) const override;
 				CircleCore getBCircle() const override;
 				int getNPoints() const override;
 				Vec2 getPoint(int n) const override;

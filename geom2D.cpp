@@ -509,21 +509,6 @@ namespace boom {
 				StLineCore line(p0, (p1-p0).normalization());
 				return c1.splitTwo(line).second;
 			};
-			auto Func2(const IModel& c0, const IModel& c1, const Vec2& inner) -> std::pair<bool,PointL> {
-				PointL pt0(c0.getOverlappingPoints(c1, inner));
-				int nV0 = pt0.size();
-				if(nV0 == c0.getNPoints()) {
-					if(nV0 == 3) {
-						for(int i=0 ; i<3 ; i++) {
-							if(!c1.isInner(pt0[i]))
-								return std::make_pair(false, std::move(pt0));
-						}
-					}
-					// m1が全部m0に収まっている
-					return std::make_pair(true, std::move(pt0));
-				}
-				return std::make_pair(false, std::move(pt0));
-			};
 		}
 		std::ostream& operator << (std::ostream& os, const IModel& mdl) {
 			return mdl.dbgPrint(os);
@@ -540,11 +525,11 @@ namespace boom {
 
 		Convex Convex::GetOverlappingConvex(const IModel& m0, const IModel& m1, const Vec2& inner) {
 			// m0がm1にめり込んでいる頂点リストを出力
-			auto res0 = Func2(m0, m1, inner);
+			auto res0 = m0.getOverlappingPoints(m1,inner);
 			if(res0.first)
 				return Convex(std::move(res0.second));
 			// m1がm0にめり込んでいる頂点リストを出力
-			auto res1 = Func2(m1, m0, inner);
+			auto res1 = m1.getOverlappingPoints(m0,inner);
 			if(res1.first)
 				return Convex(std::move(res1.second));
 
@@ -584,44 +569,45 @@ namespace boom {
 		Vec2 Convex::getPoint(int n) const { return point[n]; }
 		IModel::CPos Convex::checkPosition(const Vec2& pos) const { return ConvexCore::checkPosition(pos); }
 
-		PointL ConvexCore::getOverlappingPoints(const IModel& mdl, const Vec2& inner) const {
+		namespace {
+			int BinSearch(const PointL& point, int nV, const IModel& mdl, int a, int b, bool flip) {
+				for(;;) {
+					if(a+1 >= b)
+						break;
+					int c = (a+b)/2;
+					if(mdl.isInner(point[spn::CndRange(c, nV)]) ^ flip)
+						b = c;
+					else
+						a = c;
+				}
+				return spn::CndRange(a, nV);
+			}
+		}
+		IModel::PosL ConvexCore::getOverlappingPoints(const IModel& mdl, const Vec2& inner) const {
 			auto res = checkPosition(inner);
 			if(res.first != IModel::POSITION::OUTER) {
 				int nV = point.size();
-				auto binSearch = [this, nV, &mdl](int a, int b, bool flip) -> int {
-					for(;;) {
-						if(a+1 >= b)
-							break;
-						int c = (a+b)/2;
-						if(mdl.isInner(point[spn::CndRange(c, nV)]) ^ flip)
-							b = c;
-						else
-							a = c;
-					}
-					return spn::CndRange(a, nV);
-				};
-
 				int a,b, begI;
 				// 2分探索で衝突が始まる地点を探す
 				if(mdl.isInner(point[res.second])) {
 					a = res.second - nV;
-					b = a + nV;
+					b = res.second;
 					// 衝突開始インデックス(これ自体は衝突していない)
-					begI = binSearch(a, b, false);
+					begI = BinSearch(point, nV, mdl, a,b,false);
 				} else {
 					begI = res.second;
 					if(!mdl.isInner(point[spn::CndSub(res.second+1, nV)]))
-						return PointL();
+						return std::make_pair(false, PointL());
 				}
 
 				// 衝突が終わる地点を探す
 				a = begI + 1;
 				b = a + nV;
-				int endI = binSearch(a,b, true);		// 衝突終了インデックス(これ自体衝突している)
+				int endI = BinSearch(point,nV,mdl,a,b,true);		// 衝突終了インデックス(これ自体衝突している)
 
 				if(begI == endI) {
 					// 全部出力
-					return point;
+					return std::make_pair(true, point);
 				}
 				endI = spn::CndSub(endI+1, nV);
 				endI = spn::CndAdd(endI, begI, nV)+1;
@@ -632,9 +618,9 @@ namespace boom {
 					*pDst++ = point[spn::CndSub(begI,nV)];
 					++begI;
 				}
-				return std::move(pts);
+				return std::make_pair(false, std::move(pts));
 			}
-			return PointL();
+			return std::make_pair(false, PointL());
 		}
 
 		IModel::CPos ConvexCore::checkPosition(const Vec2& pos) const {
@@ -837,7 +823,7 @@ namespace boom {
 		Vec2 Convex::support(const Vec2& dir) const { return ConvexCore::support(dir); }
 		Vec2 Convex::center() const { return ConvexCore::center(); }
 		bool Convex::isInner(const Vec2& pos) const { return ConvexCore::isInner(pos); }
-		PointL Convex::getOverlappingPoints(const IModel& mdl, const Vec2& inner) const { return ConvexCore::getOverlappingPoints(mdl,inner); }
+		IModel::PosL Convex::getOverlappingPoints(const IModel& mdl, const Vec2& inner) const { return ConvexCore::getOverlappingPoints(mdl,inner); }
 		CircleCore Convex::getBCircle() const { return ConvexCore::getBCircle(); }
 
 		ConvexModel::ConvexModel(): _rflag(RFL_ALL) {}
@@ -874,7 +860,7 @@ namespace boom {
 		Vec2 ConvexModel::support(const Vec2& dir) const { return _convex.support(dir); }
 		Vec2 ConvexModel::center() const { return Vec2(getCenter()); }
 		bool ConvexModel::isInner(const Vec2& pos) const { return _convex.isInner(pos); }
-		PointL ConvexModel::getOverlappingPoints(const IModel& mdl, const Vec2& inner) const { return _convex.getOverlappingPoints(mdl, inner); }
+		IModel::PosL ConvexModel::getOverlappingPoints(const IModel& mdl, const Vec2& inner) const { return _convex.getOverlappingPoints(mdl, inner); }
 		CircleCore ConvexModel::getBCircle() const {
 			if(Bit::ChClear(_rflag, RFL_BBCIRCLE))
 				_bbCircle = _convex.getBCircle();
