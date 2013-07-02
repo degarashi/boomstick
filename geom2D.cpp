@@ -930,7 +930,7 @@ namespace boom {
 						cur.velN = _nml.dot(vel);
 						cur.velT = _div.dir.dot(vel);
 						// 物体Aの重心からの相対座標 (直線方向に対して)
-						cur.pos = _div.dir.dot(p);
+						cur.pos = _div.dir.dot(p) - _div.dir.dot(_rp0.getOffset());
 						cur.fricD = 0;
 					}
 					void _doSwitch() { _swI ^= 1; }
