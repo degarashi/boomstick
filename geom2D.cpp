@@ -472,8 +472,8 @@ namespace boom {
 		StLineCore ConvexCore::getOuterStLine(int n) const {
 			return StLineCore(point[n], (point[spn::CndSub(n+1, point.size())] - point[n]).normalization());
 		}
-		std::ostream& operator << (std::ostream& os, const ConvexCore& c) {
-			for(auto& p : c.point)
+		std::ostream& ConvexCore::dbgPrint(std::ostream& os) const {
+			for(auto& p : point)
 				os << '[' << p.x << ',' << p.y << ']' << std::endl;
 			return os;
 		}
@@ -484,6 +484,9 @@ namespace boom {
 		}
 		Convex2 ConvexModel::splitTwo(const StLineCore& l) const {
 			return Convex2(std::move(_convex.splitTwo(l)));
+		}
+		std::ostream& ConvexModel::dbgPrint(std::ostream& os) const {
+			return _convex.dbgPrint(os);
 		}
 		ConvexCore& ConvexCore::operator *= (const AMat32& m) {
 			for(auto& p : point)
@@ -522,6 +525,19 @@ namespace boom {
 				return std::make_pair(false, std::move(pt0));
 			};
 		}
+		std::ostream& operator << (std::ostream& os, const IModel& mdl) {
+			return mdl.dbgPrint(os);
+		}
+		std::ostream& Convex::dbgPrint(std::ostream& os) const {
+			int nP = getNPoints();
+			if(nP > 0) {
+				for(int i=0 ; i<nP-1 ; i++)
+					os  << getPoint(i) << std::endl;
+				os << getPoint(nP-1);
+			}
+			return os;
+		}
+
 		Convex Convex::GetOverlappingConvex(const IModel& m0, const IModel& m1, const Vec2& inner) {
 			// m0がm1にめり込んでいる頂点リストを出力
 			auto res0 = Func2(m0, m1, inner);
@@ -991,7 +1007,7 @@ namespace boom {
 			RForce CalcOV_Convex2(const Rigid& r0, const Rigid& r1, const Vec2& inner, const RCoeff& coeff, const StLineCore& div) {
 				// 領域算出
 				Convex cnv = Convex::GetOverlappingConvex(r0, r1, inner);
-				std::cout << cnv << std::endl;
+				std::cout << "OverlappingConvex:" << std::endl << cnv << std::endl;
 				return CalcRF_Convex(r0.getPose(), r1.getPose(), coeff, cnv, div);
 			}
 			//! 円とBox含む多角形

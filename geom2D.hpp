@@ -141,15 +141,17 @@ namespace boom {
 			DEF_CASTFUNC(Rigid)
 
 			// ---------- Convex専用 ----------
+			template <class T>
+			T _invokeError() const {
+				throw std::runtime_error("not supported function"); }
 			//! 物体を構成する頂点数を取得
 			/*! Circle, Lineなど物によってはサポートしていない */
-			virtual int getNPoints() const {
-				throw std::runtime_error("not supported function"); }
-			virtual Vec2 getPoint(int n) const {
-				throw std::runtime_error("not supported function"); }
-			virtual CPos checkPosition(const Vec2& pos) const {
-				throw std::runtime_error("not supported function"); }
+			virtual int getNPoints() const { return _invokeError<int>(); }
+			virtual Vec2 getPoint(int /*n*/) const { return _invokeError<Vec2>(); }
+			virtual CPos checkPosition(const Vec2& /*pos*/) const { return _invokeError<CPos>(); }
 			virtual Convex2 splitTwo(const StLineCore& line) const;
+			virtual std::ostream& dbgPrint(std::ostream& /*os*/) const { return _invokeError<std::ostream&>(); }
+			friend std::ostream& operator << (std::ostream& os, const IModel& mdl);
 		};
 
 		template <class T>
@@ -462,7 +464,7 @@ namespace boom {
 			bool hit(const LineCore& l) const;
 			ConvexCore& operator *= (const AMat32& m);
 
-			friend std::ostream& operator << (std::ostream& os, const ConvexCore& c);
+			std::ostream& dbgPrint(std::ostream& os) const;
 		};
 		struct Convex : ConvexCore, IModelP<ConvexCore> {
 			using ConvexCore::ConvexCore;
@@ -477,6 +479,7 @@ namespace boom {
 			CPos checkPosition(const Vec2& pos) const override;
 			Convex2 splitTwo(const StLineCore& l) const override;
 			Convex& operator *= (const AMat32& m);
+			std::ostream& dbgPrint(std::ostream& os) const override;
 			//! 凸包が重なっている領域を求める
 			/*! 既に重なっている事が分かっている前提
 				\param[in] m0 モデルその1(Convexとみなす)
@@ -521,6 +524,7 @@ namespace boom {
 				Vec2 getPoint(int n) const override;
 				CPos checkPosition(const Vec2& pos) const override;
 				Convex2 splitTwo(const StLineCore& line) const override;
+				std::ostream& dbgPrint(std::ostream& os) const override;
 		};
 
 		//! 剛体制御用
@@ -610,6 +614,7 @@ namespace boom {
 				Vec2 getPoint(int n) const override;
 				CPos checkPosition(const Vec2& pos) const override;
 				Convex2 splitTwo(const StLineCore& line) const override;
+				std::ostream& dbgPrint(std::ostream& os) const override;
 		};
 
 		class TR_Mat {

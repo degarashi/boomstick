@@ -168,6 +168,15 @@ namespace boom {
 			res.second *= BASE::getToWorld();
 			return std::move(res);
 		}
+		DEF_TMODEL(std::ostream&)::dbgPrint(std::ostream& os) const {
+			int nP = getNPoints();
+			if(nP > 0) {
+				for(int i=0 ; i<nP-1 ; i++)
+					os << getPoint(i) << std::endl;
+				os << getPoint(nP-1);
+			}
+			return os;
+		}
 		#undef DEF_TMODEL
 		template class TModel<IModel::sptr, TR_Mat>;
 		template class TModel<const IModel&, TR_Mat>;
