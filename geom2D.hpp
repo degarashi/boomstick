@@ -7,6 +7,7 @@
 #include "spinner/plane.hpp"
 #include "spinner/noseq.hpp"
 #include "collision.hpp"
+#include "cache2D.hpp"
 #include <cassert>
 #include <vector>
 #include <memory>
@@ -125,17 +126,21 @@ namespace boom {
 			/*! 均等でないスケーリングは対応しない、移動は後でオフセット、回転はdirを逆にすれば代用可
 				・・との理由で行列変換後の物体に対する射像は無し */
 			virtual Vec2 support(const Vec2& dir) const = 0;
-			virtual Vec2 center() const = 0;
+			virtual Vec2 getCenter() const = 0;
 			//! 形状毎に一意なコリジョン管理IDを取得
 			virtual uint32_t getCID() const = 0;
 			//! ある座標が図形の内部に入っているか
 			virtual bool isInner(const Vec2& pos) const { return false; }
+
+			#define INVOKE_ERROR throw std::runtime_error(std::string("not supported function: ") + __func__);
 			//! 外郭を構成する頂点で、mdlにめり込んでいる物を抽出
 			/*! \return 時計回りでmdlにめり込んでいる頂点リスト。前後も含む */
-			virtual PosL getOverlappingPoints(const IModel& mdl, const Vec2& inner) const {
-				throw std::runtime_error("not supported function"); }
+			virtual PosL getOverlappingPoints(const IModel& /*mdl*/, const Vec2& /*inner*/) const { INVOKE_ERROR }
 			//! 境界ボリューム(円)
 			virtual CircleCore getBCircle() const;
+
+			virtual float getArea(bool bInv) const { INVOKE_ERROR }
+			virtual float getInertia(bool bInv) const { INVOKE_ERROR }
 
 			#define DEF_CASTFUNC(typ) virtual boost::optional<typ&> castAs##typ() { return boost::none; } \
 				virtual boost::optional<const typ&> castAs##typ() const { auto ref = const_cast<IModel*>(this)->castAs##typ(); \
@@ -143,16 +148,13 @@ namespace boom {
 			DEF_CASTFUNC(Rigid)
 
 			// ---------- Convex専用 ----------
-			template <class T>
-			T _invokeError() const {
-				throw std::runtime_error("not supported function"); }
 			//! 物体を構成する頂点数を取得
 			/*! Circle, Lineなど物によってはサポートしていない */
-			virtual int getNPoints() const { return _invokeError<int>(); }
-			virtual Vec2 getPoint(int /*n*/) const { return _invokeError<Vec2>(); }
-			virtual CPos checkPosition(const Vec2& /*pos*/) const { return _invokeError<CPos>(); }
+			virtual int getNPoints() const { INVOKE_ERROR }
+			virtual Vec2 getPoint(int /*n*/) const { INVOKE_ERROR }
+			virtual CPos checkPosition(const Vec2& /*pos*/) const { INVOKE_ERROR }
 			virtual Convex2 splitTwo(const StLineCore& line) const;
-			virtual std::ostream& dbgPrint(std::ostream& /*os*/) const { return _invokeError<std::ostream&>(); }
+			virtual std::ostream& dbgPrint(std::ostream& /*os*/) const { INVOKE_ERROR }
 			friend std::ostream& operator << (std::ostream& os, const IModel& mdl);
 		};
 
@@ -163,7 +165,11 @@ namespace boom {
 		};
 		#define DEF_IMODEL_FUNCS \
 			Vec2 support(const Vec2& dir) const override; \
-			Vec2 center() const override;
+			Vec2 getCenter() const override;
+		#define DEF_IMODEL_MASS \
+			float getArea(bool bInv=false) const override; \
+			float getInertia(bool bInv=false) const override; \
+			CircleCore getBCircle() const override;
 
 		enum class LINEPOS {
 			BEGIN,
@@ -186,33 +192,6 @@ namespace boom {
 			using PointCore::PointCore;
 			DEF_IMODEL_FUNCS
 			CircleCore getBCircle() const override;
-		};
-		//! AxisAlignedBox
-		struct BoxCore {
-			Vec2	minV, maxV;
-
-			BoxCore() = default;
-			BoxCore(const Vec2& min_v, const Vec2& max_v);
-
-			Vec2 support(const Vec2& dir) const;
-			Vec2 nearest(const Vec2& pos) const;
-			bool hit(const LineCore& l) const;
-			CircleCore getBCircle() const;
-			Vec2 center() const;
-		};
-		struct Box : BoxCore, IModelP<BoxCore> {
-			using BoxCore::BoxCore;
-			DEF_IMODEL_FUNCS
-			CircleCore getBCircle() const override;
-		};
-		class BoxModel : public IModelP<BoxCore> {
-			BoxCore		_box;
-
-			public:
-				BoxModel() = default;
-				BoxModel(const BoxCore& b);
-				DEF_IMODEL_FUNCS
-				CircleCore getBCircle() const override;
 		};
 
 		//! 直線
@@ -278,14 +257,20 @@ namespace boom {
 			共通クラスには仮想関数テーブル分のポインタを含めたくない為に少々面倒臭い構造になっている
 			面積などを求める比較的重い計算メソッドは用意されるがキャッシュなどはしない */
 		struct CircleCore {
-			Vec2	center;
-			float	radius;
+			using CT = CType<TagArea, TagInertia>;
+			template <class T>
+			using Wrap = CoreRaw<T>;
+
+			float area() const;
+			float inertia() const;				//!< 重心を軸とした慣性モーメント
+			const Vec2& center() const;
+			const CircleCore& bcircle() const;
+			// --------------------------------------------
+			Vec2	vCenter;
+			float	fRadius;
 
 			CircleCore() = default;
 			CircleCore(const Vec2& c, float r);
-
-			float area() const;
-			float inertia() const;			//!< 重心を軸とした慣性モーメント
 
 			Vec2 support(const Vec2& dir) const;
 			bool hit(const Vec2& pt) const;
@@ -299,43 +284,61 @@ namespace boom {
 		struct Circle : CircleCore, IModelP<CircleCore> {
 			using CircleCore::CircleCore;
 			DEF_IMODEL_FUNCS
+			DEF_IMODEL_MASS
 			bool isInner(const Vec2& pos) const override;
-			CircleCore getBCircle() const override;
 		};
+
 		//! 円の剛体用クラス
 		/*! キャッシュを管理する関係で形状へのアクセスは関数を通す仕様 元クラスはcompososition */
-		class CircleModel : public IModelP<CircleCore> {
-			CircleCore			_circle;
-			mutable float		_area,
-								_inertia;
-			mutable uint32_t	_rflag;
-
+		class CircleModel : public IModelP<CircleCore>, public Cache<CircleCore> {
 			public:
-				CircleModel();
+				CircleModel() = default;
 				explicit CircleModel(const CircleCore& c);
-				const CircleCore& getCore() const;
 
-				float area() const;
-
-				const Vec2& getCenter() const;
 				float getRadius() const;
 				void setCenter(const Vec2& v);
 				void setRadius(float r);
 
 				DEF_IMODEL_FUNCS
+				DEF_IMODEL_MASS
 				bool isInner(const Vec2& pos) const override;
-				CircleCore getBCircle() const override;
 		};
 
+		//! AxisAlignedBox
+		struct BoxCore {
+			DEF_CORE_FUNCS(TagArea, TagInertia, TagCenter, TagBCircle)
+			// --------------------------------------------
+			Vec2	minV, maxV;
+
+			BoxCore() = default;
+			BoxCore(const Vec2& min_v, const Vec2& max_v);
+
+			Vec2 support(const Vec2& dir) const;
+			Vec2 nearest(const Vec2& pos) const;
+			bool hit(const LineCore& l) const;
+		};
+		struct Box : BoxCore, IModelP<BoxCore> {
+			using BoxCore::BoxCore;
+			DEF_IMODEL_FUNCS
+			CircleCore getBCircle() const override;
+		};
+		class BoxModel : public IModelP<BoxCore>, public Cache<BoxCore> {
+			BoxCore		_box;
+
+			public:
+				BoxModel() = default;
+				BoxModel(const BoxCore& b);
+				DEF_IMODEL_FUNCS
+				DEF_IMODEL_MASS
+		};
 		struct PolyCore {
+			DEF_CORE_FUNCS(TagArea, TagInertia, TagCenter, TagBCircle)
+			// --------------------------------------------
 			Vec2		point[3];
 
 			PolyCore() = default;
 			PolyCore(const Vec2& p0, const Vec2& p1, const Vec2& p2);
 
-			float area() const;
-			float inertia() const;
-			Vec2 center() const;
 			bool isInTriangle(const Vec2& p) const;
 			std::pair<Vec2,int> nearest(const Vec2& p) const;
 
@@ -343,7 +346,6 @@ namespace boom {
 			void addOffset(const Vec2& ofs);
 			static float CalcArea(const Vec2& p0, const Vec2& p1, const Vec2& p2);
 			static float CalcArea(const Vec2& p0, const Vec2& p1);
-			CircleCore getBCircle() const;
 			//! 鈍角を探す
 			/*! \return 鈍角の番号 (負数は該当なし) */
 			int getObtuseCorner() const;
@@ -354,41 +356,42 @@ namespace boom {
 			bool isInner(const Vec2& pos) const override;
 			CircleCore getBCircle() const override;
 		};
-		class PolyModel : public IModel, public spn::CheckAlign<16,PolyModel> {
-			PolyCore		_poly;
-			mutable float	_area,
-							_inertia;
-			mutable CircleCore	_bbCircle;
-			mutable AVec2	_center;
-
-			enum REFLAG {
-				RFL_CENTER = 0x01,
-				RFL_AREA = 0x02,
-				RFL_INERTIA = 0x04,
-				RFL_BBCIRCLE = 0x08,
-				RFL_ALL = 0xff
-			};
-			mutable uint32_t	_rflag;
-
+		class PolyModel : public IModelP<PolyCore>, public Cache<PolyCore>, public spn::CheckAlign<16,PolyModel> {
 			public:
-				PolyModel();
+				PolyModel() = default;
 				PolyModel(const Vec2& p0, const Vec2& p1, const Vec2& p2);
 				PolyModel(const PolyModel& p) = default;
-
-				float getInertia() const;
-				float getArea() const;
-				const AVec2& getCenter() const;
 
 				void setPoint(int n, const Vec2& v);
 				void addOffset(const Vec2& ofs);
 
 				DEF_IMODEL_FUNCS
+				DEF_IMODEL_MASS
 				bool isInner(const Vec2& pos) const override;
-				CircleCore getBCircle() const override;
 		};
 
 		//! 多角形基本クラス
 		struct ConvexCore {
+			using CT = CType<TagArea, TagInertia, TagCenter, TagBCircle>;
+			template <class T>
+			using Wrap = CoreWrap<T>;
+
+			CircleCore bcircle() const;
+			template <class INFO>
+			void getInfo(INFO& info, TagArea) const {
+				auto res = area_inertia_center();
+				info.refCache(TagArea()) = std::get<0>(res);
+				info.refCache(TagInertia()) = std::get<1>(res);
+				info.refCache(TagCenter()) = std::get<2>(res);
+			}
+			template <class INFO>
+			void getInfo(INFO& info, TagInertia) const {
+				getInfo(info, TagArea()); }
+			template <class INFO>
+			void getInfo(INFO& info, TagCenter) const {
+				getInfo(info, TagArea()); }
+
+			// --------------------------------------------
 			using AreaL = std::vector<float>;
 			struct AreaSum {
 				float result;
@@ -422,10 +425,8 @@ namespace boom {
 			ConvexCore& operator = (ConvexCore&& c);
 
 			static ConvexCore FromConcave(const PointL& src);
-
 			float area() const;
-			float inertia() const;
-			Vec2 center() const;
+
 			/*! 同時に求めると少し効率が良い */
 			std::tuple<float,float,Vec2> area_inertia_center() const;
 			Vec2 support(const Vec2& dir) const;
@@ -460,7 +461,6 @@ namespace boom {
 			LineCore getOuterLine(int n) const;
 			StLineCore getOuterStLine(int n) const;
 			IModel::PosL getOverlappingPoints(const IModel& mdl, const Vec2& inner) const;
-			CircleCore getBCircle() const;
 			// 凸包が直線と交差している箇所を2点計算
 			std::tuple<bool,Vec2,Vec2> checkCrossingLine(const StLineCore& l) const;
 			// 直線がヒットしてるか判定後、始点と終点のチェック
@@ -490,40 +490,21 @@ namespace boom {
 				\param[in] inner 重複領域の内部点 */
 			static Convex GetOverlappingConvex(const IModel& m0, const IModel& m1, const Vec2& inner);
 		};
-		class ConvexModel : public IModelP<ConvexCore>, public spn::CheckAlign<16,ConvexModel> {
-			private:
-				ConvexCore		_convex;
-				mutable AVec2	_center;
-				mutable CircleCore	_bbCircle;
-				mutable float	_area,
-								_inertia;
-				enum REFLAG {
-					RFL_CENTER_INERTIA = 0x01,
-					RFL_BBCIRCLE = 0x02,
-					RFL_ALL = 0xff
-				};
-				mutable uint32_t _rflag;
-				void _refreshCInertia() const;
-
+		class ConvexModel : public IModelP<ConvexCore>, public Cache<ConvexCore>, public spn::CheckAlign<16,ConvexModel> {
 			public:
-				ConvexModel();
 				ConvexModel(const ConvexModel& m) = default;
 				ConvexModel(std::initializer_list<Vec2> v);
 				ConvexModel(const PointL& pl);
 				ConvexModel(PointL&& pl);
 
-				float getArea() const;
-				float getInertia() const;
-				const AVec2& getCenter() const;
 				const PointL& getPoint() const;
 				PointL& refPoint();
-				const ConvexCore& getConvex() const;
 
 				void addOffset(const Vec2& ofs);
 				DEF_IMODEL_FUNCS
+				DEF_IMODEL_MASS
 				bool isInner(const Vec2& pos) const override;
 				PosL getOverlappingPoints(const IModel &mdl, const Vec2& inner) const override;
-				CircleCore getBCircle() const override;
 				int getNPoints() const override;
 				Vec2 getPoint(int n) const override;
 				CPos checkPosition(const Vec2& pos) const override;
@@ -610,11 +591,10 @@ namespace boom {
 				const MDL& getModel() const;
 
 				uint32_t getCID() const override;
-				Vec2 support(const Vec2& dir) const override;
-				Vec2 center() const override;
+				DEF_IMODEL_FUNCS
+				DEF_IMODEL_MASS
 				bool isInner(const Vec2& pos) const override;
 				PosL getOverlappingPoints(const IModel& mdl, const Vec2& inner) const override;
-				CircleCore getBCircle() const override;
 				int getNPoints() const override;
 				Vec2 getPoint(int n) const override;
 				CPos checkPosition(const Vec2& pos) const override;

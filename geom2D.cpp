@@ -92,7 +92,7 @@ namespace boom {
 		Vec2 Point::support(const Vec2& dir) const {
 			return *this;
 		}
-		Vec2 Point::center() const {
+		Vec2 Point::getCenter() const {
 			return *this;
 		}
 		CircleCore Point::getBCircle() const {
@@ -123,57 +123,71 @@ namespace boom {
 		Vec2 BoxCore::nearest(const Vec2& pos) const {
 			return pos.getMax(minV).getMin(maxV);
 		}
-		CircleCore BoxCore::getBCircle() const {
+		float BoxCore::inertia() const {
+			throw std::runtime_error("not implemented yet");
+		}
+		float BoxCore::area() const {
+			Vec2 sz = maxV - minV;
+			return sz.x * sz.y;
+		}
+		CircleCore BoxCore::bcircle() const {
 			// 対角線 = 直径
 			return CircleCore((minV + maxV) * 0.5f,
 								minV.distance(maxV));
 		}
 
-		CircleCore Box::getBCircle() const { return BoxCore::getBCircle(); }
+		CircleCore Box::getBCircle() const { return BoxCore::bcircle(); }
 		Vec2 Box::support(const Vec2& dir) const { return BoxCore::support(dir); }
-		Vec2 Box::center() const { return BoxCore::center(); }
+		Vec2 Box::getCenter() const { return BoxCore::center(); }
 
 		BoxModel::BoxModel(const BoxCore& b): _box(b) {}
-		CircleCore BoxModel::getBCircle() const { return _box.getBCircle(); }
+		CircleCore BoxModel::getBCircle() const { return getCache(TagBCircle()); }
 		Vec2 BoxModel::support(const Vec2& dir) const { return _box.support(dir); }
-		Vec2 BoxModel::center() const { return _box.center(); }
+		Vec2 BoxModel::getCenter() const { return getCache(TagCenter()); }
+		float BoxModel::getArea(bool) const { return getCache(TagArea()); }
+		float BoxModel::getInertia(bool) const { return getCache(TagInertia()); }
 
 		// ---------------------- Circle ----------------------
-		CircleCore::CircleCore(const Vec2& c, float r): center(c), radius(r) {}
+		CircleCore::CircleCore(const Vec2& c, float r): vCenter(c), fRadius(r) {}
 		float CircleCore::area() const {
-			throw std::runtime_error("");
+			throw std::domain_error("not implemented yet");
+		}
+		float CircleCore::inertia() const {
+			throw std::domain_error("not implemented yet");
 		}
 		Vec2 CircleCore::support(const Vec2& dir) const {
-			return dir * radius + center;
+			return dir * fRadius + vCenter;
 		}
 		bool CircleCore::hit(const Vec2& pt) const {
-			return center.dist_sq(pt) <= spn::Square(radius);
+			return vCenter.dist_sq(pt) <= spn::Square(fRadius);
 		}
 		bool CircleCore::hit(const CircleCore& c) const {
-			return center.dist_sq(c.center) <= spn::Square(radius + c.radius);
+			return vCenter.dist_sq(c.vCenter) <= spn::Square(fRadius + c.fRadius);
 		}
 		CircleCore CircleCore::operator * (const AMat32& m) const {
 			auto& m2 = reinterpret_cast<const spn::AMat22&>(m);
-			Vec2 tx(center + Vec2(radius,0)),
-				ty(center + Vec2(0,radius));
-			tx = tx * m2 - center;
-			ty = ty * m2 - center;
-			return CircleCore((center.asVec3(1)*m),
+			Vec2 tx(vCenter + Vec2(fRadius,0)),
+				ty(vCenter + Vec2(0,fRadius));
+			tx = tx * m2 - vCenter;
+			ty = ty * m2 - vCenter;
+			return CircleCore((vCenter.asVec3(1)*m),
 							  spn::_sseSqrt(std::max(tx.len_sq(), ty.len_sq())));
 		}
 
 		Vec2 Circle::support(const Vec2& dir) const { return CircleCore::support(dir); }
-		Vec2 Circle::center() const { return CircleCore::center; }
+		Vec2 Circle::getCenter() const { return CircleCore::vCenter; }
 		bool Circle::isInner(const Vec2& pos) const { return CircleCore::hit(pos); }
 		CircleCore Circle::getBCircle() const { return *this; }
+		float Circle::getArea(bool) const { return CircleCore::area(); }
+		float Circle::getInertia(bool) const { return CircleCore::inertia(); }
 
-		CircleModel::CircleModel(): _rflag(0xff) {}
-		CircleModel::CircleModel(const CircleCore& c): _circle(c), _rflag(0xff) {}
-
-		Vec2 CircleModel::support(const Vec2& dir) const { return _circle.support(dir); }
-		Vec2 CircleModel::center() const { return _circle.center; }
-		bool CircleModel::isInner(const Vec2& pos) const { return _circle.hit(pos); }
-		CircleCore CircleModel::getBCircle() const { return _circle; }
+		CircleModel::CircleModel(const CircleCore& c): Cache(c) {}
+		Vec2 CircleModel::support(const Vec2& dir) const { return _core.support(dir); }
+		Vec2 CircleModel::getCenter() const { return _core.vCenter; }
+		bool CircleModel::isInner(const Vec2& pos) const { return _core.hit(pos); }
+		CircleCore CircleModel::getBCircle() const { return _core; }
+		float CircleModel::getArea(bool) const { return getCache(TagArea()); }
+		float CircleModel::getInertia(bool) const { return getCache(TagInertia()); }
 
 		// ---------------------- StLine ----------------------
 		StLineCore::StLineCore(const Vec2& p, const Vec2& d): pos(p), dir(d) {}
@@ -276,7 +290,7 @@ namespace boom {
 		Vec2 Line::support(const Vec2& dir) const {
 			return LineCore::support(dir);
 		}
-		Vec2 Line::center() const {
+		Vec2 Line::getCenter() const {
 			return (point[0] + point[1]) * 0.5f;
 		}
 		CircleCore LineCore::getBCircle() const {
@@ -306,6 +320,14 @@ namespace boom {
 			for(int i=0 ; i<3 ; i++)
 				point[i] += ofs;
 		}
+		float PolyCore::inertia() const {
+			return (1.0f/18) * (point[0].dot(point[0])
+									+ point[0].dot(point[0])
+									+ point[0].dot(point[0])
+									- point[1].dot(point[2])
+									- point[2].dot(point[0])
+									- point[0].dot(point[1]));
+		}
 		bool PolyCore::isInTriangle(const Vec2& p) const {
 			Vec2 vt(p-point[0]),
 				v1(point[1]-point[0]),
@@ -330,7 +352,7 @@ namespace boom {
 				return 2;
 			return -1;
 		}
-		CircleCore PolyCore::getBCircle() const {
+		CircleCore PolyCore::bcircle() const {
 			int id = getObtuseCorner();
 			if(id >= 0) {
 				// 鈍角を持っていれば直径を使う
@@ -350,52 +372,28 @@ namespace boom {
 		}
 
 		Vec2 Poly::support(const Vec2& dir) const { return PolyCore::support(dir); }
-		Vec2 Poly::center() const { return PolyCore::center(); }
+		Vec2 Poly::getCenter() const { return PolyCore::center(); }
 		bool Poly::isInner(const Vec2& pos) const { return isInTriangle(pos); }
-		CircleCore Poly::getBCircle() const { return PolyCore::getBCircle(); }
+		CircleCore Poly::getBCircle() const { return PolyCore::bcircle(); }
 
-		PolyModel::PolyModel(): _rflag(RFL_ALL) {}
-		PolyModel::PolyModel(const Vec2& p0, const Vec2& p1, const Vec2& p2): _poly{p0,p1,p2}, _rflag(RFL_ALL) {}
-		float PolyModel::getArea() const {
-			if(Bit::ChClear(_rflag, RFL_AREA))
-				_area = _poly.area();
-			return _area;
-		}
-		const AVec2& PolyModel::getCenter() const {
-			if(Bit::ChClear(_rflag, RFL_CENTER))
-				_center = _poly.center();
-			return _center;
-		}
+		PolyModel::PolyModel(const Vec2& p0, const Vec2& p1, const Vec2& p2): Cache(p0,p1,p2) {}
 		void PolyModel::setPoint(int n, const Vec2& v) {
-			_poly.point[n] = v;
-			_rflag = RFL_ALL;
+			_core.point[n] = v;
+			Cache::setCacheFlagAll();
 		}
 		void PolyModel::addOffset(const Vec2& ofs) {
-			_poly.addOffset(ofs);
-		}
-		float PolyModel::getInertia() const {
-			if(Bit::ChClear(_rflag, RFL_INERTIA)) {
-				_inertia = (1.0f/18) * (_poly.point[0].dot(_poly.point[0])
-										+ _poly.point[0].dot(_poly.point[0])
-										+ _poly.point[0].dot(_poly.point[0])
-										- _poly.point[1].dot(_poly.point[2])
-										- _poly.point[2].dot(_poly.point[0])
-										- _poly.point[0].dot(_poly.point[1]));
-			}
-			return _inertia;
+			_core.addOffset(ofs);
 		}
 		Vec2 PolyModel::support(const Vec2& dir) const {
-			return _poly.support(dir);
+			return _core.support(dir);
 		}
-		Vec2 PolyModel::center() const {
-			return Vec2(getCenter());
+		bool PolyModel::isInner(const Vec2& pos) const {
+			return _core.isInTriangle(pos);
 		}
-		bool PolyModel::isInner(const Vec2& pos) const { return _poly.isInTriangle(pos); }
-		CircleCore PolyModel::getBCircle() const {
-			if(Bit::ChClear(_rflag, RFL_BBCIRCLE))
-				_bbCircle = _poly.getBCircle();
-			return _bbCircle;
-		}
+		Vec2 PolyModel::getCenter() const { return getCache(TagCenter()); }
+		float PolyModel::getArea(bool) const { return getCache(TagArea()); }
+		float PolyModel::getInertia(bool) const { return getCache(TagInertia()); }
+		CircleCore PolyModel::getBCircle() const { return getCache(TagBCircle()); }
 
 		// ---------------------- Convex ----------------------
 		ConvexCore::ConvexCore(const PointL& pl): point(pl) {}
@@ -463,9 +461,6 @@ namespace boom {
 			}
 			return result;
 		}
-		Vec2 ConvexCore::center() const {
-			return std::get<2>(area_inertia_center());
-		}
 		LineCore ConvexCore::getOuterLine(int n) const {
 			return LineCore(point[(n+1)%point.size()], point[n]);
 		}
@@ -483,10 +478,10 @@ namespace boom {
 			return Convex2(std::move(ConvexCore::splitTwo(l)));
 		}
 		Convex2 ConvexModel::splitTwo(const StLineCore& l) const {
-			return Convex2(std::move(_convex.splitTwo(l)));
+			return Convex2(std::move(_core.splitTwo(l)));
 		}
 		std::ostream& ConvexModel::dbgPrint(std::ostream& os) const {
-			return _convex.dbgPrint(os);
+			return _core.dbgPrint(os);
 		}
 		ConvexCore& ConvexCore::operator *= (const AMat32& m) {
 			for(auto& p : point)
@@ -785,19 +780,19 @@ namespace boom {
 		void ConvexCore::splitThis(const StLineCore& l) {
 			split(l);
 		}
-		CircleCore ConvexCore::getBCircle() const {
+		CircleCore ConvexCore::bcircle() const {
 			// 多分遅いアルゴリズムだが、今はこれで我慢
 			// 全ての3点の組み合わせを調べる
 			int nV = point.size();
 			assert(nV >= 3);
 			CircleCore c;
-			c.radius = -1;
+			c.fRadius = -1;
 			for(int i=0 ; i<nV-2 ; i++) {
 				for(int j=i+1 ; j<nV-1 ; j++) {
 					for(int k=j+1 ; k<nV ; k++) {
 						PolyCore p(point[i], point[j], point[k]);
-						auto tc = p.getBCircle();
-						if(c.radius < tc.radius)
+						auto tc = p.bcircle();
+						if(c.fRadius < tc.fRadius)
 							c = tc;
 					}
 				}
@@ -821,60 +816,36 @@ namespace boom {
 		}
 
 		Vec2 Convex::support(const Vec2& dir) const { return ConvexCore::support(dir); }
-		Vec2 Convex::center() const { return ConvexCore::center(); }
+		Vec2 Convex::getCenter() const { return std::get<2>(ConvexCore::area_inertia_center()); }
 		bool Convex::isInner(const Vec2& pos) const { return ConvexCore::isInner(pos); }
 		IModel::PosL Convex::getOverlappingPoints(const IModel& mdl, const Vec2& inner) const { return ConvexCore::getOverlappingPoints(mdl,inner); }
-		CircleCore Convex::getBCircle() const { return ConvexCore::getBCircle(); }
+		CircleCore Convex::getBCircle() const { return ConvexCore::bcircle(); }
 
-		ConvexModel::ConvexModel(): _rflag(RFL_ALL) {}
-		ConvexModel::ConvexModel(std::initializer_list<Vec2> v): _convex(v), _rflag(RFL_ALL) {}
-		ConvexModel::ConvexModel(const PointL& pl): _convex(pl), _rflag(RFL_ALL) {}
-		ConvexModel::ConvexModel(PointL&& pl): _convex(pl), _rflag(RFL_ALL) {}
+		ConvexModel::ConvexModel(std::initializer_list<Vec2> v): Cache(v) {}
+		ConvexModel::ConvexModel(const PointL& pl): Cache(pl) {}
+		ConvexModel::ConvexModel(PointL&& pl): Cache(pl) {}
+		float ConvexModel::getArea(bool) const { return getCache(TagArea()); }
+		float ConvexModel::getInertia(bool) const { return getCache(TagInertia()); }
 
-		void ConvexModel::_refreshCInertia() const {
-			if(Bit::ChClear(_rflag, RFL_CENTER_INERTIA)) {
-				auto res = _convex.area_inertia_center();
-				_area = std::get<0>(res);
-				_inertia = std::get<1>(res);
-				_center = std::get<2>(res);
-			}
-		}
-		float ConvexModel::getArea() const {
-			_refreshCInertia();
-			return _area;
-		}
-		float ConvexModel::getInertia() const {
-			_refreshCInertia();
-			return _inertia;
-		}
-		const AVec2& ConvexModel::getCenter() const {
-			_refreshCInertia();
-			return _center;
-		}
-		const PointL& ConvexModel::getPoint() const { return _convex.point; }
+		const PointL& ConvexModel::getPoint() const { return _core.point; }
 		PointL& ConvexModel::refPoint() {
-			_rflag = RFL_ALL;
-			return _convex.point;
+			setCacheFlagAll();
+			return _core.point;
 		}
-		const ConvexCore& ConvexModel::getConvex() const { return _convex; }
-		Vec2 ConvexModel::support(const Vec2& dir) const { return _convex.support(dir); }
-		Vec2 ConvexModel::center() const { return Vec2(getCenter()); }
-		bool ConvexModel::isInner(const Vec2& pos) const { return _convex.isInner(pos); }
-		IModel::PosL ConvexModel::getOverlappingPoints(const IModel& mdl, const Vec2& inner) const { return _convex.getOverlappingPoints(mdl, inner); }
-		CircleCore ConvexModel::getBCircle() const {
-			if(Bit::ChClear(_rflag, RFL_BBCIRCLE))
-				_bbCircle = _convex.getBCircle();
-			return _bbCircle;
-		}
+		Vec2 ConvexModel::support(const Vec2& dir) const { return _core.support(dir); }
+		Vec2 ConvexModel::getCenter() const { return Cache::getCache(TagCenter()); }
+		bool ConvexModel::isInner(const Vec2& pos) const { return _core.isInner(pos); }
+		IModel::PosL ConvexModel::getOverlappingPoints(const IModel& mdl, const Vec2& inner) const { return _core.getOverlappingPoints(mdl, inner); }
+		CircleCore ConvexModel::getBCircle() const { return Cache::getCache(TagBCircle()); }
 		void ConvexModel::addOffset(const Vec2& ofs) {
-			_convex.addOffset(ofs);
+			_core.addOffset(ofs);
 			// 中心座標をずらす
-			_center += ofs;
-			_bbCircle.center += ofs;
+			Cache::refCache(TagCenter()) += ofs;
+			Cache::refCache(TagBCircle()).vCenter += ofs;
 		}
-		int ConvexModel::getNPoints() const { return _convex.point.size(); }
-		Vec2 ConvexModel::getPoint(int n) const { return _convex.point[n]; }
-		IModel::CPos ConvexModel::checkPosition(const Vec2& pos) const { return _convex.checkPosition(pos); }
+		int ConvexModel::getNPoints() const { return _core.point.size(); }
+		Vec2 ConvexModel::getPoint(int n) const { return _core.point[n]; }
+		IModel::CPos ConvexModel::checkPosition(const Vec2& pos) const { return _core.checkPosition(pos); }
 
 		Vec3 Dual(const Plane& plane) {
 			float d = plane.d;

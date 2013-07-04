@@ -125,8 +125,8 @@ namespace boom {
 			Vec2 pos = _getModel(_model).support(BASE::toLocalDir(dir));
 			return BASE::toWorld(pos);
 		}
-		DEF_TMODEL(Vec2)::center() const {
-			Vec2 res = _getModel(_model).center();
+		DEF_TMODEL(Vec2)::getCenter() const {
+			Vec2 res = _getModel(_model).getCenter();
 			return BASE::toWorld(res);
 		}
 		DEF_TMODEL(bool)::isInner(const Vec2& pos) const {
@@ -142,6 +142,13 @@ namespace boom {
 		DEF_TMODEL(CircleCore)::getBCircle() const {
 			CircleCore c = _getModel(_model).getBCircle();
 			return c * BASE::getToWorld();
+		}
+		DEF_TMODEL(float)::getArea(bool bInv) const {
+			return _getModel(_model).getArea(bInv);
+		}
+		DEF_TMODEL(float)::getInertia(bool bInv) const {
+			// 返すのは常に重心周りの慣性モーメントなので座標変換は不要
+			return _getModel(_model).getInertia(bInv);
 		}
 		DEF_TMODEL(IModel::PosL)::getOverlappingPoints(const IModel& mdl, const Vec2& inner) const {
 			// innerとmdlをこちらのローカル座標系に変換
@@ -235,8 +242,8 @@ namespace boom {
 					auto st = ptr->refPose().refValue();
 					// 現フレームの加速度
 					auto acc = ptr->resist(i, cr);
-					st.acc += acc.linear;
-					st.rotAcc += acc.torque;
+					st.acc += acc.linear / ptr->getArea(false);
+					st.rotAcc += acc.torque / ptr->getInertia(false);
 					// 次のフレームの位置
 					st.ofs += st.vel * dt;
 					st.ang += st.rotVel * dt;
@@ -275,8 +282,8 @@ namespace boom {
 						dat.ang += dat.rotVel * dt;
 						dat.rotVel += dat.rotAcc * dt;
 						// (衝突判定結果は1フレーム遅れて出る為)
-						ps.acc = acc.linear;
-						ps.rotAcc = acc.torque;
+						ps.acc = acc.linear / ptr->getArea(false);
+						ps.rotAcc = acc.torque / ptr->getInertia(false);
 
 						++itr;
 						++cur;
@@ -292,8 +299,8 @@ namespace boom {
 						dat.ang = ps0.ang + (ps0.rotVel + dat.rotVel) * dth2;
 						dat.rotVel = ps0.rotVel + (ps0.rotAcc + dat.rotAcc) * dth2;
 						auto acc = ptr->resist(cur, cr);
-						dat.acc = acc.linear;
-						dat.rotAcc = acc.torque;
+						dat.acc = acc.linear / ptr->getArea(false);
+						dat.rotAcc = acc.torque / ptr->getInertia(false);
 
 						++itr;
 						++cur;
@@ -329,8 +336,8 @@ namespace boom {
 
 							ps = dat;
 							auto acc = ptr->resist(cur, cr);		// 処理前の加速度
-							ps.acc = acc.linear;
-							ps.rotAcc = acc.torque;
+							ps.acc = acc.linear / ptr->getArea(false);
+							ps.rotAcc = acc.torque / ptr->getInertia(false);
 							dat.ofs += dat.vel * dt2;
 							dat.vel += ps.acc * dt2;
 							dat.ang += dat.rotVel * dt2;
@@ -349,8 +356,8 @@ namespace boom {
 
 							ps1 = dat;
 							auto acc = ptr->resist(cur, cr);		// ps1の加速度
-							ps1.acc = acc.linear;
-							ps1.rotAcc = acc.torque;
+							ps1.acc = acc.linear / ptr->getArea(false);
+							ps1.rotAcc = acc.torque / ptr->getInertia(false);
 							dat.ofs = ps0.ofs + ps1.vel * dt2;
 							dat.vel = ps0.vel + ps1.acc * dt2;
 							dat.ang = ps0.ang + ps1.rotVel * dt2;
@@ -369,8 +376,8 @@ namespace boom {
 
 							ps2 = dat;
 							auto acc = ptr->resist(cur, cr);		// ps2の加速度
-							ps2.acc = acc.linear;
-							ps2.rotAcc = acc.torque;
+							ps2.acc = acc.linear / ptr->getArea(false);
+							ps2.rotAcc = acc.torque / ptr->getInertia(false);
 							dat.ofs = ps0.ofs + ps2.vel * dt;
 							dat.vel = ps0.vel + ps2.acc * dt;
 							dat.ang = ps0.ang + ps2.rotVel * dt;
@@ -391,8 +398,8 @@ namespace boom {
 
 							ps3 = dat;
 							auto acc = ptr->resist(cur, cr);
-							ps3.acc = acc.linear;
-							ps3.rotAcc = acc.torque;
+							ps3.acc = acc.linear / ptr->getArea(false);
+							ps3.rotAcc = acc.torque / ptr->getInertia(false);
 
 							dat.ofs = ps0.ofs + (ps0.vel + ps1.vel*2 + ps2.vel*2 + ps3.vel) * dt6;
 							dat.vel = ps0.vel + (ps0.acc + ps1.acc*2 + ps2.acc*2 + ps3.acc) * dt6;

@@ -41,7 +41,7 @@ namespace boom {
 			_vtx[n] = (_m0.support(dir) - _posB[n]);
 		}
 		bool GSimplex::_gjkMethod() {
-			Vec2 dir(_m1.center() - _m0.center());
+			Vec2 dir(_m1.getCenter() - _m0.getCenter());
 			float lens = dir.len_sq();
 			if(lens < DIST_THRESHOLD)
 				dir = Vec2(1,0);
