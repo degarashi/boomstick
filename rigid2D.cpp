@@ -102,6 +102,12 @@ namespace boom {
 
 		// -------------------------- TR_Mat --------------------------
 		TR_Mat::tagInverse TR_Mat::TagInverse;
+		TR_Mat::TR_Mat(const AMat32& m): _mToWorld(m) {
+			auto mt = m.convert33();
+			mt.invert();
+			_mToLocal = mt.convertA32();
+		}
+
 		TR_Mat::TR_Mat(const RPose& rp): _mToLocal(rp.getToLocal()), _mToWorld(rp.getToWorld()) {}
 		TR_Mat::TR_Mat(const TR_Mat& t, tagInverse): _mToLocal(t._mToWorld), _mToWorld(t._mToLocal) {}
 		TR_Mat::TR_Mat(const RPose& rp, tagInverse): _mToLocal(rp.getToWorld()), _mToWorld(rp.getToLocal()) {}

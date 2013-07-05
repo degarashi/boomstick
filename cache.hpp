@@ -49,8 +49,12 @@ namespace boom {
 
 			const CORE& getCore() const { return _core; }
 			template <class TAG>
-			decltype(std::get<TV<TAG>::POS>(_data))& refCache(TAG) const {
+			decltype(TAG()())& refCache(TAG) const {
 				_rflag &= ~TV<TAG>::FLAG;
+				return std::get<TV<TAG>::POS>(_data);
+			}
+			template <class TAG>
+			decltype(TAG()())& refCacheNF(TAG) const {
 				return std::get<TV<TAG>::POS>(_data);
 			}
 

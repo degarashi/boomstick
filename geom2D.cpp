@@ -840,8 +840,8 @@ namespace boom {
 		void ConvexModel::addOffset(const Vec2& ofs) {
 			_core.addOffset(ofs);
 			// 中心座標をずらす
-			Cache::refCache(TagCenter()) += ofs;
-			Cache::refCache(TagBCircle()).vCenter += ofs;
+			refCacheNF(TagCenter()) += ofs;
+			refCacheNF(TagBCircle()).vCenter += ofs;
 		}
 		int ConvexModel::getNPoints() const { return _core.point.size(); }
 		Vec2 ConvexModel::getPoint(int n) const { return _core.point[n]; }

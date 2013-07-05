@@ -608,6 +608,7 @@ namespace boom {
 			public:
 				static struct tagInverse {} TagInverse;
 				TR_Mat() = default;
+				TR_Mat(const AMat32& m);
 				TR_Mat(const TR_Mat& t) = default;
 				TR_Mat(const TR_Mat& t, tagInverse);
 				TR_Mat(const RPose& rp);
