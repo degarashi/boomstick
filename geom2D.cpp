@@ -934,16 +934,16 @@ namespace boom {
 							float area = (cur.pos - pre.pos) * sign0;		// マイナスの場合も有り得る
 							// calc spring
 							cur.fricD = (pre.height + cur.height) * 0.5f * area * _coeff.spring;
-							p_tor += (1.f/3) * (pre.pos*pre.height + (pre.pos*cur.height + cur.pos*pre.height)*0.5f + cur.pos*cur.height) * area * _coeff.spring;
+							p_tor += (-1.f/3) * (pre.pos*pre.height + (pre.pos*cur.height + cur.pos*pre.height)*0.5f + cur.pos*cur.height) * area * _coeff.spring;
 							// calc dumper
 							cur.fricD += (pre.velN + cur.velN) * 0.5f * area * _coeff.dumper;
 							p_lin += cur.fricD;
-							p_tor += (1.f/3) * (pre.pos*pre.velN + (pre.pos*cur.velN + cur.pos*pre.velN)*0.5f + cur.pos*cur.velN) * area * _coeff.dumper;
+							p_tor += (-1.f/3) * (pre.pos*pre.velN + (pre.pos*cur.velN + cur.pos*pre.velN)*0.5f + cur.pos*cur.velN) * area * _coeff.dumper;
 							// dynamic-friction
 							cur.fricD = (pre.velT + cur.velT) * 0.5f * cur.fricD;
 							cur.fricD *= _coeff.fricD;
 							p_fdLin += cur.fricD;
-							p_fdTor += (1.f/3) * (pre.pos*pre.fricD + (pre.pos*cur.fricD + cur.pos*pre.fricD)*0.5f + cur.pos*cur.fricD) * area * _coeff.fricD;
+							p_fdTor += (-1.f/3) * (pre.pos*pre.fricD + (pre.pos*cur.fricD + cur.pos*pre.fricD)*0.5f + cur.pos*cur.fricD) * area * _coeff.fricD;
 							// TODO: calc static-friction
 						}
 						dst.sdump.linear += _nml * p_lin;
