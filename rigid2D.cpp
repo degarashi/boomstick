@@ -244,7 +244,7 @@ namespace boom {
 			int Eular::numOfIteration() const { return 1; }
 			void Eular::advance(int pass, RItr itr, RItr itrE, const RigidCR& cr, float dt) {
 				for(int i=0 ; itr!=itrE ; ++i,++itr) {
-					auto* ptr = itr->value.get();
+					auto* ptr = (*itr).get();
 					auto st = ptr->refPose().refValue();
 					// 現フレームの加速度
 					auto acc = ptr->resist(i, cr);
@@ -276,7 +276,7 @@ namespace boom {
 				if(pass == 0) {
 					// value = 1つ前の(計算上の)状態
 					while(itr != itrE) {
-						auto* ptr = itr->value.get();
+						auto* ptr = (*itr).get();
 						auto dat = ptr->refPose().refValue();
 						auto& ps = tv0[cur];
 
@@ -296,7 +296,7 @@ namespace boom {
 					}
 				} else {
 					while(itr != itrE) {
-						auto* ptr = itr->value.get();
+						auto* ptr = (*itr).get();
 						auto dat = ptr->refPose().refValue();
 						auto& ps0 = tv0[cur];
 
@@ -336,7 +336,7 @@ namespace boom {
 				switch(pass) {
 					case 0:
 						while(itr != itrE) {
-							auto* ptr = itr->value.get();
+							auto* ptr = (*itr).get();
 							auto dat = ptr->refPose().refValue();
 							auto& ps = tv0[cur];
 
@@ -355,7 +355,7 @@ namespace boom {
 						break;
 					case 1:
 						while(itr != itrE) {
-							auto* ptr = itr->value.get();
+							auto* ptr = (*itr).get();
 							auto dat = ptr->refPose().refValue();
 							auto &ps0 = tv0[cur],
 								&ps1 = tv1[cur];
@@ -375,7 +375,7 @@ namespace boom {
 						break;
 					case 2:
 						while(itr != itrE) {
-							auto* ptr = itr->value.get();
+							auto* ptr = (*itr).get();
 							auto dat = ptr->refPose().refValue();
 							auto &ps0 = tv0[cur],
 								&ps2 = tv2[cur];
@@ -395,7 +395,7 @@ namespace boom {
 						break;
 					case 3:
 						while(itr != itrE) {
-							auto* ptr = itr->value.get();
+							auto* ptr = (*itr).get();
 							auto dat = ptr->refPose().refValue();
 							auto &ps0 = tv0[cur],
 								&ps1 = tv1[cur],

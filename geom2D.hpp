@@ -517,9 +517,9 @@ namespace boom {
 			Vec2			_vel,
 							_acc;
 			GAP_MATRIX_DEF(mutable, _finalInv, 3,2,
-			   ((float _rotVel, float _rotAcc))
-			   ((uint32_t _velAccum))			//!< Pose2Dのaccumカウンタとは別で速度に関する変数が書き換えられた際にインクリメント
-			   ((mutable uint32_t _invAccum))	//!< 逆行列キャッシュを作った時のカウンタ値
+			   ((float, _rotVel, float, _rotAcc))
+			   ((uint32_t, _velAccum))			//!< Pose2Dのaccumカウンタとは別で速度に関する変数が書き換えられた際にインクリメント
+			   ((mutable uint32_t, _invAccum))	//!< 逆行列キャッシュを作った時のカウンタ値
 			)
 			void _identitySingle();
 

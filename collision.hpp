@@ -284,12 +284,12 @@ namespace boom {
 
 				int iCur=0;
 				for(auto itr=itrB_a ; itr!=itrE_a1 ; ++itr,++iCur) {
-					const NODE& nodeA = *itr->value;
+					const NODE& nodeA = *(*itr);
 
 					auto itr2 = itr;
 					++itr2;
 					for(int jCur=iCur+1; itr2!=itrE_a ; ++itr2,++jCur) {
-						const NODE& nodeA2 = *itr2->value;
+						const NODE& nodeA2 = *(*itr2);
 						if(nchk(nodeA, nodeA2)) {
 							cr(iCur, jCur, nodeA, nodeA2, nchk.getInfo());
 							++count;
@@ -305,10 +305,10 @@ namespace boom {
 
 					iCur=0;
 					for(auto itr=itrB_a ; itr!=itrE_a ; ++itr,++iCur) {
-						const NODE& nodeA = *itr->value;
+						const NODE& nodeA = *(*itr);
 						int jCur=0;
 						for(auto itr2=itrB_b ; itr2!=itrE_b ; ++itr2,++jCur) {
-							const NODE& nodeB = *itr2->value;
+							const NODE& nodeB = *(*itr2);
 							if(nchk(nodeA,nodeB)) {
 								cr(iCur, jCur, nodeA, nodeB, nchk.getInfo());
 								++count;
