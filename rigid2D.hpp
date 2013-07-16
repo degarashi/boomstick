@@ -42,40 +42,15 @@ namespace boom {
 				void operator ()(int id0, int id1, const Rigid& r0, const Rigid& r1, const Vec2& inner);
 				// BroadCが渡すオブジェクトに適合していればIModelだろうがなんだろうがOK
 		};
-
-		struct IItg;
-		//! 剛体マネージャ
-		class RigidMgr : public RigidCR {
-			using SPRigid = std::shared_ptr<Rigid>;
-			using SPItg = std::shared_ptr<IItg>;
-			using BroadC = BroadC_RoundRobin<Rigid>;
-			BroadC			_broadC;
-			SPItg			_itg;		//!< 適用する積分アルゴリズム
-			void _checkCollision();		//! コリジョンチェックして内部変数に格納
-
-			public:
-				using const_iterator = typename BroadC::const_iterator;
-				using id_type = typename BroadC::id_type;
-
-				RigidMgr(const SPItg& itg, const RCoeff& coeff);
-				void simulate(float dt);
-
-				id_type addA(const SPRigid& sp);
-				id_type addB(const SPRigid& sp);
-				void remA(id_type id);
-				void remB(id_type id);
-		};
 		//! 剛体ラッパ (形状 + 姿勢)
-		class Rigid : public TModelSP<RPose>, public spn::CheckAlign<16,Rigid> {
+		class Rigid : public TModelH<RPose>, public spn::CheckAlign<16,Rigid> {
 			public:
 				constexpr static int NUM_RESIST = 4;
-				using sptr = std::shared_ptr<Rigid>;
-				using csptr = const sptr&;
 				using SPResist = std::shared_ptr<IResist>;
 			private:
 				SPResist		_resist[NUM_RESIST];	//!< 抵抗計算用
 			public:
-				using TModelSP<RPose>::TModelSP;
+				using TModelH<RPose>::TModelH;
 
 				// --- シミュレーションに関する関数など ---
 				RPose& refPose();
@@ -87,6 +62,41 @@ namespace boom {
 				/*! \param[in] index 通し番号 */
 				RForce::F resist(int index, const RigidCR& cr) const;
 		};
+		#define mgr_rigid reinterpret_cast<RigidRes&>(ModelMgr::_ref())
+		class RigidRes : public ModelMgr {
+			public:
+				LHdl acquireModel(IModel* mdl) {
+					return acquire(std::unique_ptr<IModel>(mdl));
+				}
+				AnotherLHandle<std::unique_ptr<Rigid>> acquireRigid(Rigid* pRigid) {
+					LHdl lh = acquire(std::unique_ptr<IModel>(pRigid));
+					return Cast<std::unique_ptr<Rigid>>(std::move(lh));
+				}
+		};
+		DEF_HANDLE(RigidRes, Rig, std::unique_ptr<Rigid>)
+
+		struct IItg;
+		//! 剛体マネージャ
+		class RigidMgr : public RigidCR {
+			using SPItg = std::shared_ptr<IItg>;
+			using BroadC = BroadC_RoundRobin<HRig>;
+			BroadC			_broadC;
+			SPItg			_itg;		//!< 適用する積分アルゴリズム
+			void _checkCollision();		//! コリジョンチェックして内部変数に格納
+
+		public:
+			using const_iterator = typename BroadC::const_iterator;
+			using id_type = typename BroadC::id_type;
+
+			RigidMgr(const SPItg& itg, const RCoeff& coeff);
+			void simulate(float dt);
+
+			id_type addA(HRig hRig);
+			id_type addB(HRig hRig);
+			void remA(id_type id);
+			void remB(id_type id);
+		};
+
 		//! 位置と速度を与えた時にかかる加速度(抵抗力)を計算
 		struct IResist : std::enable_shared_from_this<IResist> {
 			using sptr = std::shared_ptr<IResist>;

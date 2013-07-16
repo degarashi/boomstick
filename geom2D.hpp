@@ -5,7 +5,7 @@
 #include "spinner/assoc.hpp"
 #include "spinner/pose.hpp"
 #include "spinner/plane.hpp"
-#include "spinner/noseq.hpp"
+#include "spinner/resmgr.hpp"
 #include "collision.hpp"
 #include "cache2D.hpp"
 #include <cassert>
@@ -88,8 +88,6 @@ namespace boom {
 		using Convex2 = std::pair<Convex,Convex>;
 		using ConvexCore2 = std::pair<ConvexCore, ConvexCore>;
 		struct IModel {
-			using sptr = std::shared_ptr<IModel>;
-			using csptr = const sptr&;
 			enum class POSITION {
 				INNER,
 				ONLINE,
@@ -133,6 +131,9 @@ namespace boom {
 			virtual std::ostream& dbgPrint(std::ostream& /*os*/) const { INVOKE_ERROR }
 			friend std::ostream& operator << (std::ostream& os, const IModel& mdl);
 		};
+		#define mgr_model	ModelMgr::_ref()
+		class ModelMgr : public spn::ResMgrA<std::unique_ptr<IModel>, ModelMgr> {};
+		DEF_HANDLE(ModelMgr, Mdl, std::unique_ptr<IModel>)
 
 		template <class T>
 		struct IModelP : IModel {
@@ -556,7 +557,7 @@ namespace boom {
 		class TModel : public IModel, public BASE {
 			MDL				_model;		//!< 形状
 
-			const IModel& _getModel(IModel::csptr sp) const;
+			const IModel& _getModel(const HLMdl& mdl) const;
 			const IModel& _getModel(const IModel& mdl) const;
 
 			public:
@@ -597,7 +598,7 @@ namespace boom {
 				const AMat32& getToWorld() const;
 		};
 		template <class BASE>
-		using TModelSP = TModel<IModel::sptr, BASE>;
+		using TModelH = TModel<HLMdl, BASE>;
 		template <class BASE>
 		using TModelR = TModel<const IModel&, BASE>;
 

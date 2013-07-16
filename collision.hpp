@@ -246,8 +246,7 @@ namespace boom {
 				NUM_TYPE
 			};
 		private:
-			using SPNode = std::shared_ptr<NODE>;
-			using Nodes = spn::noseq_list<SPNode>;
+			using Nodes = spn::noseq_list<NODE>;
 			Nodes	_node[NUM_TYPE];
 
 		public:
@@ -256,8 +255,8 @@ namespace boom {
 			int getNum(TYPE typ) const { return _node[typ].size(); }
 			int getNumObj() const { return getNum(TYPE_A) + getNum(TYPE_B); }
 
-			id_type add(TYPE typ, const SPNode& sp) {
-				return _node[typ].add(sp);
+			id_type add(TYPE typ, NODE obj) {
+				return _node[typ].add(obj);
 			}
 			void rem(TYPE typ, id_type id) {
 				_node[typ].rem(id);
@@ -284,12 +283,12 @@ namespace boom {
 
 				int iCur=0;
 				for(auto itr=itrB_a ; itr!=itrE_a1 ; ++itr,++iCur) {
-					const NODE& nodeA = *(*itr);
+					const auto& nodeA = *(*itr).cref().get();
 
 					auto itr2 = itr;
 					++itr2;
 					for(int jCur=iCur+1; itr2!=itrE_a ; ++itr2,++jCur) {
-						const NODE& nodeA2 = *(*itr2);
+						const auto& nodeA2 = *(*itr2).cref().get();
 						if(nchk(nodeA, nodeA2)) {
 							cr(iCur, jCur, nodeA, nodeA2, nchk.getInfo());
 							++count;
@@ -305,10 +304,10 @@ namespace boom {
 
 					iCur=0;
 					for(auto itr=itrB_a ; itr!=itrE_a ; ++itr,++iCur) {
-						const NODE& nodeA = *(*itr);
+						const auto& nodeA = *(*itr).cref().get();
 						int jCur=0;
 						for(auto itr2=itrB_b ; itr2!=itrE_b ; ++itr2,++jCur) {
-							const NODE& nodeB = *(*itr2);
+							const auto& nodeB = *(*itr2).cref().get();
 							if(nchk(nodeA,nodeB)) {
 								cr(iCur, jCur, nodeA, nodeB, nchk.getInfo());
 								++count;

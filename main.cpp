@@ -31,6 +31,8 @@ void TestAssoc() {
 	std::cout << std::endl;
 }
 void TestRigid() {
+	std::unique_ptr<RigidRes> rmgr(new RigidRes);
+
 	boom::RCoeff rc = {1,1,1,1,1};
 	RigidMgr rm(IItg::sptr(new itg::Eular), rc);
 	// 頂点を定義して、重心を求めそこを中心にして座標を変換
@@ -41,11 +43,12 @@ void TestRigid() {
 		ofs1 = c1->getCenter();
 	c0->addOffset(-ofs0);
 	c1->addOffset(-ofs1);
-
-	Rigid::sptr rg[2] = {Rigid::sptr(Rigid::New(IModel::sptr(c0))),
-						Rigid::sptr(Rigid::New(IModel::sptr(c1)))};
-	RPose* pp[2] = {&rg[0]->refPose(),
-					&rg[1]->refPose()};
+	HLMdl lhC0 = mgr_rigid.acquireModel(c0),
+			lhC1 = mgr_rigid.acquireModel(c1);
+	HLRig lhR[2] = {mgr_rigid.acquireRigid(Rigid::New(lhC0)),
+					mgr_rigid.acquireRigid(Rigid::New(lhC1))};
+	RPose* pp[2] = {&lhR[0].ref()->refPose(),
+					&lhR[1].ref()->refPose()};
 	pp[0]->setOfs(ofs0);
 	pp[1]->setOfs(ofs1);
 	pp[0]->setVelocity(Vec2(1,0));
@@ -54,9 +57,9 @@ void TestRigid() {
 	auto spGrav = IResist::sptr(new resist::Gravity(Vec2(0,-9.8f)));
 	auto spCol = IResist::sptr(new resist::Impact);
 	for(int i=0 ; i<2 ; i++) {
-		rm.addA(rg[i]);
-		rg[i]->addR(spGrav);
-		rg[i]->addR(spCol);
+		rm.addA(lhR[i].get());
+		lhR[i].ref()->addR(spGrav);
+		lhR[i].ref()->addR(spCol);
 	}
 	for(int i=0 ; i<10 ; i++)
 		rm.simulate(1.f);

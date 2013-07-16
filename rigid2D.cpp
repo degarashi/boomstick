@@ -165,7 +165,7 @@ namespace boom {
 
 		#define DEF_TMODEL(typ)	template <class MDL,class BASE> typ TModel<MDL,BASE>
 		DEF_TMODEL(const IModel&)::_getModel(const IModel& mdl) const { return mdl; }
-		DEF_TMODEL(const IModel&)::_getModel(IModel::csptr sp) const { return *sp.get(); }
+		DEF_TMODEL(const IModel&)::_getModel(const HLMdl& mdl) const { return *mdl.cref().get(); }
 		DEF_TMODEL(Vec2)::support(const Vec2& dir) const {
 			// dirをローカルに座標変換してサポート写像した後、またワールド座標系に戻す
 			Vec2 pos = _getModel(_model).support(BASE::toLocalDir(dir));
@@ -236,9 +236,9 @@ namespace boom {
 			return os;
 		}
 		#undef DEF_TMODEL
-		template class TModel<IModel::sptr, TR_Mat>;
+		template class TModel<HLMdl, TR_Mat>;
 		template class TModel<const IModel&, TR_Mat>;
-		template class TModel<IModel::sptr, RPose>;
+		template class TModel<HLMdl, RPose>;
 		template class TModel<const IModel&, RPose>;
 
 		// -------------------------- Rigid --------------------------
@@ -284,7 +284,7 @@ namespace boom {
 			int Eular::numOfIteration() const { return 1; }
 			void Eular::advance(int pass, RItr itr, RItr itrE, const RigidCR& cr, float dt) {
 				for(int i=0 ; itr!=itrE ; ++i,++itr) {
-					auto* ptr = (*itr).get();
+					auto* ptr = (*itr)->get();
 					auto st = ptr->refPose().refValue();
 					// 現フレームの加速度
 					auto acc = ptr->resist(i, cr);
@@ -316,7 +316,7 @@ namespace boom {
 				if(pass == 0) {
 					// value = 1つ前の(計算上の)状態
 					while(itr != itrE) {
-						auto* ptr = (*itr).get();
+						auto* ptr = (*itr)->get();
 						auto dat = ptr->refPose().refValue();
 						auto& ps = tv0[cur];
 
@@ -336,7 +336,7 @@ namespace boom {
 					}
 				} else {
 					while(itr != itrE) {
-						auto* ptr = (*itr).get();
+						auto* ptr = (*itr)->get();
 						auto dat = ptr->refPose().refValue();
 						auto& ps0 = tv0[cur];
 
@@ -376,7 +376,7 @@ namespace boom {
 				switch(pass) {
 					case 0:
 						while(itr != itrE) {
-							auto* ptr = (*itr).get();
+							auto* ptr = (*itr)->get();
 							auto dat = ptr->refPose().refValue();
 							auto& ps = tv0[cur];
 
@@ -395,7 +395,7 @@ namespace boom {
 						break;
 					case 1:
 						while(itr != itrE) {
-							auto* ptr = (*itr).get();
+							auto* ptr = (*itr)->get();
 							auto dat = ptr->refPose().refValue();
 							auto &ps0 = tv0[cur],
 								&ps1 = tv1[cur];
@@ -415,7 +415,7 @@ namespace boom {
 						break;
 					case 2:
 						while(itr != itrE) {
-							auto* ptr = (*itr).get();
+							auto* ptr = (*itr)->get();
 							auto dat = ptr->refPose().refValue();
 							auto &ps0 = tv0[cur],
 								&ps2 = tv2[cur];
@@ -435,7 +435,7 @@ namespace boom {
 						break;
 					case 3:
 						while(itr != itrE) {
-							auto* ptr = (*itr).get();
+							auto* ptr = (*itr)->get();
 							auto dat = ptr->refPose().refValue();
 							auto &ps0 = tv0[cur],
 								&ps1 = tv1[cur],
@@ -469,11 +469,11 @@ namespace boom {
 			RigidCR::setNumObjects(_broadC.getNumObj());
 			_broadC.collision(*this);
 		}
-		RigidMgr::id_type RigidMgr::addA(const SPRigid& sp) {
-			return _broadC.add(BroadC::TYPE_A, sp);
+		RigidMgr::id_type RigidMgr::addA(HRig hRig) {
+			return _broadC.add(BroadC::TYPE_A, hRig);
 		}
-		RigidMgr::id_type RigidMgr::addB(const SPRigid& sp) {
-			return _broadC.add(BroadC::TYPE_B, sp);
+		RigidMgr::id_type RigidMgr::addB(HRig hRig) {
+			return _broadC.add(BroadC::TYPE_B, hRig);
 		}
 		void RigidMgr::remA(id_type id) {
 			_broadC.rem(BroadC::TYPE_A, id);
