@@ -1,4 +1,5 @@
 #include "geom2D.hpp"
+#include "rigid2D.hpp"
 
 namespace boom {
 	bool geo2d::NarrowC_Model::operator()(const geo2d::IModel& mdl0, const geo2d::IModel& mdl1) {

@@ -1,5 +1,5 @@
 #include "spinner/vector.hpp"
-#include "geom2D.hpp"
+#include "rigid2D.hpp"
 #include "spinner/assoc.hpp"
 #include <iostream>
 using namespace spn;
