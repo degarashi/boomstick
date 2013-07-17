@@ -49,6 +49,24 @@ namespace boom {
 		RPose::Value::~Value() {
 			reinterpret_cast<RPose*>(&_pose)->_setAsChanged();
 		}
+		RPose::Value::Value(const Value& v): spn::Pose2D::Value(v),
+			vel(v.vel), acc(v.acc), rotVel(v.rotVel), rotAcc(v.rotAcc) {}
+		RPose::Value& RPose::Value::operator = (const TValue& tv) {
+			static_cast<spn::Pose2D::Value&>(*this) = static_cast<const spn::Pose2D::TValue&>(tv);
+			vel = tv.vel;
+			acc = tv.acc;
+			rotVel = tv.rotVel;
+			rotAcc = tv.rotAcc;
+			return * this;
+		}
+		RPose::TValue& RPose::TValue::operator = (const Value& v) {
+			static_cast<spn::Pose2D::TValue&>(*this) = static_cast<const spn::Pose2D::Value&>(v);
+			vel = v.vel;
+			acc = v.acc;
+			rotVel = v.rotVel;
+			rotAcc = v.rotAcc;
+			return *this;
+		}
 
 		RPose::RPose(): _finalInv() {
 			_identitySingle();

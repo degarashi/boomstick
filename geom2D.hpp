@@ -503,12 +503,16 @@ namespace boom {
 			protected:
 				void _setAsChanged();
 			public:
+				struct TValue;
 				struct Value : spn::Pose2D::Value {
 					Vec2	&vel, &acc;
 					float	&rotVel, &rotAcc;
 
 					Value(RPose& rp);
 					~Value();
+					Value(const Value& v);
+					Value& operator = (const TValue& tv);
+					void operator = (const Value& v) = delete;
 				};
 				struct TValue : spn::Pose2D::TValue {
 					Vec2	vel, acc;
@@ -517,6 +521,7 @@ namespace boom {
 					TValue() = default;
 					TValue(const Value& v):
 						vel(v.vel), acc(v.acc), rotVel(v.rotVel), rotAcc(v.rotAcc) {}
+					TValue& operator = (const Value& v);
 				};
 
 				RPose();
