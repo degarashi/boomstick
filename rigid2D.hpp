@@ -124,7 +124,7 @@ namespace boom {
 			//! 1回分の時間を進めるのに必要なステップ数
 			virtual int numOfIteration() const = 0;
 
-			virtual void beginIteration(int n) {}
+			virtual void beginIteration(int /*n*/) {}
 			virtual void endIteration() {}
 		};
 

@@ -104,7 +104,7 @@ namespace boom {
 			//! 形状毎に一意なコリジョン管理IDを取得
 			virtual uint32_t getCID() const = 0;
 			//! ある座標が図形の内部に入っているか
-			virtual bool isInner(const Vec2& pos) const { return false; }
+			virtual bool isInner(const Vec2& /*pos*/) const { return false; }
 
 			#define INVOKE_ERROR throw std::runtime_error(std::string("not supported function: ") + __func__);
 			//! 外郭を構成する頂点で、mdlにめり込んでいる物を抽出
@@ -113,8 +113,8 @@ namespace boom {
 			//! 境界ボリューム(円)
 			virtual CircleCore getBCircle() const;
 
-			virtual float getArea(bool bInv) const { INVOKE_ERROR }
-			virtual float getInertia(bool bInv) const { INVOKE_ERROR }
+			virtual float getArea(bool /*bInv*/) const { INVOKE_ERROR }
+			virtual float getInertia(bool /*bInv*/) const { INVOKE_ERROR }
 
 			#define DEF_CASTFUNC(typ) virtual boost::optional<typ&> castAs##typ() { return boost::none; } \
 				virtual boost::optional<const typ&> castAs##typ() const { auto ref = const_cast<IModel*>(this)->castAs##typ(); \
@@ -374,7 +374,7 @@ namespace boom {
 				float result;
 
 				AreaSum(): result(0) {}
-				void operator()(int n, const Vec2& p0, const Vec2& p1) {
+				void operator()(int /*n*/, const Vec2& p0, const Vec2& p1) {
 					result += PolyCore::CalcArea(p0,p1);
 				}
 			};

@@ -11,7 +11,7 @@ namespace boom {
 	class DummyInfo {
 		public:
 			using type = void;
-			void resize(int nMaxObj) {}
+			void resize(int /*nMaxObj*/) {}
 			void clear() {}
 	};
 
@@ -55,7 +55,7 @@ namespace boom {
 				_ent[id0](t, 1);
 				_ent[id1](t, -1);
 			}
-			boost::optional<decltype(_ent[0].get())> getInfo(id_type id0, id_type id1) const {
+			boost::optional<decltype(_ent[0].get())> getInfo(id_type id0, id_type /*id1*/) const {
 				return _ent[id0].get();
 			}
 	};
