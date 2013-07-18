@@ -480,6 +480,7 @@ namespace boom {
 		}
 
 		Convex Convex::GetOverlappingConvex(const IModel& m0, const IModel& m1, const Vec2& inner) {
+			assert(m0.isInner(inner) && m1.isInner(inner));
 			// m0がm1にめり込んでいる頂点リストを出力
 			auto res0 = m0.getOverlappingPoints(m1,inner);
 			if(res0.first)

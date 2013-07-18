@@ -64,7 +64,6 @@ void TestRigid() {
 	for(int i=0 ; i<10 ; i++)
 		rm.simulate(1.f);
 }
-
 int main(int argc, char **argv) {
 	TestRigid();
 	return 0;

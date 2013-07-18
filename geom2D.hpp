@@ -23,6 +23,8 @@ namespace boom {
 	using spn::AMat33;
 	using spn::_sseRcp22Bit;
 	using spn::CType;
+	using spn::CramersRule;
+	using spn::CramerDet;
 	using Float2 = std::pair<float,float>;
 	using int2 = std::pair<int,int>;
 	using int2x2 = std::pair<int2,int2>;
@@ -37,16 +39,13 @@ namespace boom {
 	//! 三角形(v0,v1,v2)のvtに対する重心比率
 	/*! \return first: (v1-v0)の比率 <br>
 				second: (v2-v0)の比率 */
-	template <class T>
-	Float2 TriangleRatio(const T& v0, const T& v1, const T& v2, const T& vt) {
+	inline Vec2 TriangleRatio(const Vec2& v0, const Vec2& v1, const Vec2& v2, const Vec2& vt) {
 		Float2 ret;
-		T toV1(v1-v0),
-			toV2(v2-v0),
-			toVT(vt-v0);
-		float invarea = _sseRcp22Bit(Area_x2(toV1, toV2));
-		ret.first = Area_x2(toV1, toVT) * invarea;		// 横比率
-		ret.second = Area_x2(toVT, toV2) * invarea;		// 縦比率
-		return ret;
+		Vec2 	toV1(v1-v0),
+				toV2(v2-v0),
+				toVT(vt-v0);
+		float det = spn::CramerDet(toV1, toV2);
+		return spn::CramersRule(toV1, toV2, toVT, _sseRcp22Bit(det));
 	}
 	//! 三角形(v0,v1,v2)のvtに対する重心比率をユーザー定義変数(f0,f1,f2)に適用した物を算出
 	/*! \param[in] v0 三角形座標0
@@ -57,9 +56,9 @@ namespace boom {
 					const T& f0, const T& f1, const T& f2)
 	{
 		auto res = TriangleRatio(v0,v1,v2,vt);
-		auto toT01(f0.l_intp(f1, res.second)),
-				toT21(f2.l_intp(f1, res.second));
-		return toT01.l_intp(toT21, res.first);
+		auto toT01 = f1-f0,
+			toT02 = f2-f0;
+		return (toT01 * res.x) + (toT02 * res.y) + f0;
 	}
 	template <class T>
 	T LineLerp(const Vec2& v0, const Vec2& v1, const Vec2& vt,
