@@ -184,6 +184,8 @@ namespace boom {
 			Vec2 placeOnLine(const Vec2& p) const;
 			//! 基準位置に対する方向ベクトルとの内積
 			float posDot(const Vec2& p) const;
+
+			StLineCore operator * (const AMat32& m) const;
 		};
 		//! 半直線
 		struct RayCore {
@@ -195,6 +197,8 @@ namespace boom {
 			const StLineCore& asStLine() const;
 			Vec2x2 nearest(const RayCore& r) const;
 			Vec2 nearest(const Vec2& p) const;
+
+			RayCore operator * (const AMat32& m) const;
 		};
 
 		//! 線分
@@ -221,6 +225,8 @@ namespace boom {
 			StLineCore toStLine() const;
 			bool online(const Vec2& p) const;
 			CircleCore getBCircle() const;
+
+			LineCore operator * (const AMat32& m) const;
 		};
 		struct Line : LineCore, IModelP<LineCore> {
 			using LineCore::LineCore;

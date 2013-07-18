@@ -531,36 +531,30 @@ namespace boom {
 					TmpIn	_tmp[2];
 					int		_swI = 0;
 					const RPose			&_rp0,
-					&_rp1;
-					const StLineCore	&_div;
+										&_rp1;
 					const RCoeff		&_coeff;
-					Vec2				_nml;
+					const StLineCore	&_nml;
+					Vec2				_div;
+					RForce				_force = {};
 
 					void _advance(const Vec2& p) {
 						_doSwitch();
 						auto& cur = _current();
-						cur.height = std::fabs(_div.dir.ccw(p-_div.pos));
+						cur.height = std::fabs(_nml.dir.ccw(p-_nml.pos));
 
 						// 物体Bから見た物体Aの相対速度
 						Vec2 vel = _rp1.getVelocAt(p) - _rp0.getVelocAt(p);
-						cur.velN = _nml.dot(vel);
-						cur.velT = _div.dir.dot(vel);
+						cur.velN = _div.dot(vel);
+						cur.velT = _nml.dir.dot(vel);
 						// 物体Aの重心からの相対座標 (直線方向に対して)
-						cur.pos = _div.dir.dot(p) - _div.dir.dot(_rp0.getOffset());
+						cur.pos = _nml.dir.dot(p) - _nml.dir.dot(_rp0.getOffset());
 						cur.fricD = 0;
 					}
 					void _doSwitch() { _swI ^= 1; }
 					TmpIn& _current() { return _tmp[_swI]; }
 					TmpIn& _prev() { return _tmp[_swI^1]; }
 
-				public:
-					Tmp(const RPose& r0, const RPose& r1, const StLineCore& div, const RCoeff& coeff): _swI(0), _rp0(r0), _rp1(r1), _div(div), _coeff(coeff) {
-						// 衝突ライン(2D)の法線
-						_nml = div.dir * cs_mRot90[0];
-						if(_nml.dot(_rp0.getOffset() - div.pos) > 0)
-							_nml *= -1.f;
-					}
-					void calcForce(RForce& dst, const ConvexCore& c, float sign0) {
+					void _calcForce(RForce& dst, const ConvexCore& c, float sign0) {
 						const auto& pts = c.point;
 						int nV = pts.size();
 						if(nV < 3)
@@ -591,23 +585,36 @@ namespace boom {
 							p_fdTor += (-1.f/3) * (pre.pos*pre.fricD + (pre.pos*cur.fricD + cur.pos*pre.fricD)*0.5f + cur.pos*cur.fricD) * area * _coeff.fricD;
 							// TODO: calc static-friction
 						}
-						dst.sdump.linear += _nml * p_lin;
+						dst.sdump.linear += _nml.dir * p_lin;
 						dst.sdump.torque += p_tor;
-						dst.fricD.linear += _div.dir * p_fdLin;
+						dst.fricD.linear += _div * p_fdLin;
 						dst.fricD.torque += p_fdTor;
 					}
+
+				public:
+					Tmp(const RPose &r0, const RPose &r1, const ConvexCore& cv, const StLineCore& nml, const RCoeff &coeff): _swI(0), _rp0(r0), _rp1(r1), _coeff(coeff), _nml(nml) {
+						// 衝突ライン(2D)の法線
+						_div = nml.dir * cs_mRot90[0];
+						if(_div.dot(_rp0.getOffset() - nml.pos) > 0)
+							_div *= -1.f;
+
+						// 直線(断面)で2つに切ってそれぞれ計算
+						auto cvt = cv.splitTwo(StLineCore{nml.pos, _div});
+						cvt.first.dbgPrint(std::cout);
+						std::cout << std::endl;
+						cvt.second.dbgPrint(std::cout);
+
+						_calcForce(_force, cvt.first, 1.f);
+						_calcForce(_force, cvt.second, -1.f);
+					}
+					const RForce& getForce() const { return _force; }
 			};
 			//! 凸包を三角形に分割して抗力を計算
 			RForce CalcRF_Convex(const RPose& rp0, const RPose& rp1, const RCoeff& coeff, const ConvexCore& cv, const StLineCore& div) {
 				// 直線方向に向かって左側が表で、右が裏
 				// st.dot(line)がプラスなら足し、逆なら引く
-				Tmp tmp(rp0, rp1, div, coeff);
-				RForce rf = {};
-				// 直線(断面)で2つに切ってそれぞれ計算
-				auto cvt = cv.splitTwo(div);
-				tmp.calcForce(rf, cvt.first, 1.f);
-				tmp.calcForce(rf, cvt.second, -1.f);
-				return rf;
+				Tmp tmp(rp0, rp1, cv, div, coeff);
+				return tmp.getForce();
 			}
 			//! 円同士
 			RForce CalcOV_Circle2(const Rigid& r0, const Rigid& r1, const Vec2& inner, const RCoeff& coeff, const StLineCore& div) {

@@ -169,6 +169,9 @@ namespace boom {
 			Vec2 tv(p-pos);
 			return dir.dot(tv);
 		}
+		StLineCore StLineCore::operator * (const AMat32& m) const {
+			return StLineCore{pos.asVec3(1)*m, dir.asVec3(0)*m};
+		}
 
 		// ---------------------- Ray ----------------------
 		RayCore::RayCore(const Vec2& p, const Vec2& d): pos(p), dir(d) {}
@@ -179,6 +182,9 @@ namespace boom {
 		}
 		Vec2 RayCore::nearest(const Vec2& p) const {
 			return NearestPoint(asStLine(), p, [](float f){ return std::max(0.f,f); });
+		}
+		RayCore RayCore::operator * (const AMat32& m) const {
+			return RayCore{pos.asVec3(1)*m, dir.asVec3(0)*m};
 		}
 
 		// ---------------------- Line ----------------------
@@ -246,6 +252,9 @@ namespace boom {
 				return LNear(point[0] + diff*d, LINEPOS::ONLINE);
 			}
 			return LNear(Vec2(), LINEPOS::NOTHIT);
+		}
+		LineCore LineCore::operator * (const AMat32& m) const {
+			return LineCore{point[0].asVec3(1)*m, point[1].asVec3(1)*m};
 		}
 
 		Vec2 Line::support(const Vec2& dir) const {
