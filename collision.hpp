@@ -7,143 +7,161 @@
 #include "spinner/noseq.hpp"
 
 namespace boom {
-	//! ColResultで使用: ダミー情報クラス
-	class DummyInfo {
-		public:
-			using type = void;
-			void resize(int /*nMaxObj*/) {}
-			void clear() {}
-	};
+	namespace c_ent {
+		//! c_info::Pairsで使用: 値の平均を計算する
+		template <class T>
+		class Average {
+			T		_value;
+			int		_count;
 
-	//! ColResultで使用: 値の平均を計算する
-	template <class T>
-	class AverageEntry {
-		T		_value;
-		int		_count;
-
-		public:
-			using type = T;
-			AverageEntry(): _value(0), _count(0) {}
-			void operator()(const T& val, int sign) {
-				_value += val * sign;
-				++_count;
-			}
-			T get() const {
-				return _value * spn::_sseRcp22Bit(_count);
-			}
-	};
-
-	//! ColResultで使用: 値を合算する
-	template <class T, class ID>
-	class SharedEntry {
-		public:
-			using type = T;
-			using id_type = ID;
-		private:
-			using EntList = std::vector<T>;
-			EntList		_ent;
-		public:
-			void resize(int nMaxObj) {
-				static_assert(std::is_integral<ID>::value, "");
-				_ent.resize(nMaxObj);
-			}
-			void clear() {
-				_ent.clear();
-			}
-			void pushInfo(id_type id0, id_type id1, const typename T::type& t) {
-				assert(id0 < _ent.size() && id1 < _ent.size());
-				_ent[id0](t, 1);
-				_ent[id1](t, -1);
-			}
-			boost::optional<decltype(_ent[0].get())> getInfo(id_type id0, id_type /*id1*/) const {
-				return _ent[id0].get();
-			}
-	};
-
-	//! ColResultで使用: オブジェクトの組み合わせ1組に対して1つの情報を割り当てる
-	template <class T>
-	class SharedInfo {
-		using type = T;
-		using id_type = typename T::id_type;
-		using InfoVec = std::vector<T>;
-		struct Link {
-			uint16_t minID,
-					maxID;
-			Link() = default;
-			Link(uint16_t v): minID(v), maxID(v) {}
+			public:
+				using type = T;
+				Average(): _value(0), _count(0) {}
+				void operator ()(const T& val, int sign) {
+					_value += val * sign;
+					++_count;
+				}
+				T get() const {
+					return _value * spn::_sseRcp22Bit(_count);
+				}
 		};
-		using LinkVec = std::vector<Link>;
-		using Cursor = std::pair<uint16_t,uint16_t>;
-		using CurVec = std::vector<Cursor>;
+		//! c_info::Pairsで使用: 値の合計を出す
+		template <class T>
+		class Sum {
+			T		_value;
+			public:
+				using type = T;
+				Sum(): _value(0) {}
+				void operator ()(const T& val, int sign) { _value += val * sign; }
+				const T& get() const { return _value; }
+		};
+	}
+	namespace c_info {
+		//! ColResultで使用: ダミー情報クラス
+		/*! 変数をセットされても何もしない */
+		class Dummy {
+			public:
+				using type = void;
+				void resize(int /*nMaxObj*/) {}
+				void clear() {}
+				template <class T>
+				void operator ()(T&& val, int sign) {}
+				template <class ID, class DAT>
+				void pushInfo(ID id0, ID id1, DAT&& dat) {}
+				template <class ID>
+				int getInfo(ID id0, ID id1) const { throw std::runtime_error("not supported"); }
+		};
+		//! ColResultで使用: オブジェクト毎に値を合算する
+		template <class T, class ID>
+		class Pairs {
+			public:
+				using type = T;
+				using id_type = ID;
+			private:
+				using EntList = std::vector<T>;
+				EntList		_ent;
+			public:
+				void resize(int nMaxObj) {
+					static_assert(std::is_integral<ID>::value, "");
+					_ent.resize(nMaxObj);
+				}
+				void clear() {
+					_ent.clear();
+				}
+				void pushInfo(id_type id0, id_type id1, const typename T::type& t) {
+					assert(id0 < _ent.size() && id1 < _ent.size());
+					_ent[id0](t, 1);
+					_ent[id1](t, -1);
+				}
+				boost::optional<decltype(_ent[0].get())> getInfo(id_type id0, id_type /*id1*/) const {
+					return _ent[id0].get();
+				}
+		};
+		//! ColResultで使用: オブジェクトの組み合わせ1組に対して1つの情報を割り当てる
+		template <class T>
+		class Shared {
+			using type = T;
+			using id_type = typename T::id_type;
+			using InfoVec = std::vector<T>;
+			struct Link {
+				uint16_t minID,
+				maxID;
+				Link() = default;
+				Link(uint16_t v): minID(v), maxID(v) {}
+			};
+			using LinkVec = std::vector<Link>;
+			using Cursor = std::pair<uint16_t,uint16_t>;
+			using CurVec = std::vector<Cursor>;
 
-		InfoVec	_infoVec;
-		LinkVec	_linkVec;
-		CurVec	_curVec;
-		id_type	_curID,
-				_nItem;
+			InfoVec	_infoVec;
+			LinkVec	_linkVec;
+			CurVec	_curVec;
+			id_type	_curID,
+			_nItem;
 
-		public:
-			void resize(int nMaxObj) {
-				_curVec.resize(nMaxObj);
-				_curID = _nItem = 0;
-				std::memset(&_curVec[0], 0, sizeof(uint16_t)*nMaxObj*2);
-			}
-			void clear() {
-				_infoVec.clear();
-				_linkVec.clear();
-				_curVec.clear();
-			}
-			// 組み合わせは常にid0<id1で、値が前後したりは考慮しない
-			template <class P>
-			void pushInfo(id_type id0, id_type id1, P&& t) {
-				assert(id0 < id1);
-				assert(id0 < _curVec.size());
+			public:
+				void resize(int nMaxObj) {
+					_curVec.resize(nMaxObj);
+					_curID = _nItem = 0;
+					std::memset(&_curVec[0], 0, sizeof(uint16_t)*nMaxObj*2);
+				}
+				void clear() {
+					_infoVec.clear();
+					_linkVec.clear();
+					_curVec.clear();
+				}
+				// 組み合わせは常にid0<id1で、値が前後したりは考慮しない
+				template <class P>
+				void pushInfo(id_type id0, id_type id1, P&& t) {
+					assert(id0 < id1);
+					assert(id0 < _curVec.size());
 
-				_infoVec.emplace_back(t);
-				if(_curID != id0) {
-					// ID0エントリの切り替え
-					if(_nItem > 0) {
-						_curVec[_curID] = _curVec[id0] = _linkVec.size();
-						_linkVec.emplace_back(id1);
-					} else if(!_linkVec.empty()) {
-						auto& b = _linkVec.back();
-						b.minID = b.maxID = id1;
+					_infoVec.emplace_back(std::forward<P>(t));
+					if(_curID != id0) {
+						// ID0エントリの切り替え
+						if(_nItem > 0) {
+							_curVec[_curID] = _curVec[id0] = _linkVec.size();
+							_linkVec.emplace_back(id1);
+						} else if(!_linkVec.empty()) {
+							auto& b = _linkVec.back();
+							b.minID = b.maxID = id1;
+						}
+						_curID = id0;
+						_nItem = 0;
+					} else {
+						// 同一ID0の中でID1の間隔が空いた場合、リンクを分割
+						auto& link = _linkVec.back();
+						if(link.maxID+1 != id1) {
+							_linkVec.emplace_back(id1);
+						} else
+							++link.maxID;
 					}
-					_curID = id0;
-					_nItem = 0;
-				} else {
-					// 同一ID0の中でID1の間隔が空いた場合、リンクを分割
-					auto& link = _linkVec.back();
-					if(link.maxID+1 != id1) {
-						_linkVec.emplace_back(id1);
-					} else
-						++link.maxID;
 				}
-			}
-			//! 組み合わせに関連付けられた情報を取り出す
-			boost::optional<const T&> getInfo(id_type id0, id_type id1) const {
-				if(id0 < id1)
-					std::swap(id0,id1);
+				//! 組み合わせに関連付けられた情報を取り出す
+				boost::optional<const T&> getInfo(id_type id0, id_type id1) const {
+					if(id0 < id1)
+						std::swap(id0,id1);
 
-				const Cursor& cur = _curVec[id0];
-				if(cur.first == cur.second)
-					return boost::none;
-
-				uint32_t idx = cur.first,
-						ofs = 0;
-				while(id1 > _linkVec[idx].maxID) {
-					ofs += _linkVec[idx].minID;
-					if(++idx >= cur.second)
+					const Cursor& cur = _curVec[id0];
+					if(cur.first == cur.second)
 						return boost::none;
+
+					uint32_t idx = cur.first,
+					ofs = 0;
+					while(id1 > _linkVec[idx].maxID) {
+						ofs += _linkVec[idx].minID;
+						if(++idx >= cur.second)
+							return boost::none;
+					}
+					ofs += _linkVec[idx].minID;
+					return _linkVec[ofs];
 				}
-				ofs += _linkVec[idx].minID;
-				return _linkVec[ofs];
-			}
-	};
+		};
+	}
 
 	//! コリジョン判定の結果を参照しやすい形で格納
 	/*! テンプレート引数による固定数実装。適当にクラスを複数用意するなり工夫する */
-	template <int MAXN, class INFO=DummyInfo>
+	template <int MAXN, class INFO=c_info::Dummy>
 	class ColResult {
 		public:
 			using id_type = typename INFO::id_type;

@@ -28,7 +28,7 @@ namespace boom {
 		};
 		class Rigid;
 		/*! NarrowC_ModelからInnerを受け取り, 力積計算 */
-		class RigidCR : public ColResult<512, SharedEntry<AverageEntry<RForce>, uint32_t>> {
+		class RigidCR : public ColResult<512, c_info::Pairs<c_ent::Sum<RForce>, uint32_t>> {
 			// NOTE: ひとまずは反発係数固定での実装
 			RCoeff		_coeff;		//!< 力積計算に使う係数
 			public:
