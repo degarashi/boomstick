@@ -27,6 +27,7 @@ namespace boom {
 			friend std::ostream& operator << (std::ostream& os, const RForce& f);
 		};
 		class Rigid;
+		using DualRForce = DualValue<RForce>;
 		/*! NarrowC_ModelからInnerを受け取り, 力積計算 */
 		class RigidCR : public ColResult<512, c_info::Pairs<c_ent::Sum<RForce>, uint32_t>> {
 			// NOTE: ひとまずは反発係数固定での実装
@@ -174,6 +175,6 @@ namespace boom {
 
 		//! ペナルティ法における抗力計算
 		/*! 重なり領域だけを使うことは無くて、抗力の算出とセットなので内部で積分計算 */
-		RForce CalcForce(const Rigid& r0, const Rigid& r1, const Vec2& inner, const RCoeff& coeff, const StLineCore& div);
+		DualRForce CalcForce(const Rigid& r0, const Rigid& r1, const Vec2& inner, const RCoeff& coeff, const StLineCore& div);
 	}
 }

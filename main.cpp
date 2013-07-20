@@ -37,8 +37,8 @@ void TestRigid() {
 	RigidMgr rm(IItg::sptr(new itg::Eular), rc);
 	// 頂点を定義して、重心を求めそこを中心にして座標を変換
 	ConvexModel *c0 = ConvexModel::New({Vec2(0,0), Vec2(0,1), Vec2(1,1), Vec2(1,0)}),
-				*c1 = ConvexModel::New(*c0);
-	c1->addOffset(Vec2(0.75f));
+				*c1 = ConvexModel::New({Vec2(-2,0), Vec2(2,0), Vec2(2,-1), Vec2(-2,-1)});
+	c0->addOffset(Vec2(0,-0.1f));
 	AVec2 ofs0 = c0->getCenter(),
 		ofs1 = c1->getCenter();
 	c0->addOffset(-ofs0);
@@ -52,7 +52,7 @@ void TestRigid() {
 	pp[0]->setOfs(ofs0);
 	pp[1]->setOfs(ofs1);
 	pp[0]->setVelocity(Vec2(1,0));
-	pp[1]->setVelocity(Vec2(-1,0));
+	pp[1]->setVelocity(Vec2(0,0));
 
 	auto spGrav = IResist::sptr(new resist::Gravity(Vec2(0,-9.8f)));
 	auto spCol = IResist::sptr(new resist::Impact);

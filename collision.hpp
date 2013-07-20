@@ -17,8 +17,8 @@ namespace boom {
 			public:
 				using type = T;
 				Average(): _value(0), _count(0) {}
-				void operator ()(const T& val, int sign) {
-					_value += val * sign;
+				void operator ()(const T& val) {
+					_value += val;
 					++_count;
 				}
 				T get() const {
@@ -32,10 +32,19 @@ namespace boom {
 			public:
 				using type = T;
 				Sum(): _value(0) {}
-				void operator ()(const T& val, int sign) { _value += val * sign; }
+				void operator ()(const T& val) { _value += val; }
 				const T& get() const { return _value; }
 		};
 	}
+	//! マイナス演算子で負数ではなく別の値を返す
+	template <class T>
+	struct DualValue {
+		T	_value[2];
+
+		T& operator() (int n) { return _value[n]; }
+		operator const T& () const { return _value[0]; }
+		const T& operator - () const { return _value[1]; }
+	};
 	namespace c_info {
 		//! ColResultで使用: ダミー情報クラス
 		/*! 変数をセットされても何もしない */
@@ -44,12 +53,10 @@ namespace boom {
 				using type = void;
 				void resize(int /*nMaxObj*/) {}
 				void clear() {}
-				template <class T>
-				void operator ()(T&& val, int sign) {}
 				template <class ID, class DAT>
-				void pushInfo(ID id0, ID id1, DAT&& dat) {}
+				void pushInfo(ID /*id0*/, ID /*id1*/, const DAT& /*dat*/) {}
 				template <class ID>
-				int getInfo(ID id0, ID id1) const { throw std::runtime_error("not supported"); }
+				int getInfo(ID /*id0*/, ID /*id1*/) const { throw std::runtime_error("not supported"); }
 		};
 		//! ColResultで使用: オブジェクト毎に値を合算する
 		template <class T, class ID>
@@ -68,10 +75,11 @@ namespace boom {
 				void clear() {
 					_ent.clear();
 				}
-				void pushInfo(id_type id0, id_type id1, const typename T::type& t) {
+				template <class T2>
+				void pushInfo(id_type id0, id_type id1, const T2& t) {
 					assert(id0 < _ent.size() && id1 < _ent.size());
-					_ent[id0](t, 1);
-					_ent[id1](t, -1);
+					_ent[id0](t);
+					_ent[id1](-t);
 				}
 				boost::optional<decltype(_ent[0].get())> getInfo(id_type id0, id_type /*id1*/) const {
 					return _ent[id0].get();

@@ -285,16 +285,18 @@ namespace boom {
 		// -------------------------- IResist --------------------------
 		namespace resist {
 			Gravity::Gravity(const Vec2& v): _grav(v) {}
-			void Gravity::resist(RForce::F& acc, const Rigid& /*r*/, int /*index*/, const RigidCR& /*cr*/) const {
-				acc.linear += _grav;
+			void Gravity::resist(RForce::F& acc, const Rigid& r, int /*index*/, const RigidCR& /*cr*/) const {
+				float inv_area = _sseRcp22Bit(r.getModel().cref()->getArea(false));
+				acc.linear += _grav * _sseRcp22Bit(inv_area);
 			}
 
 			void Impact::resist(RForce::F& acc, const Rigid& r, int index, const RigidCR& cr) const {
+				float inv_area = _sseRcp22Bit(r.getModel().cref()->getArea(false));
 				auto fc = cr.getInfo().getInfo(index, 0);
 				auto& ff = fc->sdump;
 				auto& ff2 = fc->fricD;
-				acc += ff;
-				acc += ff2;
+				acc += ff * inv_area;
+				acc += ff2 * inv_area;
 			}
 		}
 		namespace itg {
@@ -523,8 +525,8 @@ namespace boom {
 					struct TmpIn {
 						float height;		// 深度
 						float velN, velT;	// 衝突断面の相対速度の垂直、水平成分
-						float pos;			// 直線に射影した2D頂点は1次元の数値になる
-						float fricD;
+						float pos[2];		// 直線に射影した2D頂点は1次元の数値になる
+						float forceN;		// 点に働く抗力
 					};
 
 				private:
@@ -535,68 +537,88 @@ namespace boom {
 					const RCoeff		&_coeff;
 					const StLineCore	&_nml;
 					Vec2				_div;
-					RForce				_force = {};
+					DualRForce			_force = {};
 
 					void _advance(const Vec2& p) {
 						_doSwitch();
 						auto& cur = _current();
-						cur.height = std::fabs(_nml.dir.ccw(p-_nml.pos));
+						cur.height = _nml.dir.dot(p-_nml.pos);
 
 						// 物体Bから見た物体Aの相対速度
-						Vec2 vel = _rp1.getVelocAt(p) - _rp0.getVelocAt(p);
-						cur.velN = _div.dot(vel);
-						cur.velT = _nml.dir.dot(vel);
+						Vec2 vel = _rp0.getVelocAt(p) - _rp1.getVelocAt(p);
+						cur.velN = std::min(_nml.dir.dot(vel), 0.f);
+						cur.velT = _div.dot(vel);
 						// 物体Aの重心からの相対座標 (直線方向に対して)
-						cur.pos = _nml.dir.dot(p) - _nml.dir.dot(_rp0.getOffset());
-						cur.fricD = 0;
+						float d = -_div.dot(p);
+						cur.pos[0] = d + _div.dot(_rp0.getOffset());
+						cur.pos[1] = d + _div.dot(_rp1.getOffset());
+						cur.forceN = 0;
 					}
 					void _doSwitch() { _swI ^= 1; }
 					TmpIn& _current() { return _tmp[_swI]; }
 					TmpIn& _prev() { return _tmp[_swI^1]; }
 
-					void _calcForce(RForce& dst, const ConvexCore& c, float sign0) {
+					void _calcForce(const ConvexCore& c, float sign0) {
 						const auto& pts = c.point;
 						int nV = pts.size();
 						if(nV < 3)
 							return;
 
+						// [0]=Aに働く力、[1]=Bに働く力
 						float p_lin = 0,
-						p_tor = 0,
-						p_fdLin = 0,
-						p_fdTor = 0;
+								p_tor[2] = {},
+								p_fdLin = 0,
+								p_fdTor[2] = {};
+
 						_advance(pts[0]);
 						for(int i=1 ; i<=nV ; i++) {
 							int idx = spn::CndSub(i,nV);
 							_advance(pts[idx]);
 							auto& cur = _current();
 							auto& pre = _prev();
-							float area = (cur.pos - pre.pos) * sign0;		// マイナスの場合も有り得る
-							// calc spring
-							cur.fricD = (pre.height + cur.height) * 0.5f * area * _coeff.spring;
-							p_tor += (-1.f/3) * (pre.pos*pre.height + (pre.pos*cur.height + cur.pos*pre.height)*0.5f + cur.pos*cur.height) * area * _coeff.spring;
-							// calc dumper
-							cur.fricD += (pre.velN + cur.velN) * 0.5f * area * _coeff.dumper;
-							p_lin += cur.fricD;
-							p_tor += (-1.f/3) * (pre.pos*pre.velN + (pre.pos*cur.velN + cur.pos*pre.velN)*0.5f + cur.pos*cur.velN) * area * _coeff.dumper;
-							// dynamic-friction
-							cur.fricD = (pre.velT + cur.velT) * 0.5f * cur.fricD;
-							cur.fricD *= _coeff.fricD;
-							p_fdLin += cur.fricD;
-							p_fdTor += (-1.f/3) * (pre.pos*pre.fricD + (pre.pos*cur.fricD + cur.pos*pre.fricD)*0.5f + cur.pos*cur.fricD) * area * _coeff.fricD;
+							if(std::fabs(cur.height) + std::fabs(pre.height) < 1e-5f)
+								continue;
+							float area = (cur.pos[0] - pre.pos[0]) * sign0;		// 線分の距離(面積) マイナスの場合も有り得る
+							// ---- calc spring ----
+							// forceN(spring) = average(h0,h1) * area * spring_coeff
+							cur.forceN = (pre.height + cur.height) * 0.5f * area * _coeff.spring;
+							// torqueN(spring) = 1/3 * (p1h1 + (p1h2)/2 + (h1p2)/2 + p2h2) * area * spring_coeff
+							for(int j=0 ; j<2 ; j++)
+								p_tor[j] += (-1.f/3) * (pre.pos[j]*pre.height + (pre.pos[j]*cur.height + cur.pos[j]*pre.height)*0.5f + cur.pos[j]*cur.height) * area * _coeff.spring;
+
+							// ---- calc dumper ----
+							// forceN(dumper) = average(vn0, vn1) * area * dump_coeff
+							cur.forceN += (pre.velN + cur.velN) * 0.5f * area * _coeff.dumper;
+							p_lin += cur.forceN;
+							// torqueN(dumper) = 1/3 * (p1vn1 + p1vn2/2 + p2vn1/2 + p2vn2) * area * dump_coeff
+							for(int j=0 ; j<2 ; j++)
+								p_tor[j] += (-1.f/3) * (pre.pos[j]*pre.velN + (pre.pos[j]*cur.velN + cur.pos[j]*pre.velN)*0.5f + cur.pos[j]*cur.velN) * area * _coeff.dumper;
+
+							// ---- calc dynamic-friction ----
+							// forceN(fricD) = average(fd0, fd1) * area * fricD_coeff
+							float fd[2] = {spn::PlusMinus1(pre.velT) * pre.forceN,
+											spn::PlusMinus1(cur.velT) * cur.forceN};
+							p_fdLin += (fd[0] + fd[1]) * 0.5f * _coeff.fricD;
+							// torqueN(fricD)
+							for(int j=0 ; j<2 ; j++)
+								p_fdTor[j] += (-1.f/3) * (pre.pos[j]*fd[0] + (pre.pos[j]*fd[1] + cur.pos[j]*fd[0])*0.5f + cur.pos[j]*fd[1]) * area * _coeff.fricD;
 							// TODO: calc static-friction
 						}
-						dst.sdump.linear += _nml.dir * p_lin;
-						dst.sdump.torque += p_tor;
-						dst.fricD.linear += _div * p_fdLin;
-						dst.fricD.torque += p_fdTor;
+						constexpr float sign[2] = {1,-1};
+						for(int i=0 ; i<2 ; i++) {
+							auto& fc = _force(i);
+
+							fc.sdump.linear += _nml.dir * p_lin * sign[i];
+							fc.sdump.torque +=  p_tor[i] * sign[i];
+							fc.fricD.linear += _div * p_fdLin * sign[i];
+							fc.fricD.torque += p_fdTor[i] * sign[i];
+						}
 					}
 
 				public:
 					Tmp(const RPose &r0, const RPose &r1, const ConvexCore& cv, const StLineCore& nml, const RCoeff &coeff): _swI(0), _rp0(r0), _rp1(r1), _coeff(coeff), _nml(nml) {
 						// 衝突ライン(2D)の法線
 						_div = nml.dir * cs_mRot90[0];
-						if(_div.dot(_rp0.getOffset() - nml.pos) > 0)
-							_div *= -1.f;
 
 						// 直線(断面)で2つに切ってそれぞれ計算
 						auto cvt = cv.splitTwo(StLineCore{nml.pos, _div});
@@ -604,32 +626,32 @@ namespace boom {
 						std::cout << std::endl;
 						cvt.second.dbgPrint(std::cout);
 
-						_calcForce(_force, cvt.first, 1.f);
-						_calcForce(_force, cvt.second, -1.f);
+						_calcForce(cvt.first, 1.f);
+						_calcForce(cvt.second, -1.f);
 					}
-					const RForce& getForce() const { return _force; }
+					const DualRForce& getForce() const { return _force; }
 			};
 			//! 凸包を三角形に分割して抗力を計算
-			RForce CalcRF_Convex(const RPose& rp0, const RPose& rp1, const RCoeff& coeff, const ConvexCore& cv, const StLineCore& div) {
+			DualRForce CalcRF_Convex(const RPose& rp0, const RPose& rp1, const RCoeff& coeff, const ConvexCore& cv, const StLineCore& div) {
 				// 直線方向に向かって左側が表で、右が裏
 				// st.dot(line)がプラスなら足し、逆なら引く
 				Tmp tmp(rp0, rp1, cv, div, coeff);
 				return tmp.getForce();
 			}
 			//! 円同士
-			RForce CalcOV_Circle2(const Rigid& r0, const Rigid& r1, const Vec2& inner, const RCoeff& coeff, const StLineCore& div) {
+			DualRForce CalcOV_Circle2(const Rigid& r0, const Rigid& r1, const Vec2& inner, const RCoeff& coeff, const StLineCore& div) {
 				// 境界線分を計算して共通領域を2つに分けてそれぞれ積分
 				// 中身がCircleだと分かっているのでポインタの読み替え
 				throw std::runtime_error("not implemented yet");
 			}
-			RForce CalcOV_Convex2(const Rigid& r0, const Rigid& r1, const Vec2& inner, const RCoeff& coeff, const StLineCore& div) {
+			DualRForce CalcOV_Convex2(const Rigid& r0, const Rigid& r1, const Vec2& inner, const RCoeff& coeff, const StLineCore& div) {
 				// 領域算出
 				Convex cnv = Convex::GetOverlappingConvex(r0, r1, inner);
 				std::cout << "OverlappingConvex:" << std::endl << cnv << std::endl;
 				return CalcRF_Convex(r0.getPose(), r1.getPose(), coeff, cnv, div);
 			}
 			//! 円とBox含む多角形
-			RForce CalcOV_CircleConvex(const Rigid& r0, const Rigid& r1, const Vec2& inner, const RCoeff& coeff, const StLineCore& div) {
+			DualRForce CalcOV_CircleConvex(const Rigid& r0, const Rigid& r1, const Vec2& inner, const RCoeff& coeff, const StLineCore& div) {
 				PointL _pts;
 				// pts[0]とpts[nV-1]の間は円弧を表す
 				// 円弧部分は弓部で分けて凸包部分は三角形で計算し、残りは独自式で積分
@@ -637,7 +659,7 @@ namespace boom {
 			}
 		}
 
-		RForce CalcForce(const Rigid& r0, const Rigid& r1, const Vec2& inner, const RCoeff& coeff, const StLineCore& div) {
+		DualRForce CalcForce(const Rigid& r0, const Rigid& r1, const Vec2& inner, const RCoeff& coeff, const StLineCore& div) {
 			// 実質Convex, Box, Circle専用
 			if(r0.getCID() == Circle::GetCID()) {
 				if(r1.getCID() == Circle::GetCID())
