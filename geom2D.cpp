@@ -689,61 +689,99 @@ namespace boom {
 		ConvexCore2 ConvexCore::splitTwo(const StLineCore& l) const {
 			int nV = point.size();
 			PointL pt0(nV+1), pt1(nV+1);		// 最初に最大容量確保しておき、後で縮める
-			auto *pDst0 = &pt0[0],
-				*pDst1 = &pt1[0];
+			Vec2* pDst[2] = {&pt0[0], &pt1[0]};
 
 			constexpr float DOT_THRESHOLD = 1e-5f;
-			// ライン上は前回値, プラスは1, マイナスは0を返す
-			auto fcheck = [](int prev, float d) -> int{
-				if(d < -DOT_THRESHOLD)
+			// 右側は0, ライン上は前回値, 左側は1を返す
+			auto fcheck = [&l](int prev, const Vec2& pt) -> int {
+				float c = l.dir.ccw(pt - l.pos);
+				if(c >= DOT_THRESHOLD)
 					return 0;
-				if(d < DOT_THRESHOLD)
-					return prev;
-				return 1;
+				if(c <= -DOT_THRESHOLD)
+					return 1;
+				return prev;
 			};
-			auto fadd = [&pDst0, &pDst1, &l](const Vec2& pPrev, const Vec2& pCur, int flg) {
+			// 走査の始点はライン上でない頂点とする
+			int cur = 0;
+			int flag;
+			while(cur != nV) {
+				const auto& p = point[cur++];
+				flag = fcheck(-1, p);
+				if(flag != -1)
+					break;
+				// とりあえず片方のリストに貯めておく
+				*pDst[0]++ = p;
+			}
+			// 2点以上がライン上なら分割なし
+			if(cur > 2) {
+				if(flag == 0x01) {
+					// すべて右側
+					return ConvexCore2({}, point);
+				} else {
+					// すべて左側
+					return ConvexCore2(point, {});
+				}
+			}
+			if(flag == 0x01) {
+				std::swap(pt0, pt1);
+				std::swap(pDst[0], pDst[1]);
+			}
+			int prev = flag;
+
+			auto fadd = [&pDst, &l](const Vec2& pPrev, const Vec2& pCur, int flg) {
 				switch(flg) {
 					case 0x03:		// Left -> Left
-						*pDst0++ = pPrev;
+						*pDst[1]++ = pPrev;
 						break;
 					case 0x02: {	// Left -> Right
 						auto res = LineCore(pPrev, pCur).crossPoint(l);
 						assert(res.second == LINEPOS::ONLINE);
-						*pDst0++ = pPrev;
-						*pDst0++ = res.first;
-						*pDst1++ = res.first;
+						*pDst[1]++ = pPrev;
+						if(pPrev.dist_sq(res.first) >= 1e-6f)
+							*pDst[1]++ = res.first;
+						*pDst[0]++ = res.first;
 						break; }
 					case 0x01: {	// Right -> Left
 						auto res = LineCore(pPrev, pCur).crossPoint(l);
 						assert(res.second == LINEPOS::ONLINE);
-						*pDst1++ = pPrev;
-						*pDst1++ = res.first;
-						*pDst0++ = res.first;
+						*pDst[0]++ = pPrev;
+						if(pPrev.dist_sq(res.first) >= 1e-6f)
+							*pDst[0]++ = res.first;
+						*pDst[1]++ = res.first;
 						break; }
 					case 0x00:		// Right -> Right
-						*pDst1++ = pPrev;
+						*pDst[0]++ = pPrev;
 						break;
 				}
 			};
-
-			int fchk = fcheck(0, l.dir.ccw(point[0] - l.pos)),
-				prev = fchk,
-				flag = prev;
-			for(int i=1 ; i<nV ; i++) {
+			for(int i=cur ; i<nV ; i++) {
 				// 正数が左側、負数は右側
 				const auto& p = point[i];
-				prev = fcheck(prev, l.dir.ccw(p-l.pos));
+				prev = fcheck(prev, p);
 				flag = ((flag<<1) | prev) & 0x03;
-
 				fadd(point[i-1], p, flag);
 			}
-			flag = ((flag<<1) | fchk) & 0x03;
+			prev = fcheck(prev, point[0]);
+			flag = ((flag<<1) | prev) & 0x03;
 			fadd(point[nV-1], point[0], flag);
 
-			pt0.resize(pDst0 - &pt0[0]);
-			pt1.resize(pDst1 - &pt1[0]);
-			return std::make_pair(ConvexCore(std::move(pt0)),
-								  ConvexCore(std::move(pt1)));
+			if(pDst[0] - &pt0[0] < 2)
+				pDst[0] = &pt0[0];
+			else if(pDst[1] - &pt1[0] < 2)
+				pDst[1] = &pt1[0];
+			else {
+				if(cur == 2) {
+					// 最初の1点がライン上だったので頂点を複製
+					if((flag & 1) == 1)
+						*pDst[1]++ = pt0[0];
+					else
+						*pDst[0]++ = pt1[0];
+				}
+			}
+
+			pt0.resize(pDst[0] - &pt0[0]);
+			pt1.resize(pDst[1] - &pt1[0]);
+			return ConvexCore2(std::move(pt0), std::move(pt1));
 		}
 		ConvexCore ConvexCore::split(const StLineCore& l) {
 			auto res = splitTwo(l);
