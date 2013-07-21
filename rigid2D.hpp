@@ -171,6 +171,14 @@ namespace boom {
 					Gravity(const Vec2& v);
 					void resist(RForce::F& acc, const Rigid& r, int index, const RigidCR& cr) const override;
 			};
+			//! 空気抵抗
+			/*! 速度に比例した抵抗を掛ける */
+			class Air : public IResist {
+				float	_cLinear, _cRot;
+				public:
+					Air(float cLinear, float cRot);
+					void resist(RForce::F& acc, const Rigid& r, int index, const RigidCR& cr) const override;
+			};
 		}
 
 		//! ペナルティ法における抗力計算

@@ -291,12 +291,21 @@ namespace boom {
 			}
 
 			void Impact::resist(RForce::F& acc, const Rigid& r, int index, const RigidCR& cr) const {
-				float inv_area = _sseRcp22Bit(r.getModel().cref()->getArea(false));
+				auto& mdl = *r.getModel().cref().get();
+				float inv_area = _sseRcp22Bit(mdl.getArea(false));
+				float inv_inertia = _sseRcp22Bit(mdl.getInertia(false));
 				auto fc = cr.getInfo().getInfo(index, 0);
 				auto& ff = fc->sdump;
 				auto& ff2 = fc->fricD;
-				acc += ff * inv_area;
-				acc += ff2 * inv_area;
+				acc.linear += (ff.linear + ff2.linear) * inv_area;
+				acc.torque += (ff.torque + ff2.torque) * inv_inertia;
+			}
+
+			Air::Air(float cLinear, float cRot): _cLinear(cLinear), _cRot(cRot) {}
+			void Air::resist(RForce::F& acc, const Rigid& r, int index, const RigidCR& cr) const {
+				const RPose& ps = r.getPose();
+				acc.linear -= ps.getVelocity() * _cLinear;
+				acc.torque -= ps.getRotVel() * _cRot;
 			}
 		}
 		namespace itg {
@@ -584,7 +593,7 @@ namespace boom {
 							cur.forceN = (pre.height + cur.height) * 0.5f * area * _coeff.spring;
 							// torqueN(spring) = 1/3 * (p1h1 + (p1h2)/2 + (h1p2)/2 + p2h2) * area * spring_coeff
 							for(int j=0 ; j<2 ; j++)
-								p_tor[j] += (-1.f/3) * (pre.pos[j]*pre.height + (pre.pos[j]*cur.height + cur.pos[j]*pre.height)*0.5f + cur.pos[j]*cur.height) * area * _coeff.spring;
+								p_tor[j] += (1.f/3) * (pre.pos[j]*pre.height + (pre.pos[j]*cur.height + cur.pos[j]*pre.height)*0.5f + cur.pos[j]*cur.height) * area * _coeff.spring;
 
 							// ---- calc dumper ----
 							// forceN(dumper) = average(vn0, vn1) * area * dump_coeff
@@ -592,7 +601,7 @@ namespace boom {
 							p_lin += cur.forceN;
 							// torqueN(dumper) = 1/3 * (p1vn1 + p1vn2/2 + p2vn1/2 + p2vn2) * area * dump_coeff
 							for(int j=0 ; j<2 ; j++)
-								p_tor[j] += (-1.f/3) * (pre.pos[j]*pre.velN + (pre.pos[j]*cur.velN + cur.pos[j]*pre.velN)*0.5f + cur.pos[j]*cur.velN) * area * _coeff.dumper;
+								p_tor[j] += (1.f/3) * (pre.pos[j]*pre.velN + (pre.pos[j]*cur.velN + cur.pos[j]*pre.velN)*0.5f + cur.pos[j]*cur.velN) * area * _coeff.dumper;
 
 							// ---- calc dynamic-friction ----
 							// forceN(fricD) = average(fd0, fd1) * area * fricD_coeff
@@ -601,7 +610,7 @@ namespace boom {
 							p_fdLin += (fd[0] + fd[1]) * 0.5f * _coeff.fricD;
 							// torqueN(fricD)
 							for(int j=0 ; j<2 ; j++)
-								p_fdTor[j] += (-1.f/3) * (pre.pos[j]*fd[0] + (pre.pos[j]*fd[1] + cur.pos[j]*fd[0])*0.5f + cur.pos[j]*fd[1]) * area * _coeff.fricD;
+								p_fdTor[j] += (1.f/3) * (pre.pos[j]*fd[0] + (pre.pos[j]*fd[1] + cur.pos[j]*fd[0])*0.5f + cur.pos[j]*fd[1]) * area * _coeff.fricD;
 							// TODO: calc static-friction
 						}
 						constexpr float sign[2] = {1,-1};
@@ -622,9 +631,11 @@ namespace boom {
 
 						// 直線(断面)で2つに切ってそれぞれ計算
 						auto cvt = cv.splitTwo(StLineCore{nml.pos, _div});
+						std::cout << "1:";
 						cvt.first.dbgPrint(std::cout);
-						std::cout << std::endl;
+						std::cout << std::endl << "2:";
 						cvt.second.dbgPrint(std::cout);
+						std::cout << std::endl;
 
 						_calcForce(cvt.first, 1.f);
 						_calcForce(cvt.second, -1.f);
@@ -648,7 +659,9 @@ namespace boom {
 				// 領域算出
 				Convex cnv = Convex::GetOverlappingConvex(r0, r1, inner);
 				std::cout << "OverlappingConvex:" << std::endl << cnv << std::endl;
-				return CalcRF_Convex(r0.getPose(), r1.getPose(), coeff, cnv, div);
+				if(cnv.point.empty())
+					return DualRForce();
+				return CalcRF_Convex(r0, r1, coeff, cnv, div);
 			}
 			//! 円とBox含む多角形
 			DualRForce CalcOV_CircleConvex(const Rigid& r0, const Rigid& r1, const Vec2& inner, const RCoeff& coeff, const StLineCore& div) {
