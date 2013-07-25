@@ -870,6 +870,24 @@ namespace boom {
 			float invlen = _sseRcp22Bit(p.length());
 			return Plane(p*invlen, -invlen);
 		}
+		namespace {
+			constexpr float MIN_DUAL2DIST = 1e-5f;
+			float Clip(float val) {
+				if(std::fabs(val) < MIN_DUAL2DIST)
+					return val<0 ? -MIN_DUAL2DIST : MIN_DUAL2DIST;
+				return val;
+			}
+		}
+		StLineCore Dual2(const Vec2& v) {
+			float rlen = _sseRcp22Bit(Clip(v.length()));
+			Vec2 pos = v * rlen,
+				dir = v * cs_mRot90[0] * rlen;
+			return StLineCore(pos, dir);
+		}
+		Vec2 Dual2(const StLineCore& l) {
+			float rlen = _sseRcp22Bit(Clip(l.pos.length()));
+			return l.dir * cs_mRot90[1] * rlen;
+		}
 		StLineCore Dual(const Vec2& v) {
 			Vec2 t0(0,-v.y),
 				t1(1, v.x-v.y);
