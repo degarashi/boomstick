@@ -92,27 +92,60 @@ namespace boom {
 					return false;
 
 				auto& ts = ToSearch[idx];
+				if(rV.distance(_vtx[ts[0]]) < 1e-7f ||
+					rV.distance(_vtx[ts[2]]) < 1e-7f)
+				{
+					std::cout << _m0 << std::endl << _m1 << std::endl;
+					return false;
+				}
+
 				// 現時点で三角形が原点を含んでいるか
-				float cm = (_vtx[ts[1]] - _vtx[ts[0]]).cw(-_vtx[ts[0]]) *
-							(_vtx[ts[2]] - _vtx[ts[1]]).cw(-_vtx[ts[1]]);
-				if(cm >= -1e-5f) {
+				bool bIn;
+				if((_vtx[1]-_vtx[0]).cw(_vtx[2]-_vtx[0]) > 0) {
+					bIn = (_vtx[1]-_vtx[0]).cw(-_vtx[0]) >= 0 &&
+					(_vtx[2]-_vtx[1]).cw(-_vtx[1]) >= 0 &&
+					(_vtx[0]-_vtx[2]).cw(-_vtx[2]) >= 0;
+				} else {
+					bIn = (_vtx[1]-_vtx[0]).ccw(-_vtx[0]) >= 0 &&
+					(_vtx[2]-_vtx[1]).ccw(-_vtx[1]) >= 0 &&
+					(_vtx[0]-_vtx[2]).ccw(-_vtx[2]) >= 0;
+				}
+// 				float cm = (_vtx[ts[1]] - _vtx[ts[0]]).cw(-_vtx[ts[0]]) *
+// 							(_vtx[ts[2]] - _vtx[ts[1]]).cw(-_vtx[ts[1]]);
+// 				if(cm >= -1e-5f) {
+				if(bIn) {
 					_inner = TriangleLerp(_vtx[0], _vtx[1], _vtx[2], ori,
 										_posB[0], _posB[1], _posB[2]);
+					assert(_m0.isInner(_inner) && _m1.isInner(_inner));
 					return true;
 				}
-				res = LineCore(_vtx[ts[0]], _vtx[ts[1]]).nearest(rV);
+				float dist = std::numeric_limits<float>::max();
+				idx = -1;
+				res = LineCore(_vtx[ts[0]], _vtx[ts[1]]).nearest(ori);
 				if(res.second == LINEPOS::ONLINE) {
-					// この辺について調べる
-					idx = ts[2];
-					continue;
+					float td = res.first.len_sq();
+					if(dist > td) {
+						dist = td;
+						// この辺について調べる
+						idx = ts[2];
+					}
 				}
-				res = LineCore(_vtx[ts[1]], _vtx[ts[2]]).nearest(rV);
+				res = LineCore(_vtx[ts[1]], _vtx[ts[2]]).nearest(ori);
 				if(res.second == LINEPOS::ONLINE) {
-					// この辺について調べる
-					idx = ts[0];
-					continue;
+					float td = res.first.len_sq();
+					if(dist > td) {
+						dist = td;
+						// この辺について調べる
+						idx = ts[0];
+					}
 				}
-				return false;
+				if(dist < 1e-7f) {
+					_inner = TriangleLerp(_vtx[0], _vtx[1], _vtx[2], ori,
+										  _posB[0], _posB[1], _posB[2]);
+					return true;
+				}
+				if(idx < 0)
+					return false;
 			}
 		}
 		GSimplex::GSimplex(const IModel& m0, const IModel& m1): _m0(m0), _m1(m1), _bHit(_gjkMethod()) {}
