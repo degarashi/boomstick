@@ -727,15 +727,17 @@ namespace boom {
 						break;
 					case 0x02: {	// Left -> Right
 						auto res = LineCore(pPrev, pCur).crossPoint(l);
-						assert(res.second == LINEPOS::ONLINE);
 						*pDst[1]++ = pPrev;
+						if(res.second != LINEPOS::ONLINE)
+							res.first = pCur;
 						if(pPrev.dist_sq(res.first) >= 1e-6f)
 							*pDst[1]++ = res.first;
 						*pDst[0]++ = res.first;
 						break; }
 					case 0x01: {	// Right -> Left
 						auto res = LineCore(pPrev, pCur).crossPoint(l);
-						assert(res.second == LINEPOS::ONLINE);
+						if(res.second != LINEPOS::ONLINE)
+							res.first = pCur;
 						*pDst[0]++ = pPrev;
 						if(pPrev.dist_sq(res.first) >= 1e-6f)
 							*pDst[0]++ = res.first;
