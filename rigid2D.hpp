@@ -1,5 +1,6 @@
 #pragma once
 #include "geom2D.hpp"
+#include "spinner/withbool.hpp"
 
 namespace boom {
 	namespace geo2d {
@@ -26,23 +27,7 @@ namespace boom {
 			RForce operator * (float s) const;
 			friend std::ostream& operator << (std::ostream& os, const RForce& f);
 		};
-		class Rigid;
-		using DualRForce = DualValue<RForce>;
-		/*! NarrowC_ModelからInnerを受け取り, 力積計算 */
-		class RigidCR : public ColResult<512, c_info::Pairs<c_ent::Sum<RForce>, uint32_t>> {
-			// NOTE: ひとまずは反発係数固定での実装
-			RCoeff		_coeff;		//!< 力積計算に使う係数
-			public:
-				using narrow_type = NarrowC_Model;
-				RigidCR(const RCoeff& c);
-				//! 当たり判定チェック(narrow-phase)をしてヒットしていたら力積計算
-				/*! \param[in] id0 ObjectAの通し番号
-				*					\param[in] id1 ObjectBの通し番号
-				*					\param[in] mdl0 ObjectAのインタフェース
-				*					\param[in] mdl1 ObjectBのインタフェース */
-				void operator ()(int id0, int id1, const Rigid& r0, const Rigid& r1, const Vec2& inner);
-				// BroadCが渡すオブジェクトに適合していればIModelだろうがなんだろうがOK
-		};
+		using CResult = ColResult<512, c_info::Pairs<c_ent::Sum<RForce>, uint32_t>>;
 		//! 剛体ラッパ (形状 + 姿勢)
 		class Rigid : public TModelH<RPose>, public spn::CheckAlign<16,Rigid> {
 			public:
@@ -61,7 +46,7 @@ namespace boom {
 				void addR(const SPResist& sp);
 				//! 抵抗力を計算
 				/*! \param[in] index 通し番号 */
-				RForce::F resist(int index, const RigidCR& cr) const;
+				RForce::F resist(int index, const CResult& cr) const;
 		};
 		#define mgr_rigid reinterpret_cast<RigidRes&>(ModelMgr::_ref())
 		class RigidRes : public ModelMgr {
@@ -78,24 +63,70 @@ namespace boom {
 
 		struct IItg;
 		//! 剛体マネージャ
-		class RigidMgr : public RigidCR {
+		class RigidMgr {
 			using SPItg = std::shared_ptr<IItg>;
-			using BroadC = BroadC_RoundRobin<HRig>;
+			using NPID = uint16_t;
+			struct NPair {
+				Vec2	pos,				//!< 接触位置
+						dir;				//!< 接触法線
+				HRig	hAnother;			//!< 相手のハンドル
+				int		nFrame;				//!< 連続ヒット数 (接触判定には関係しないが外部から物体の静止判定をする際に使用)
+				NPID	nextID, prevID;		/*!< ~0の時は無効 */
+			};
+			using NP_Pool = spn::noseq_list<NPair, NPID>;
+			NP_Pool			_npPool;
+
+			struct ERig {
+				using TPose = typename spn::Pose2D::TValue;
+
+				HRig		hRig;
+				TPose		prePose;		//!< 前の姿勢
+				uint16_t	nHitPrev,		//!< 1フレーム前のHitエントリカウント
+							nHitCur,		//!< 現在のHitエントリカウント
+							nHitNew;		//!< 新しく追加したHitエントリの数
+				NPID		hitID;			//!< Hitリストの先頭
+
+				constexpr static NPID invalid = ~0;
+
+				ERig(HRig hR);
+				operator HRig () const;
+				operator const Rigid& () const;
+				operator Rigid& ();
+				void savePose();
+
+				void resetHitCount();
+				//! エントリ数を比較してもう衝突していないエントリを削除
+				void removeOld(NP_Pool& pool);
+				//! 既存のエントリを探して先頭に持ってくる。エントリが無ければ作成
+				spn::WithBool<NPair&> addHit(HRig hR, NP_Pool& pool);
+			};
+			using BroadC = BroadC_RoundRobin<ERig, const Rigid&>;
+			using NarrowC = NarrowC_Model;
 			BroadC			_broadC;
 			SPItg			_itg;		//!< 適用する積分アルゴリズム
 			void _checkCollision();		//! コリジョンチェックして内部変数に格納
+			// NOTE: ひとまずは反発係数固定での実装
+			RCoeff			_coeff;		//!< 力積計算に使う係数
+			CResult			_cresult;	//!< 力積をRigidから参照する為のクラス
 
-		public:
-			using const_iterator = typename BroadC::const_iterator;
-			using id_type = typename BroadC::id_type;
+			public:
+				using iterator = typename BroadC::iterator;
+				using id_type = typename BroadC::id_type;
 
-			RigidMgr(const SPItg& itg, const RCoeff& coeff);
-			void simulate(float dt);
+				RigidMgr(const SPItg& itg, const RCoeff& coeff);
+				void simulate(float dt);
+				//! broad/narrow phase collisionに通った物体のペアを受け取る関数。Inner-pointを受け取り力積計算をする
+				/*!	BroadCが渡すオブジェクトに適合していればIModelだろうがなんだろうがOK
+				 *					\param[in] id0 ObjectAの通し番号
+				 *					\param[in] id1 ObjectBの通し番号
+				 *					\param[in] mdl0 ObjectAのインタフェース
+				 *					\param[in] mdl1 ObjectBのインタフェース */
+				void operator ()(int id0, int id1, ERig& er0, ERig& er1, const Vec2& inner);
 
-			id_type addA(HRig hRig);
-			id_type addB(HRig hRig);
-			void remA(id_type id);
-			void remB(id_type id);
+				id_type addA(HRig hRig);
+				id_type addB(HRig hRig);
+				void remA(id_type id);
+				void remB(id_type id);
 		};
 
 		//! 位置と速度を与えた時にかかる加速度(抵抗力)を計算
@@ -108,10 +139,10 @@ namespace boom {
 			*	\param[in] r 姿勢
 			*	\param[in] index 自分のID
 			*	\param[in] cr 当たり判定結果 */
-			virtual void resist(RForce::F& acc, const Rigid& r, int index, const RigidCR& cr) const = 0;
+			virtual void resist(RForce::F& acc, const Rigid& r, int index, const CResult& cr) const = 0;
 		};
 
-		using RItr = RigidMgr::const_iterator;
+		using RItr = RigidMgr::iterator;
 		using TValueA = std::vector<RPose::TValue>;
 		//! 積分インタフェース
 		struct IItg {
@@ -121,7 +152,7 @@ namespace boom {
 			//! 剛体の姿勢を積分計算
 			/*! \param[inout] st 現在の姿勢
 			*	\param[in] dt 前回フレームからの時間(sec) */
-			virtual void advance(int pass, RItr itr, RItr itrE, const RigidCR& cr, float dt) = 0;
+			virtual void advance(int pass, RItr itr, RItr itrE, const CResult& cr, float dt) = 0;
 			//! 1回分の時間を進めるのに必要なステップ数
 			virtual int numOfIteration() const = 0;
 
@@ -132,7 +163,7 @@ namespace boom {
 		// ---------------------- 積分アルゴリズム ----------------------
 		namespace itg {
 			#define DEF_IITG_FUNCS \
-			virtual void advance(int pass, RItr itr, RItr itrE, const RigidCR& cr, float dt) override; \
+			virtual void advance(int pass, RItr itr, RItr itrE, const CResult& cr, float dt) override; \
 			int numOfIteration() const override;
 			//! オイラー法
 			struct Eular : IItg {
@@ -162,14 +193,14 @@ namespace boom {
 			//! 衝突による加速度
 			class Impact : public IResist {
 				public:
-					void resist(RForce::F& acc, const Rigid& r, int index, const RigidCR& cr) const override;
+					void resist(RForce::F& acc, const Rigid& r, int index, const CResult& cr) const override;
 			};
 			//! 重力による加速度
 			class Gravity : public IResist {
 				Vec2	_grav;
 				public:
 					Gravity(const Vec2& v);
-					void resist(RForce::F& acc, const Rigid& r, int index, const RigidCR& cr) const override;
+					void resist(RForce::F& acc, const Rigid& r, int index, const CResult& cr) const override;
 			};
 			//! 空気抵抗
 			/*! 速度に比例した抵抗を掛ける */
@@ -177,10 +208,10 @@ namespace boom {
 				float	_cLinear, _cRot;
 				public:
 					Air(float cLinear, float cRot);
-					void resist(RForce::F& acc, const Rigid& r, int index, const RigidCR& cr) const override;
+					void resist(RForce::F& acc, const Rigid& r, int index, const CResult& cr) const override;
 			};
 		}
-
+		using DualRForce = DualValue<RForce>;
 		//! ペナルティ法における抗力計算
 		/*! 重なり領域だけを使うことは無くて、抗力の算出とセットなので内部で積分計算 */
 		DualRForce CalcForce(const Rigid& r0, const Rigid& r1, const Vec2& inner, const RCoeff& coeff, const StLineCore& div);

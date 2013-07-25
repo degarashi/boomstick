@@ -16,16 +16,4 @@ namespace boom {
 		}
 		return false;
 	}
-	// -------------------------- RigidCR --------------------------
-	geo2d::RigidCR::RigidCR(const RCoeff& c): _coeff(c) {}
-	void geo2d::RigidCR::operator ()(int id0, int id1, const Rigid& r0, const Rigid& r1, const Vec2& inner) {
-		//TODO: 衝突平面のちゃんとした計算
-		StLineCore st(Vec2(0,0), Vec2(0,1));
-		try {
-			auto f = CalcForce(r0, r1, inner, _coeff, st);
-			setFlagWithInfo(id0, id1, f);
-		} catch(const std::exception& e) {
-			std::cout << "exception occurred: " << e.what() << std::endl;
-		}
-	}
 }

@@ -287,7 +287,7 @@ namespace boom {
 			}
 			assert(false);
 		}
-		RForce::F Rigid::resist(int index, const RigidCR& cr) const {
+		RForce::F Rigid::resist(int index, const CResult& cr) const {
 			RForce::F res = {};
 			for(auto& sp : _resist) {
 				if(!sp)
@@ -300,12 +300,12 @@ namespace boom {
 		// -------------------------- IResist --------------------------
 		namespace resist {
 			Gravity::Gravity(const Vec2& v): _grav(v) {}
-			void Gravity::resist(RForce::F& acc, const Rigid& r, int /*index*/, const RigidCR& /*cr*/) const {
+			void Gravity::resist(RForce::F& acc, const Rigid& r, int /*index*/, const CResult& /*cr*/) const {
 				float inv_area = _sseRcp22Bit(r.getModel().cref()->getArea(false));
 				acc.linear += _grav * _sseRcp22Bit(inv_area);
 			}
 
-			void Impact::resist(RForce::F& acc, const Rigid& r, int index, const RigidCR& cr) const {
+			void Impact::resist(RForce::F& acc, const Rigid& r, int index, const CResult& cr) const {
 				auto& mdl = *r.getModel().cref().get();
 				float inv_area = _sseRcp22Bit(mdl.getArea(false));
 				float inv_inertia = _sseRcp22Bit(mdl.getInertia(false));
@@ -317,7 +317,7 @@ namespace boom {
 			}
 
 			Air::Air(float cLinear, float cRot): _cLinear(cLinear), _cRot(cRot) {}
-			void Air::resist(RForce::F& acc, const Rigid& r, int index, const RigidCR& cr) const {
+			void Air::resist(RForce::F& acc, const Rigid& r, int index, const CResult& cr) const {
 				const RPose& ps = r.getPose();
 				acc.linear -= ps.getVelocity() * _cLinear;
 				acc.torque -= ps.getRotVel() * _cRot;
@@ -326,14 +326,14 @@ namespace boom {
 		namespace itg {
 			// -------------------------- Eular --------------------------
 			int Eular::numOfIteration() const { return 1; }
-			void Eular::advance(int pass, RItr itr, RItr itrE, const RigidCR& cr, float dt) {
+			void Eular::advance(int pass, RItr itr, RItr itrE, const CResult& cr, float dt) {
 				for(int i=0 ; itr!=itrE ; ++i,++itr) {
-					auto* ptr = (*itr)->get();
-					auto st = ptr->refPose().refValue();
+					Rigid& r = static_cast<Rigid&>(*itr);
+					auto st = r.refPose().refValue();
 					// 現フレームの加速度
-					auto acc = ptr->resist(i, cr);
-					st.acc += acc.linear / ptr->getArea(false);
-					st.rotAcc += acc.torque / ptr->getInertia(false);
+					auto acc = r.resist(i, cr);
+					st.acc += acc.linear / r.getArea(false);
+					st.rotAcc += acc.torque / r.getInertia(false);
 					// 次のフレームの位置
 					st.ofs += st.vel * dt;
 					st.ang += st.rotVel * dt;
@@ -353,44 +353,44 @@ namespace boom {
 				decltype(_tvalue) tmp;
 				std::swap(_tvalue, tmp);
 			}
-			void ImpEular::advance(int pass, RItr itr, RItr itrE, const RigidCR& cr, float dt) {
+			void ImpEular::advance(int pass, RItr itr, RItr itrE, const CResult& cr, float dt) {
 				auto *tv0 = &_tvalue[0];
 				float dth2 = dt/2;
 				int cur = 0;
 				if(pass == 0) {
 					// value = 1つ前の(計算上の)状態
 					while(itr != itrE) {
-						auto* ptr = (*itr)->get();
-						auto dat = ptr->refPose().refValue();
+						Rigid& r = static_cast<Rigid&>(*itr);
+						auto dat = r.refPose().refValue();
 						auto& ps = tv0[cur];
 
 						// 内部のメモリに書き込むと同時に出力
 						ps = dat;
-						auto acc = ptr->resist(cur, cr);
+						auto acc = r.resist(cur, cr);
 						dat.ofs += dat.vel * dt;
 						dat.vel += dat.acc * dt;
 						dat.ang += dat.rotVel * dt;
 						dat.rotVel += dat.rotAcc * dt;
 						// (衝突判定結果は1フレーム遅れて出る為)
-						ps.acc = acc.linear / ptr->getArea(false);
-						ps.rotAcc = acc.torque / ptr->getInertia(false);
+						ps.acc = acc.linear / r.getArea(false);
+						ps.rotAcc = acc.torque / r.getInertia(false);
 
 						++itr;
 						++cur;
 					}
 				} else {
 					while(itr != itrE) {
-						auto* ptr = (*itr)->get();
-						auto dat = ptr->refPose().refValue();
+						Rigid& r = static_cast<Rigid&>(*itr);
+						auto dat = r.refPose().refValue();
 						auto& ps0 = tv0[cur];
 
 						dat.ofs = ps0.ofs + (ps0.vel + dat.vel) * dth2;
 						dat.vel = ps0.vel + (ps0.acc + dat.acc) * dth2;
 						dat.ang = ps0.ang + (ps0.rotVel + dat.rotVel) * dth2;
 						dat.rotVel = ps0.rotVel + (ps0.rotAcc + dat.rotAcc) * dth2;
-						auto acc = ptr->resist(cur, cr);
-						dat.acc = acc.linear / ptr->getArea(false);
-						dat.rotAcc = acc.torque / ptr->getInertia(false);
+						auto acc = r.resist(cur, cr);
+						dat.acc = acc.linear / r.getArea(false);
+						dat.rotAcc = acc.torque / r.getInertia(false);
 
 						++itr;
 						++cur;
@@ -407,7 +407,7 @@ namespace boom {
 				std::swap(_tvalue, tmp);
 			}
 			// TODO: 4回分も当たり判定していたら遅そうなので2回に留める案
-			void RK4::advance(int pass, RItr itr, RItr itrE, const RigidCR& cr, float dt) {
+			void RK4::advance(int pass, RItr itr, RItr itrE, const CResult& cr, float dt) {
 				float dt2 = dt/2,
 						dt6 = dt/6;
 				int cur = 0,
@@ -420,14 +420,14 @@ namespace boom {
 				switch(pass) {
 					case 0:
 						while(itr != itrE) {
-							auto* ptr = (*itr)->get();
-							auto dat = ptr->refPose().refValue();
+							Rigid& r = static_cast<Rigid&>(*itr);
+							auto dat = r.refPose().refValue();
 							auto& ps = tv0[cur];
 
 							ps = dat;
-							auto acc = ptr->resist(cur, cr);		// 処理前の加速度
-							ps.acc = acc.linear / ptr->getArea(false);
-							ps.rotAcc = acc.torque / ptr->getInertia(false);
+							auto acc = r.resist(cur, cr);		// 処理前の加速度
+							ps.acc = acc.linear / r.getArea(false);
+							ps.rotAcc = acc.torque / r.getInertia(false);
 							dat.ofs += dat.vel * dt2;
 							dat.vel += ps.acc * dt2;
 							dat.ang += dat.rotVel * dt2;
@@ -439,15 +439,15 @@ namespace boom {
 						break;
 					case 1:
 						while(itr != itrE) {
-							auto* ptr = (*itr)->get();
-							auto dat = ptr->refPose().refValue();
+							Rigid& r = static_cast<Rigid&>(*itr);
+							auto dat = r.refPose().refValue();
 							auto &ps0 = tv0[cur],
 								&ps1 = tv1[cur];
 
 							ps1 = dat;
-							auto acc = ptr->resist(cur, cr);		// ps1の加速度
-							ps1.acc = acc.linear / ptr->getArea(false);
-							ps1.rotAcc = acc.torque / ptr->getInertia(false);
+							auto acc = r.resist(cur, cr);		// ps1の加速度
+							ps1.acc = acc.linear / r.getArea(false);
+							ps1.rotAcc = acc.torque / r.getInertia(false);
 							dat.ofs = ps0.ofs + ps1.vel * dt2;
 							dat.vel = ps0.vel + ps1.acc * dt2;
 							dat.ang = ps0.ang + ps1.rotVel * dt2;
@@ -459,15 +459,15 @@ namespace boom {
 						break;
 					case 2:
 						while(itr != itrE) {
-							auto* ptr = (*itr)->get();
-							auto dat = ptr->refPose().refValue();
+							Rigid& r = static_cast<Rigid&>(*itr);
+							auto dat = r.refPose().refValue();
 							auto &ps0 = tv0[cur],
 								&ps2 = tv2[cur];
 
 							ps2 = dat;
-							auto acc = ptr->resist(cur, cr);		// ps2の加速度
-							ps2.acc = acc.linear / ptr->getArea(false);
-							ps2.rotAcc = acc.torque / ptr->getInertia(false);
+							auto acc = r.resist(cur, cr);		// ps2の加速度
+							ps2.acc = acc.linear / r.getArea(false);
+							ps2.rotAcc = acc.torque / r.getInertia(false);
 							dat.ofs = ps0.ofs + ps2.vel * dt;
 							dat.vel = ps0.vel + ps2.acc * dt;
 							dat.ang = ps0.ang + ps2.rotVel * dt;
@@ -479,17 +479,17 @@ namespace boom {
 						break;
 					case 3:
 						while(itr != itrE) {
-							auto* ptr = (*itr)->get();
-							auto dat = ptr->refPose().refValue();
+							Rigid& r = static_cast<Rigid&>(*itr);
+							auto dat = r.refPose().refValue();
 							auto &ps0 = tv0[cur],
 								&ps1 = tv1[cur],
 								&ps2 = tv2[cur],
 								&ps3 = tv3[cur];
 
 							ps3 = dat;
-							auto acc = ptr->resist(cur, cr);
-							ps3.acc = acc.linear / ptr->getArea(false);
-							ps3.rotAcc = acc.torque / ptr->getInertia(false);
+							auto acc = r.resist(cur, cr);
+							ps3.acc = acc.linear / r.getArea(false);
+							ps3.rotAcc = acc.torque / r.getInertia(false);
 
 							dat.ofs = ps0.ofs + (ps0.vel + ps1.vel*2 + ps2.vel*2 + ps3.vel) * dt6;
 							dat.vel = ps0.vel + (ps0.acc + ps1.acc*2 + ps2.acc*2 + ps3.acc) * dt6;
@@ -507,11 +507,11 @@ namespace boom {
 		}
 
 		// -------------------------- RigidMgr --------------------------
-		RigidMgr::RigidMgr(IItg::csptr itg, const RCoeff& coeff): RigidCR(coeff), _itg(itg) {}
+		RigidMgr::RigidMgr(IItg::csptr itg, const RCoeff& coeff): _itg(itg), _coeff(coeff) {}
 		void RigidMgr::_checkCollision() {
-			RigidCR::clear();
-			RigidCR::setNumObjects(_broadC.getNumObj());
-			_broadC.collision(*this);
+			_cresult.clear();
+			_cresult.setNumObjects(_broadC.getNumObj());
+			_broadC.broadCollision(*this, NarrowC());
 		}
 		RigidMgr::id_type RigidMgr::addA(HRig hRig) {
 			return _broadC.add(BroadC::TYPE_A, hRig);
@@ -526,20 +526,181 @@ namespace boom {
 			_broadC.rem(BroadC::TYPE_B, id);
 		}
 		void RigidMgr::simulate(float dt) {
+			_broadC.iterate([](ERig& er) {
+				// ヒットカウントを初期化
+				er.resetHitCount();
+			});
+
 			IItg* itg = _itg.get();
 			int nR = _broadC.getNumObj(),
 				nItr = itg->numOfIteration();
-
 			itg->beginIteration(nR);
 			for(int i=0 ; i<nItr ; i++) {
 				// 当たり判定結果は一回分だけとっておけば良い
 				_checkCollision();
 				for(int j=0 ; j<BroadC::NUM_TYPE ; j++) {
 					auto typ = static_cast<BroadC::TYPE>(j);
-					itg->advance(i, _broadC.cbegin(typ), _broadC.cend(typ), *this, dt);
+					itg->advance(i, _broadC.begin(typ), _broadC.end(typ), _cresult, dt);
 				}
 			}
 			itg->endIteration();
+
+			_broadC.iterate([this](ERig& er) {
+				// 不要なエントリを削除
+				er.removeOld(_npPool);
+				// 次回の為に1フレーム前の姿勢を保存
+				er.savePose();
+			});
+		}
+		void RigidMgr::operator ()(int id0, int id1, ERig& er0_, ERig& er1_, const Vec2& inner) {
+			using spn::Pose2D;
+
+			HRig hR0 = er0_.hRig,
+				hR1 = er1_.hRig;
+			ERig *er0 = &er0_,
+				*er1 = &er1_;
+			float sign = 1.f;
+			// ハンドルのインデックス値が小さいほうがエントリを格納する
+			if(hR0.getIndex() < hR1.getIndex()) {
+				std::swap(hR0, hR1);
+				std::swap(er0, er1);
+				std::swap(id0, id1);
+				sign = -1.f;
+			}
+
+			Rigid &r0 = *hR0.ref(),
+					&r1 = *hR1.ref();
+			auto b0 = er0->addHit(hR1, _npPool);
+			boost::optional<GEpa> epa;
+			if(b0) {
+				// 初回の接触: 一手前の姿勢での最近傍対から接触法線を求める
+				const IModel &mdl0 = *r0.getModel().cref(),
+							&mdl1 = *r1.getModel().cref();
+				TModelR<RPose>	tm0(mdl0, er0->prePose),
+								tm1(mdl1, er1->prePose);
+
+				epa = boost::in_place(tm0, tm1);
+				// 前回の姿勢で衝突していたら配置当初から衝突していた可能性が高い
+				if(epa->getResult()) {
+					// オブジェクトの中心座標を元に再度トライ
+					CircleCore cc0 = r0.getBCircle(),
+								cc1 = r1.getBCircle();
+
+					Vec2 dir(cc0.vCenter - cc1.vCenter);
+					float dist = dir.length();
+					if(dist < 1e-5f)
+						dir = Vec2(1,0);
+					else
+						dir *= _sseRcp22Bit(dist);
+
+					constexpr float MARGIN = 1.05f;
+					tm0.setOfs(cc1.vCenter + dir * (cc0.fRadius + cc1.fRadius) * MARGIN * sign);
+					epa = boost::in_place(tm0, tm1);
+					assert(!epa->getResult());
+				}
+			} else {
+				// 2回目以降の接触: 前回の法線の向きに物体を適当に離して最近傍対を求める
+				Pose2D ps0 = static_cast<const Pose2D&>(r0.getPose()),
+						ps1 = static_cast<const Pose2D&>(r1.getPose());
+				float dist = (r0.getBCircle().fRadius + r1.getBCircle().fRadius) * 0.05f;
+				Vec2 ofs = b0->dir * dist * sign;
+				for(;;) {
+					ps0.setOfs(ps0.getOffset() + ofs);
+					ps1.setOfs(ps1.getOffset() - ofs);
+
+					TModelR<RPose>	tm0(*r0.getModel().cref(), ps0),
+									tm1(*r1.getModel().cref(), ps1);
+					epa = boost::in_place(tm0, tm1);
+					if(!epa->getResult())
+						break;
+				}
+			}
+			const Vec2x2& npair = epa->getNearestPair();
+			// 中点からhR0方向に伸びる直線が接触平面
+			b0->pos = inner;
+			b0->dir = (npair.second - npair.first).normalization() * sign;
+
+			try {
+				StLineCore st(b0->pos, b0->dir);
+				auto f = CalcForce(r0, r1, inner, _coeff, st);
+				_cresult.setFlagWithInfo(id0, id1, f);
+			} catch(const std::exception& e) {
+				std::cout << "exception occurred: " << e.what() << std::endl;
+			}
+		}
+
+		RigidMgr::ERig::ERig(HRig hR): hRig(hR), prePose(hR.cref()->getPose()), nHitCur(0), hitID(~0) {}
+		RigidMgr::ERig::operator const Rigid& () const {
+			return *hRig.cref().get();
+		}
+		RigidMgr::ERig::operator Rigid& () {
+			return *hRig.ref().get();
+		}
+		void RigidMgr::ERig::resetHitCount() {
+			nHitPrev = nHitCur;
+			nHitCur = nHitNew = 0;
+		}
+		void RigidMgr::ERig::savePose() {
+			prePose = static_cast<const spn::Pose2D&>(hRig.cref()->getPose());
+		}
+		void RigidMgr::ERig::removeOld(NP_Pool& pool) {
+			int nRemove = std::max(nHitPrev - nHitCur - nHitNew, 0);
+			if(nRemove > 0) {
+				int n = nHitCur+nHitNew;
+				NPID id = hitID;
+				while(--n >= 0) {
+					NPair* np = &pool.get(id);
+					id = np->nextID;
+				}
+
+				// 末尾まで全部削除
+				NPID nid;
+				do {
+					NPair* np = &pool.get(id);
+					nid = np->nextID;
+					pool.rem(id);
+				} while((id=nid) != invalid);
+			}
+		}
+		spn::WithBool<RigidMgr::NPair&> RigidMgr::ERig::addHit(HRig hR, NP_Pool& pool) {
+			NPID id = hitID;
+			while(hitID != invalid) {
+				NPair* np = &pool.get(id);
+				if(np->hAnother == hR) {
+					++np->nFrame;
+					++nHitCur;
+					if(hitID != id) {
+						// 一旦リストから解除して・・・
+						if(np->prevID != invalid)
+							pool.get(np->prevID).nextID = np->nextID;
+						if(np->nextID != invalid)
+							pool.get(np->nextID).prevID = np->prevID;
+						// 先頭に加える
+						NPair* npTop = &pool.get(hitID);
+						npTop->prevID = id;
+						np->nextID = hitID;
+						hitID = id;
+					}
+					return spn::make_wb(false, *np);
+				}
+				id = np->nextID;
+			}
+			++nHitNew;
+			// 該当のエントリが存在しなかったので新しく作る
+			auto ne = pool.alloc();
+			id = ne.first;
+			NPair& nnp = ne.second;
+			if(hitID != invalid) {
+				NPair* np = &pool.get(hitID);
+				np->prevID = id;
+				nnp.nextID = hitID;
+			} else
+				nnp.nextID = invalid;
+			nnp.hAnother = hR;
+			nnp.prevID = invalid;
+			nnp.nFrame = 0;
+			hitID = id;
+			return spn::make_wb(true, nnp);
 		}
 
 		// ----- 領域の積分計算関数 -----
@@ -600,7 +761,7 @@ namespace boom {
 							_advance(pts[idx]);
 							auto& cur = _current();
 							auto& pre = _prev();
-							if(std::fabs(cur.height) + std::fabs(pre.height) < 1e-5f)
+							if(std::fabs(cur.height) + std::fabs(pre.height) < 1e-4f)
 								continue;
 							float area = (cur.pos[0] - pre.pos[0]) * sign0;		// 線分の距離(面積) マイナスの場合も有り得る
 							// ---- calc spring ----
@@ -620,8 +781,8 @@ namespace boom {
 
 							// ---- calc dynamic-friction ----
 							// forceN(fricD) = average(fd0, fd1) * area * fricD_coeff
-							float fd[2] = {spn::PlusMinus1(pre.velT) * pre.forceN,
-											spn::PlusMinus1(cur.velT) * cur.forceN};
+							float fd[2] = {pre.velT * pre.forceN,
+											cur.velT * cur.forceN};
 							p_fdLin += (fd[0] + fd[1]) * 0.5f * _coeff.fricD;
 							// torqueN(fricD)
 							for(int j=0 ; j<2 ; j++)

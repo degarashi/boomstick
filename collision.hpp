@@ -263,7 +263,7 @@ namespace boom {
 
 	//! broad-phase collision manager (round robin)
 	/*! A->A, A->Bでは判定が行われるが B->Bはされない */
-	template <class NODE>
+	template <class NODE, class CAST=NODE>
 	class BroadC_RoundRobin {
 		public:
 			enum TYPE {
@@ -277,6 +277,7 @@ namespace boom {
 
 		public:
 			using const_iterator = typename Nodes::const_iterator;
+			using iterator = typename Nodes::iterator;
 			using id_type = typename Nodes::id_type;
 			int getNum(TYPE typ) const { return _node[typ].size(); }
 			int getNumObj() const { return getNum(TYPE_A) + getNum(TYPE_B); }
@@ -287,20 +288,26 @@ namespace boom {
 			void rem(TYPE typ, id_type id) {
 				_node[typ].rem(id);
 			}
-			const_iterator cbegin(TYPE typ) const {
-				return _node[typ].cbegin();
+			const_iterator cbegin(TYPE typ) const { return _node[typ].cbegin(); }
+			const_iterator cend(TYPE typ) const { return _node[typ].cend(); }
+			iterator begin(TYPE typ) { return _node[typ].begin(); }
+			iterator end(TYPE typ) { return _node[typ].end(); }
+
+			template <class CB>
+			void iterate(CB cb) {
+				for(int i=0 ; i<NUM_TYPE ; i++) {
+					auto typ = static_cast<TYPE>(i);
+					for(auto itr=begin(typ) ; itr!=end(typ) ; itr++)
+						cb(*itr);
+				}
 			}
-			const_iterator cend(TYPE typ) const {
-				return _node[typ].cend();
-			}
-			template <class CRes>
-			int collision(CRes& cr) const {
-				int nA = _node[TYPE_A].size(),
-					nB = _node[TYPE_B].size(),
-					count = 0;
-				typename CRes::narrow_type nchk;
-				cr.clear();
-				cr.setNumObjects(nA + nB);
+
+			//! リストに溜め込まずに直接コールバックを呼ぶ
+			/*! \param[in] cr		コールバック関数
+				\param[in] nchk		詳細判定関数 */
+			template <class CRes, class NChk>
+			int broadCollision(CRes& cr, NChk nchk) {
+				int count = 0;
 				// A -> A
 				auto itrB_a = _node[TYPE_A].begin(),
 					itrE_a = _node[TYPE_A].end(),
@@ -309,14 +316,14 @@ namespace boom {
 
 				int iCur=0;
 				for(auto itr=itrB_a ; itr!=itrE_a1 ; ++itr,++iCur) {
-					const auto& nodeA = *(*itr).cref().get();
+					const auto& nodeA = static_cast<CAST>(*itr);
 
 					auto itr2 = itr;
 					++itr2;
 					for(int jCur=iCur+1; itr2!=itrE_a ; ++itr2,++jCur) {
-						const auto& nodeA2 = *(*itr2).cref().get();
+						const auto& nodeA2 = static_cast<CAST>(*itr2);
 						if(nchk(nodeA, nodeA2)) {
-							cr(iCur, jCur, nodeA, nodeA2, nchk.getInfo());
+							cr(iCur, jCur, *itr, *itr2, nchk.getInfo());
 							++count;
 						}
 					}
@@ -330,18 +337,48 @@ namespace boom {
 
 					iCur=0;
 					for(auto itr=itrB_a ; itr!=itrE_a ; ++itr,++iCur) {
-						const auto& nodeA = *(*itr).cref().get();
+						const auto& nodeA = static_cast<CAST>(*itr);
 						int jCur=0;
 						for(auto itr2=itrB_b ; itr2!=itrE_b ; ++itr2,++jCur) {
-							const auto& nodeB = *(*itr2).cref().get();
-							if(nchk(nodeA,nodeB)) {
-								cr(iCur, jCur, nodeA, nodeB, nchk.getInfo());
+							const auto& nodeB = static_cast<CAST>(*itr2);
+							if(nchk(nodeA, nodeB)) {
+								cr(iCur, jCur, *itr, *itr2, nchk.getInfo());
 								++count;
 							}
 						}
 					}
 				}
 				return count;
+			}
+
+			//! 判定結果を一時的に貯めておく用
+			template <class Aux>
+			struct AuxInfo {
+				int			id0, id1;
+				const CAST *pR0, *pR1;
+				Aux			aux;
+
+				template <class A>
+				AuxInfo(int i0, int i1, const CAST* r0, const CAST* r1, A&& a):
+					id0(i0), id1(i1), pR0(r0), pR1(r1), aux(std::forward<A>(a)) {}
+			};
+			template <class Aux>
+			using CPList = std::vector<AuxInfo<Aux>>;
+			template <class Aux>
+			struct AuxCB {
+				CPList<Aux>	buff;
+				template <class A>
+				void operator() (int id0, int id1, CAST& c0, CAST& c1, A&& a) {
+					buff.emplace_back(id0, id1, &c0, &c1, std::forward<A>(a));
+				}
+			};
+
+			//! 判定結果をリスト出力する
+			template <class NChk>
+			CPList<typename NChk::aux_type> broadCollision(NChk nchk) {
+				AuxCB<typename NChk::aux_type> cb;
+				broadCollision(cb, nchk);
+				return std::move(cb.buff);
 			}
 	};
 }
