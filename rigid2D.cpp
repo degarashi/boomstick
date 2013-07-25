@@ -67,6 +67,13 @@ namespace boom {
 			rotAcc = v.rotAcc;
 			return *this;
 		}
+		RPose::TValue::TValue(const RPose& rp) {
+			static_cast<spn::Pose2D::TValue&>(*this) = static_cast<const spn::Pose2D::TValue&>(rp);
+			vel = rp.getVelocity();
+			acc = rp.getAccel();
+			rotVel = rp.getRotVel();
+			rotAcc = rp.getRotAccel();
+		}
 
 		RPose::RPose(): _finalInv() {
 			_identitySingle();
@@ -74,6 +81,14 @@ namespace boom {
 		RPose::RPose(const RPose& rp): _finalInv() {
 			// trivialなctorなのでベタコピー
 			std::memcpy(this, &rp, sizeof(rp));
+		}
+		RPose::RPose(const spn::Pose2D& ps): _finalInv() {
+			std::memcpy(static_cast<spn::Pose2D*>(this), &ps, sizeof(ps));
+			_identitySingle();
+		}
+		RPose& RPose::operator =(const spn::Pose2D& ps) {
+			static_cast<spn::Pose2D&>(*this) = ps;
+			return *this;
 		}
 
 		void RPose::identity() {

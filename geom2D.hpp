@@ -527,12 +527,20 @@ namespace boom {
 					TValue() = default;
 					TValue(const Value& v):
 						vel(v.vel), acc(v.acc), rotVel(v.rotVel), rotAcc(v.rotAcc) {}
+					TValue(const RPose& rp);
+					TValue& operator = (const RPose& rp);
 					TValue& operator = (const Value& v);
 				};
 
 				RPose();
 				RPose(const RPose& rp);
+				//! Pose2Dの部分だけをコピーして他は0で初期化
+				explicit RPose(const spn::Pose2D& ps);
 				void identity();
+
+				RPose& operator = (const RPose& rp) = default;
+				//! Pose2Dの部分だけをコピーして他はそのまま
+				RPose& operator = (const spn::Pose2D& ps);
 
 				// ---- setter / getter ----
 				void setVelocity(const Vec2& v);
@@ -575,7 +583,7 @@ namespace boom {
 				TModel(const TModel& t) = default;
 				TModel(const MDL& mdl);
 				template <class... T>
-				TModel(const MDL& mdl, const T&... args): BASE(args...), _model(mdl) {}
+				TModel(const MDL& mdl, T&&... args): BASE(std::forward<T>(args)...), _model(mdl) {}
 				const MDL& getModel() const;
 
 				uint32_t getCID() const override;
