@@ -380,6 +380,15 @@ namespace boom {
 			return *this;
 		}
 
+		namespace {
+			bool Back(const Vec2& v0, const Vec2& v1, const Vec2& v2) {
+				Vec2 to0(v0 - v1),
+					to2(v2 - v1);
+				float c = to0.cw(to2),
+					d = to0.dot(to2);
+				return c >= 0 || (c > -1e-3f && d > 1e-3f);
+			}
+		}
 		ConvexCore ConvexCore::FromConcave(const PointL& src) {
 			int nV = src.size();
 			assert(nV >= 3);
@@ -393,15 +402,16 @@ namespace boom {
 			*pDst++ = tsrc[0];
 			*pDst++ = tsrc[1];
 			for(int rc=2 ; rc<nV ; rc++) {
-				while(Vec2::Cw(pDst[-2], pDst[-1], tsrc[rc]) > 0) {
+				while(Back(pDst[-2], pDst[-1], tsrc[rc])) {
 					if(--pDst == &pts[1])
 						break;
 				}
 				*pDst++ = tsrc[rc];
 			}
+			*pDst++ = tsrc[nV-2];
 			Vec2* pTgt = pDst-1;
-			for(int rc=nV-2 ; rc>=0 ; rc--) {
-				while(Vec2::Cw(pDst[-2], pDst[-1], tsrc[rc]) > 0) {
+			for(int rc=nV-3 ; rc>=0 ; rc--) {
+				while(Back(pDst[-2], pDst[-1], tsrc[rc])) {
 					if(--pDst == pTgt)
 						break;
 				}
@@ -410,7 +420,6 @@ namespace boom {
 			// 末尾がダブる為、削る
 			--pDst;
 
-			int n = pDst - &pts[0];
 			assert(pDst < &pts[0]+nV);
 			pts.resize(pDst - &pts[0]);
 			return ConvexCore(std::move(pts));
@@ -470,18 +479,6 @@ namespace boom {
 			return *this;
 		}
 
-		namespace {
-			//! c0の1領域に対してc1がめり込んでいる場合の領域抽出
-			auto Func(const IModel& c0, const IModel& c1, const Vec2& inner) -> Convex {
-				// innerをc0ローカルにして判定
-				auto ip = c0.checkPosition(inner);
-				const Vec2 &p0 = c0.getPoint(ip.second),
-							&p1 = c0.getPoint(spn::CndSub(ip.second+1, c0.getNPoints()));
-				// lineをc1ローカルにして分割 -> ワールド座標系に変換
-				StLineCore line(p0, (p1-p0).normalization());
-				return c1.splitTwo(line).second;
-			};
-		}
 		std::ostream& operator << (std::ostream& os, const IModel& mdl) {
 			return mdl.dbgPrint(os);
 		}
@@ -499,46 +496,34 @@ namespace boom {
 			if(!m0.isInner(inner) || !m1.isInner(inner))
 				throw std::runtime_error("invalid inner point");
 
-			// m0がm1にめり込んでいる頂点リストを出力
-			auto res0 = m0.getOverlappingPoints(m1,inner);
-			if(res0.first)
-				return Convex(std::move(res0.second));
-			// m1がm0にめり込んでいる頂点リストを出力
-			auto res1 = m1.getOverlappingPoints(m0,inner);
-			if(res1.first)
-				return Convex(std::move(res1.second));
+			// DualTransformで直線から点に変換
+			int nV0 = m0.getNPoints(),
+				nV1 = m1.getNPoints();
+			std::vector<Vec2> vTmp(std::max(nV0,nV1));
+			std::vector<Vec2> v2(nV0+nV1);
+			for(int i=0 ; i<nV0 ; i++)
+				vTmp[i] = m0.getPoint(i) - inner;
+			for(int i=0 ; i<nV0 ; i++)
+				v2[i] = Dual2(vTmp[i], vTmp[spn::CndSub(i+1, nV0)]);
 
-			const PointL &pt0 = res0.second,
-						&pt1 = res1.second;
-			int nV0 = pt0.size(),
-				nV1 = pt1.size();
-			if(nV0 == 0) {
-				assert(nV1 >= 3);	// これがfalseなら、2つのConvexは重なっていない可能性がある
-				// m1のめり込んだ頂点全部がm0の1つの辺に収まっている
-				return Func(m0, m1, inner);
-			} else if(nV1 == 0) {
-				assert(nV0 >= 3);	// これがfalseなら、2つのConvexは重なっていない可能性がある
-				// m0のめり込んだ頂点全部がm1の1つの辺に収まっている
-				return Func(m1, m0, inner);
-			} else {
-				assert(nV0>=3 && nV1>=3);
-				PointL ptDst(nV0 + nV1 - 2);
+			for(int i=0 ; i<nV1 ; i++)
+				vTmp[i] = m1.getPoint(i) - inner;
+			for(int i=0 ; i<nV1 ; i++)
+				v2[i+nV0] = Dual2(vTmp[i], vTmp[spn::CndSub(i+1, nV1)]);
 
-				auto* pDst = &ptDst[0];
-				// 繋ぎ目の処理: m0リストの始点をRayに変換した物とm1の終端で頂点を1つ
-				auto res = LineCore(pt0[0], pt0[1]).crossPoint(LineCore(pt1[nV1-2], pt1[nV1-1]));
-				assert(res.second == LINEPOS::ONLINE);
-				*pDst++ = res.first;
-				for(int i=1 ; i<nV0-1 ; i++)
-					*pDst++ = pt0[i];
-				// m1リストの始点をRayに変換した物とm0の終端で頂点を1つ
-				res = LineCore(pt0[nV0-2], pt0[nV0-1]).crossPoint(LineCore(pt1[0], pt1[1]));
-				assert(res.second == LINEPOS::ONLINE);
-				*pDst++ = res.first;
-				for(int i=1 ; i<nV1-1 ; i++)
-					*pDst++ = pt1[i];
-				return Convex(std::move(ptDst));
-			}
+			// 凸包を求める
+			ConvexCore cc = ConvexCore::FromConcave(v2);
+			// DualTransformで直線から点に変換
+			int nVD = cc.point.size();
+			for(auto& p : cc.point)
+				std::cout << p << std::endl;
+			v2.resize(nVD);
+			for(int i=0 ; i<nVD ; i++)
+				v2[i] = -Dual2(cc.point[i], cc.point[spn::CndSub(i+1, nVD)]) + inner;
+			for(auto& p : v2)
+				std::cout << p << std::endl;
+
+			return std::move(v2);
 		}
 		int Convex::getNPoints() const { return point.size(); }
 		Vec2 Convex::getPoint(int n) const { return point[n]; }
@@ -879,21 +864,12 @@ namespace boom {
 		}
 		namespace {
 			constexpr float MIN_DUAL2DIST = 1e-5f;
-			float Clip(float val) {
-				if(std::fabs(val) < MIN_DUAL2DIST)
-					return val<0 ? -MIN_DUAL2DIST : MIN_DUAL2DIST;
-				return val;
-			}
 		}
-		StLineCore Dual2(const Vec2& v) {
-			float rlen = _sseRcp22Bit(Clip(v.length()));
-			Vec2 pos = v * rlen,
-				dir = v * cs_mRot90[0] * rlen;
-			return StLineCore(pos, dir);
-		}
-		Vec2 Dual2(const StLineCore& l) {
-			float rlen = _sseRcp22Bit(Clip(l.pos.length()));
-			return l.dir * cs_mRot90[1] * rlen;
+		Vec2 Dual2(const Vec2& v0, const Vec2& v1) {
+			Vec2 dir = (v1-v0).normalization();
+			float dist = dir.cw(-v0);
+			dist = std::max(MIN_DUAL2DIST, dist);
+			return dir * _sseRcp22Bit(dist);
 		}
 		StLineCore Dual(const Vec2& v) {
 			Vec2 t0(0,-v.y),

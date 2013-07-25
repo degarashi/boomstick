@@ -707,10 +707,9 @@ namespace boom {
 
 		//! DualTransform (point2D -> line2D)
 		StLineCore Dual(const Vec2& v);
-		StLineCore Dual2(const Vec2& v);
 		//! DualTransform (line2D -> point2D)
 		Vec2 Dual(const StLineCore& l);
-		Vec2 Dual2(const StLineCore& l);
+		Vec2 Dual2(const Vec2& v0, const Vec2& v1);
 		//! DualTransform (point3D -> plane)
 		Plane Dual(const Vec3& v);
 		//! DualTransform (plane -> point3D)
