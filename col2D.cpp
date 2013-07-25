@@ -124,15 +124,26 @@ namespace boom {
 		}
 
 		// ---------------------- GEpa ----------------------
+		GEpa::~GEpa() {
+			_clear();
+		}
+		GEpa::VPool thread_local GEpa::tls_vPool(GEpa::MAX_VERT);
+
+		Vec2x2* GEpa::_allocVert(int n) {
+			Vec2x2* p = tls_vPool.malloc();
+			if(n >= 0) {
+				std::memmove(&_vl[n+1], &_vl[n], sizeof(Vec2x2*)*(_szVl-n));
+				_vl[n] = p;
+			} else
+				_vl[_szVl] = p;
+			++_szVl;
+			assert(_szVl <= _vl.size());
+			return p;
+		}
 		const Vec2x2& GEpa::_minkowskiSub(const Vec2& dir, int n) {
-			auto* vp = new Vec2x2;
+			Vec2x2* vp = _allocVert(n);
 			vp->second = _m1.support(-dir);
 			vp->first = _m0.support(dir) - vp->second;
-			if(n >= 0)
-				_vl.insert(_vl.begin()+n, vp);
-			else
-				_vl.push_back(vp);
-
 			return *vp;
 		}
 		// デバッグ用Print関数
@@ -146,8 +157,9 @@ namespace boom {
 			}
 		}
 		void GEpa::_printASV() {
-			for(auto& p : _vl) {
-				PrintV(*p);
+			int nV = _szVl;
+			for(int i=0 ; i<nV ; i++) {
+				PrintV(*_vl[i]);
 				std::cout << std::endl;
 			}
 			for(auto& p : _asv) {
@@ -158,28 +170,23 @@ namespace boom {
 		}
 
 		int GEpa::_getIndex(const Vec2x2 *vp) const {
-			int nV = _vl.size();
-			for(int i=0 ; i<nV ; i++) {
-				if(_vl[i] == vp)
-					return i;
-			}
-			return 0xffff;
+			auto itr = std::find(_vl.begin(), _vl.end(), vp);
+			if(itr == _vl.end())
+				return 0xffff;
+			return itr-_vl.begin();
 		}
 		namespace {
 			const Vec2 c_origin(0);
 		}
-		void GEpa::_addAsv(const Vec2& v0, const Vec2& v1, const Vec2x2* (&vtx)[2]) {
-			auto res = LineCore(v0,v1).nearest(c_origin);
+		void GEpa::_addAsv(const Vec2x2& v0, const Vec2x2& v1) {
+			auto res = LineCore(v0.first, v1.first).nearest(c_origin);
 			float len = res.first.length();
 			if(res.second == LINEPOS::ONLINE) {
 				res.first *= _sseRcp22Bit(len);
-				_asv.insert(LmLen{len, res.first, {vtx[0], vtx[1]}});
+				_asv.insert(LmLen{len, res.first, {&v0,&v1}});
 			}
 		}
 		void GEpa::_epaMethodOnHit() {
-			_adjustLoop();
-			_geneASV();
-
 			// 衝突時: 脱出ベクトルを求める
 			float minLen = std::numeric_limits<float>::max();
 			while(!_asv.empty()) {
@@ -200,13 +207,11 @@ namespace boom {
 						break;
 				}
 
-				_addAsv(v0.first, v1.first, fr.vtx);
-				_addAsv(v1.first, v2.first, fr.vtx);
+				_addAsv(v0, v1);
+				_addAsv(v1, v2);
 			}
 		}
 		void GEpa::_epaMethodNoHit() {
-			_adjustLoop();
-			_geneASV();
 			// 無衝突時: 最近傍対を求める
 			while(!_asv.empty()) {
 				auto fr = _asv.pop_frontR();
@@ -227,49 +232,34 @@ namespace boom {
 					_nvec.first = v1.second + fr.dir * fr.dist;
 					return;
 				}
-				_addAsv(v0.first, v1.first, fr.vtx);
-				_addAsv(v1.first, v2.first, fr.vtx);
+				_addAsv(v0, v1);
+				_addAsv(v1, v2);
 			}
 			assert(false);
 		}
-		void GEpa::_adjustLoop() {
-			int nV = _vl.size();
-			if(nV < 3)
-				return;
-			// 頂点0を基準にCWの値でソート
-			struct Cw {
-				float	val;
-				int		idx;
-
-				bool operator > (const Cw& c) const {
-					return val > c.val;
-				}
-			};
-			spn::AssocVec<Cw, std::greater<Cw>> asv;
-
-			const Vec2& v0 = _vl[0]->first;
-			for(int i=1 ; i<nV ; i++)
-				asv.insert(Cw{v0.cw(_vl[i]->first), i});
-
-			decltype(_vl) nvl(nV);
-			auto* pDst = &nvl[0];
-			*pDst++ = _vl[0];
-			while(!asv.empty()) {
-				auto c = asv.pop_frontR();
-				*pDst++ = _vl[c.idx];
-			}
-			std::swap(_vl, nvl);
+		void GEpa::_adjustLoop3() {
+			assert(_szVl == 3);
+			Vec2 v01(_vl[1]->first - _vl[0]->first),
+				v02(_vl[2]->first - _vl[0]->first);
+			if(v01.ccw(v02) < 0)
+				std::swap(_vl[0], _vl[1]);
+		}
+		void GEpa::_clear() {
+			size_t nV = _szVl;
+			for(size_t i=0 ; i<nV ; i++)
+				tls_vPool.destroy(_vl[i]);
+			_szVl = 0;
+			_asv.clear();
 		}
 		void GEpa::_geneASV() {
-			int nV = _vl.size();
+			int nV = _szVl;
 			assert(nV >= 3 || !getResult());
 			_asv.clear();
 
-			Vec2 ori(0);
 			for(int i=0 ; i<nV ; i++) {
 				auto &p0 = *_vl[i],
 					&p1 = *_vl[(i+1)%nV];
-				auto res = LineCore(p1.first, p0.first).nearest(ori);
+				auto res = LineCore(p1.first, p0.first).nearest(c_origin);
 				float len = res.first.length();
 				if(len < 1e-5f) {
 					// 線分上に原点があるので少し小細工
@@ -285,7 +275,6 @@ namespace boom {
 				_asv.insert(LmLen{len, res.first, {_vl[i], _vl[(i+1)%nV]}});
 			}
 		}
-
 		void GEpa::_recover2NoHit() {
 			auto res = LineCore(_vtx[0], _vtx[1]).nearest(Vec2(0));
 			float len = res.first.length();
@@ -315,11 +304,14 @@ namespace boom {
 			_asv.insert(lm);
 		}
 
-		GEpa::GEpa(const IModel& m0, const IModel& m1): GSimplex(m0,m1) {
+		GEpa::GEpa(const IModel& m0, const IModel& m1): GSimplex(m0,m1), _szVl(0) {
 			int nV = _nVtx;
-			_vl.resize(nV);
-			for(int i=0 ; i<nV ; i++)
-				_vl[i] = new Vec2x2(_vtx[i], _posB[i]);
+			_szVl = nV;
+			for(int i=0 ; i<nV ; i++) {
+				auto res = _vl[i] = tls_vPool.malloc();
+				res->first = _vtx[i];
+				res->second = _posB[i];
+			}
 
 			do {
 				if(getResult()) {
@@ -328,6 +320,10 @@ namespace boom {
 						break;
 					} else if(nV == 2)
 						_recover2OnHit();
+					else {
+						_adjustLoop3();
+						_geneASV();
+					}
 					_epaMethodOnHit();
 				} else {
 					if(nV == 1) {
@@ -345,6 +341,10 @@ namespace boom {
 						}
 					} else if(nV == 2)
 						_recover2NoHit();
+					else {
+						_adjustLoop3();
+						_geneASV();
+					}
 					_epaMethodNoHit();
 				}
 			} while(false);

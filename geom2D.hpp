@@ -11,6 +11,7 @@
 #include <cassert>
 #include <vector>
 #include <memory>
+#include <boost/pool/object_pool.hpp>
 
 namespace boom {
 	using spn::AVec2;
@@ -639,11 +640,20 @@ namespace boom {
 				//! 初期化 = GJKによる判定(ヒットチェックだけ)
 				GSimplex(const IModel& m0, const IModel& m1);
 				bool getResult() const;
+				//! 衝突時: 内部点を取得
 				const Vec2& getInner() const;
 		};
+
 		/*! 常に頂点リストを時計回りに保つ */
 		class GEpa : public GSimplex {
-			std::vector<Vec2x2*>	_vl;
+			constexpr static int MAX_VERT = 0x100;
+			using VPool = boost::object_pool<Vec2x2>;
+			static thread_local VPool tls_vPool;
+			using VList = std::array<Vec2x2*, MAX_VERT>;
+
+			VList	_vl;
+			size_t	_szVl;
+			Vec2x2* _allocVert(int n=-1);
 			int _getIndex(const Vec2x2* vp) const;
 
 			//! 点と辺の両対応
@@ -664,7 +674,7 @@ namespace boom {
 				Vec2	_pvec;
 				Vec2x2	_nvec;
 			};
-			void _addAsv(const Vec2& v0, const Vec2& v1, const Vec2x2* (&vtx)[2]);
+			void _addAsv(const Vec2x2& v0, const Vec2x2& v1);
 
 			/*! \param[in] n 計算した頂点の挿入先インデックス */
 			const Vec2x2& _minkowskiSub(const Vec2& dir, int n=-1);
@@ -679,12 +689,14 @@ namespace boom {
 			//! Hit: 頂点が2つしか無い時の補正
 			void _recover2OnHit();
 			//! 頂点の並び順を時計回りに修正
-			void _adjustLoop();
+			void _adjustLoop3();
 			//! 頂点リスト(3つ以上)から最短距離リストを生成
 			void _geneASV();
+			void _clear();
 
 			public:
 				GEpa(const IModel& m0, const IModel& m1);
+				~GEpa();
 				Vec2x2 getNearestPair() const;
 				const Vec2& getPVector() const;
 		};
