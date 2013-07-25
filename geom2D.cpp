@@ -388,23 +388,30 @@ namespace boom {
 			PointL tsrc(src);
 			std::sort(tsrc.begin(), tsrc.end(), [](const Vec2& v0, const Vec2& v1){ return v0.x < v1.x; });
 
-			PointL pts(nV*2);
+			PointL pts(nV+1);
 			Vec2* pDst = &pts[0];
 			*pDst++ = tsrc[0];
 			*pDst++ = tsrc[1];
 			for(int rc=2 ; rc<nV ; rc++) {
-				if(Vec2::Cw(tsrc[rc-2], tsrc[rc-1], tsrc[rc]) < 0)
-					--pDst;
+				while(Vec2::Cw(pDst[-2], pDst[-1], tsrc[rc]) > 0) {
+					if(--pDst == &pts[1])
+						break;
+				}
 				*pDst++ = tsrc[rc];
 			}
-			*pDst++ = tsrc[nV-1];
-			*pDst++ = tsrc[nV-2];
-			for(int rc=nV-3 ; rc>=0 ; rc--) {
-				if(Vec2::Cw(tsrc[rc+2], tsrc[rc+1], tsrc[rc]) < 0)
-					--pDst;
+			Vec2* pTgt = pDst-1;
+			for(int rc=nV-2 ; rc>=0 ; rc--) {
+				while(Vec2::Cw(pDst[-2], pDst[-1], tsrc[rc]) > 0) {
+					if(--pDst == pTgt)
+						break;
+				}
 				*pDst++ = tsrc[rc];
 			}
-			assert(&pts[0]+nV*2 <= pDst);
+			// 末尾がダブる為、削る
+			--pDst;
+
+			int n = pDst - &pts[0];
+			assert(pDst < &pts[0]+nV);
 			pts.resize(pDst - &pts[0]);
 			return ConvexCore(std::move(pts));
 		}
