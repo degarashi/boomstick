@@ -308,23 +308,25 @@ namespace boom {
 			template <class CRes, class NChk>
 			int broadCollision(CRes& cr, NChk nchk) {
 				int count = 0;
-				// A -> A
 				auto itrB_a = _node[TYPE_A].begin(),
 					itrE_a = _node[TYPE_A].end(),
 					itrE_a1 = itrE_a;
 				--itrE_a1;
 
-				int iCur=0;
-				for(auto itr=itrB_a ; itr!=itrE_a1 ; ++itr,++iCur) {
-					const auto& nodeA = static_cast<CAST>(*itr);
+				if(!_node[TYPE_A].empty()) {
+					// A -> A
+					int iCur=0;
+					for(auto itr=itrB_a ; itr!=itrE_a1 ; ++itr,++iCur) {
+						const auto& nodeA = static_cast<CAST>(*itr);
 
-					auto itr2 = itr;
-					++itr2;
-					for(int jCur=iCur+1; itr2!=itrE_a ; ++itr2,++jCur) {
-						const auto& nodeA2 = static_cast<CAST>(*itr2);
-						if(nchk(nodeA, nodeA2)) {
-							cr(iCur, jCur, *itr, *itr2, nchk.getInfo());
-							++count;
+						auto itr2 = itr;
+						++itr2;
+						for(int jCur=iCur+1; itr2!=itrE_a ; ++itr2,++jCur) {
+							const auto& nodeA2 = static_cast<CAST>(*itr2);
+							if(nchk(nodeA, nodeA2)) {
+								cr(iCur, jCur, *itr, *itr2, nchk.getInfo());
+								++count;
+							}
 						}
 					}
 				}
@@ -335,7 +337,8 @@ namespace boom {
 							itrE_b1 = itrE_b;
 					--itrE_b1;
 
-					iCur=0;
+					int nA = _node[TYPE_A].size();
+					int iCur=0;
 					for(auto itr=itrB_a ; itr!=itrE_a ; ++itr,++iCur) {
 						const auto& nodeA = static_cast<CAST>(*itr);
 						int jCur=0;

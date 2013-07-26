@@ -11,6 +11,7 @@ namespace boom {
 		template <class T>
 		using Wrapper = typename CORE::template Wrap<T>;
 
+		float							_cache_ratio[CT::size];
 		mutable uint32_t				_rflag = ~0;
 		mutable typename CTD::AsTuple	_data;
 		protected:
@@ -27,9 +28,25 @@ namespace boom {
 			}
 
 		public:
-			Cache() {}
+			Cache() {
+				setCacheRatioAll(1.f);
+			}
 			template <class... Ts>
-			Cache(Ts&&... ts): _core(std::forward<Ts>(ts)...) {}
+			Cache(Ts&&... ts): _core(std::forward<Ts>(ts)...) {
+				setCacheRatioAll(1.f);
+			}
+
+			void setCacheRatioAll(float r) {
+				for(auto& a : _cache_ratio)
+					a = r;
+			}
+			void setCacheRatio(float r) {}
+			//! パラメータの倍率を設定
+			template <class TAG, class... Ts>
+			void setCacheRatio(float r) {
+				_cache_ratio[CT::template Find<TAG>::result] = r;
+				setCacheRatio<Ts...>(r);
+			}
 
 			struct FlagTrue {};
 			struct FlagFalse {};
@@ -68,9 +85,12 @@ namespace boom {
 			// キャッシュ無効
 			template <class TAG>
 			TypeD<TAG> _getCache(FlagFalse) const {
-				return TAG().get(_core);
+				return TAG().get(_core) * getCacheRatio<TAG>();
 			}
-
+			template <class TAG>
+			float getCacheRatio() const {
+				return _cache_ratio[TV<TAG>::POS];
+			}
 			template <class TAG>
 			Detect<TAG> getCache(TAG) const {
 				return _getCache<TAG>(flag_type<TAG>());
@@ -85,7 +105,7 @@ namespace boom {
 		using BASE::getInfo;
 		template <class INFO, class TAG>
 		void getInfo(INFO& info, TAG tag) const {
-			info.refCache(tag) = tag.get(*this);
+			info.refCache(tag) = tag.get(*this) * info.template getCacheRatio<TAG>();
 		}
 		operator const BASE& () const { return *this; }
 	};
@@ -96,7 +116,7 @@ namespace boom {
 		CoreRaw(Ts&&... ts): BASE(std::forward<Ts>(ts)...) {}
 		template <class INFO, class TAG>
 		void getInfo(INFO& info, TAG tag) const {
-			info.refCache(tag) = tag.get(*this);
+			info.refCache(tag) = tag.get(*this) * info.template getCacheRatio<TAG>();
 		}
 		operator const BASE& () const { return *this; }
 	};

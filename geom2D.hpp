@@ -261,6 +261,7 @@ namespace boom {
 			// radius
 			void getArcPoints(PointL& dst, float ang0, float ang1, float deep) const;
 			CircleCore operator * (const AMat32& m) const;
+			CircleCore operator * (float s) const;
 		};
 		//! 円の基本クラス
 		/*! 共通クラスを当たり判定対応にラップした物 */

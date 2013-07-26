@@ -134,6 +134,10 @@ namespace boom {
 			return CircleCore((vCenter.asVec3(1)*m),
 							  spn::_sseSqrt(std::max(tx.len_sq(), ty.len_sq())));
 		}
+		// 半径のみ倍率をかける
+		CircleCore CircleCore::operator * (float s) const {
+			return CircleCore(vCenter, fRadius*s);
+		}
 
 		Vec2 Circle::support(const Vec2& dir) const { return CircleCore::support(dir); }
 		Vec2 Circle::getCenter() const { return CircleCore::vCenter; }
