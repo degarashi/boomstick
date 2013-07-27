@@ -737,7 +737,7 @@ namespace boom {
 						Vec2 vel = _rp0.getVelocAt(p) - _rp1.getVelocAt(p);
 						float dt = _nml.dir.dot(vel);
 						cur.velN = -std::min(dt, 0.f);
-						cur.velT = _div.dot(vel) > 0 ? 1 : -1;
+						cur.velT = _div.dot(vel);
 						// 物体Aの重心からの相対座標 (直線方向に対して)
 						cur.pos[0] = _div.dot(p - _rp0.getOffset());
 						cur.pos[1] = _div.dot(p - _rp1.getOffset());

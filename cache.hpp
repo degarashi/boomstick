@@ -40,7 +40,7 @@ namespace boom {
 				for(auto& a : _cache_ratio)
 					a = r;
 			}
-			void setCacheRatio(float r) {}
+			void setCacheRatio(float /*r*/) {}
 			//! パラメータの倍率を設定
 			template <class TAG, class... Ts>
 			void setCacheRatio(float r) {

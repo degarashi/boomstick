@@ -313,7 +313,8 @@ namespace boom {
 					itrE_a1 = itrE_a;
 				--itrE_a1;
 
-				if(!_node[TYPE_A].empty()) {
+				int nA = _node[TYPE_A].size();
+				if(nA > 0) {
 					// A -> A
 					int iCur=0;
 					for(auto itr=itrB_a ; itr!=itrE_a1 ; ++itr,++iCur) {
@@ -329,22 +330,21 @@ namespace boom {
 							}
 						}
 					}
-				}
-				// A -> B
-				if(!_node[TYPE_B].empty()) {
-					auto itrB_b = _node[TYPE_B].begin(),
-							itrE_b = _node[TYPE_B].end();
+					// A -> B
+					if(!_node[TYPE_B].empty()) {
+						auto itrB_b = _node[TYPE_B].begin(),
+						itrE_b = _node[TYPE_B].end();
 
-					int nA = _node[TYPE_A].size();
-					int iCur=0;
-					for(auto itr=itrB_a ; itr!=itrE_a ; ++itr,++iCur) {
-						const auto& nodeA = static_cast<CAST>(*itr);
-						int jCur=0;
-						for(auto itr2=itrB_b ; itr2!=itrE_b ; ++itr2,++jCur) {
-							const auto& nodeB = static_cast<CAST>(*itr2);
-							if(nchk(nodeA, nodeB)) {
-								cr(iCur, jCur+nA, *itr, *itr2, nchk.getInfo());
-								++count;
+						int iCur=0;
+						for(auto itr=itrB_a ; itr!=itrE_a ; ++itr,++iCur) {
+							const auto& nodeA = static_cast<CAST>(*itr);
+							int jCur=0;
+							for(auto itr2=itrB_b ; itr2!=itrE_b ; ++itr2,++jCur) {
+								const auto& nodeB = static_cast<CAST>(*itr2);
+								if(nchk(nodeA, nodeB)) {
+									cr(iCur, jCur+nA, *itr, *itr2, nchk.getInfo());
+									++count;
+								}
 							}
 						}
 					}
