@@ -279,8 +279,8 @@ namespace boom {
 			using const_iterator = typename Nodes::const_iterator;
 			using iterator = typename Nodes::iterator;
 			using id_type = typename Nodes::id_type;
-			int getNum(TYPE typ) const { return _node[typ].size(); }
-			int getNumObj() const { return getNum(TYPE_A) + getNum(TYPE_B); }
+			int getNumObj(TYPE typ) const { return _node[typ].size(); }
+			int getNumObj() const { return getNumObj(TYPE_A) + getNumObj(TYPE_B); }
 
 			id_type add(TYPE typ, NODE obj) {
 				return _node[typ].add(obj);

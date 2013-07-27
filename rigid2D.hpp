@@ -152,7 +152,7 @@ namespace boom {
 			//! 剛体の姿勢を積分計算
 			/*! \param[inout] st 現在の姿勢
 			*	\param[in] dt 前回フレームからの時間(sec) */
-			virtual void advance(int pass, RItr itr, RItr itrE, const CResult& cr, float dt) = 0;
+			virtual void advance(int pass, int offset, RItr itr, RItr itrE, const CResult& cr, float dt) = 0;
 			//! 1回分の時間を進めるのに必要なステップ数
 			virtual int numOfIteration() const = 0;
 
@@ -163,7 +163,7 @@ namespace boom {
 		// ---------------------- 積分アルゴリズム ----------------------
 		namespace itg {
 			#define DEF_IITG_FUNCS \
-			virtual void advance(int pass, RItr itr, RItr itrE, const CResult& cr, float dt) override; \
+			virtual void advance(int pass, int offset, RItr itr, RItr itrE, const CResult& cr, float dt) override; \
 			int numOfIteration() const override;
 			//! オイラー法
 			struct Eular : IItg {

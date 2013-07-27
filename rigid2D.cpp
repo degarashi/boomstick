@@ -326,7 +326,7 @@ namespace boom {
 		namespace itg {
 			// -------------------------- Eular --------------------------
 			int Eular::numOfIteration() const { return 1; }
-			void Eular::advance(int pass, RItr itr, RItr itrE, const CResult& cr, float dt) {
+			void Eular::advance(int pass, int offset, RItr itr, RItr itrE, const CResult& cr, float dt) {
 				for(int i=0 ; itr!=itrE ; ++i,++itr) {
 					Rigid& r = static_cast<Rigid&>(*itr);
 					auto st = r.refPose().refValue();
@@ -353,10 +353,10 @@ namespace boom {
 				decltype(_tvalue) tmp;
 				std::swap(_tvalue, tmp);
 			}
-			void ImpEular::advance(int pass, RItr itr, RItr itrE, const CResult& cr, float dt) {
+			void ImpEular::advance(int pass, int offset, RItr itr, RItr itrE, const CResult& cr, float dt) {
 				auto *tv0 = &_tvalue[0];
 				float dth2 = dt/2;
-				int cur = 0;
+				int cur = offset;
 				if(pass == 0) {
 					// value = 1つ前の(計算上の)状態
 					while(itr != itrE) {
@@ -407,10 +407,10 @@ namespace boom {
 				std::swap(_tvalue, tmp);
 			}
 			// TODO: 4回分も当たり判定していたら遅そうなので2回に留める案
-			void RK4::advance(int pass, RItr itr, RItr itrE, const CResult& cr, float dt) {
+			void RK4::advance(int pass, int offset, RItr itr, RItr itrE, const CResult& cr, float dt) {
 				float dt2 = dt/2,
 						dt6 = dt/6;
-				int cur = 0,
+				int cur = offset,
 					nR = itrE-itr;
 				auto *tv0 = &_tvalue[0],
 					*tv1 = &_tvalue[nR],
@@ -537,9 +537,11 @@ namespace boom {
 				});
 				// 当たり判定結果は一回分だけとっておけば良い
 				_checkCollision();
+				int offset = 0;
 				for(int j=0 ; j<BroadC::NUM_TYPE ; j++) {
 					auto typ = static_cast<BroadC::TYPE>(j);
-					itg->advance(i, _broadC.begin(typ), _broadC.end(typ), _cresult, dt);
+					itg->advance(i, offset, _broadC.begin(typ), _broadC.end(typ), _cresult, dt);
+					offset += _broadC.getNumObj(typ);
 				}
 				_broadC.iterate([this](ERig& er) {
 					// 不要なエントリを削除
