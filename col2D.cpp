@@ -155,7 +155,14 @@ namespace boom {
 		const Vec2& GSimplex::getInner() const {
 			return _inner;
 		}
-
+		namespace {
+			bool IsNaN(float f) {
+				return !(f>0) && !(f<=0);
+			}
+			bool IsNaN(const Vec2& v) {
+				return IsNaN(v.x) || IsNaN(v.y);
+			}
+		}
 		// ---------------------- GEpa ----------------------
 		GEpa::~GEpa() {
 			_clear();
@@ -211,13 +218,15 @@ namespace boom {
 		namespace {
 			const Vec2 c_origin(0);
 		}
-		void GEpa::_addAsv(const Vec2x2& v0, const Vec2x2& v1) {
+		bool GEpa::_addAsv(const Vec2x2& v0, const Vec2x2& v1) {
 			auto res = LineCore(v0.first, v1.first).nearest(c_origin);
-			float len = res.first.length();
 			if(res.second == LINEPOS::ONLINE) {
+				float len = res.first.length();
 				res.first *= _sseRcp22Bit(len);
 				_asv.insert(LmLen{len, res.first, {&v0,&v1}});
+				return true;
 			}
+			return res.second != LINEPOS::NOTHIT;
 		}
 		void GEpa::_epaMethodOnHit() {
 			// 衝突時: 脱出ベクトルを求める
@@ -225,11 +234,9 @@ namespace boom {
 			while(!_asv.empty()) {
 				auto fr = _asv.pop_frontR();
 
-				_printASV();
 				const Vec2x2 &v1 = _minkowskiSub(fr.dir, _getIndex(fr.vtx[0])),
 							&v0 = *fr.vtx[0],
 							&v2 = *fr.vtx[1];
-				_printASV();
 				float d1 = fr.dir.dot(v1.first);
 				if(spn::IsNear(d1, fr.dist, 5e-4f)) {
 					if(minLen > fr.dist) {
@@ -240,8 +247,10 @@ namespace boom {
 						break;
 				}
 
-				_addAsv(v0, v1);
-				_addAsv(v1, v2);
+				if(_addAsv(v0, v1) || _addAsv(v1, v2)) {
+					_pvec = fr.dir * fr.dist;
+					break;
+				}
 			}
 		}
 		void GEpa::_epaMethodNoHit() {
@@ -254,19 +263,24 @@ namespace boom {
 					_nvec.first = p.second + fr.dir * fr.dist;
 					return;
 				}
-				_printASV();
+				if(fr.dist < 1e-6f || IsNaN(fr.dir)) {
+					_nvec.first = _nvec.second = fr.vtx[0]->second;
+					return;
+				}
 				const Vec2x2& v1 = _minkowskiSub(-fr.dir, _getIndex(fr.vtx[0])),
 							&v0 = *fr.vtx[0],
 							&v2 = *fr.vtx[1];
-				_printASV();
 				float d1 = fr.dir.dot(v1.first);
-				if(spn::IsNear(d1, fr.dist, 5e-4f)) {
+				if(spn::IsNear(std::fabs(d1), fr.dist, 5e-4f)) {
 					_nvec.second = v1.second;
 					_nvec.first = v1.second + fr.dir * fr.dist;
 					return;
 				}
-				_addAsv(v0, v1);
-				_addAsv(v1, v2);
+				if(_addAsv(v0, v1) || _addAsv(v1, v2)) {
+					_nvec.second = v1.second;
+					_nvec.first = v1.second + fr.dir * fr.dist;
+					return;
+				}
 			}
 			assert(false);
 		}
@@ -383,9 +397,14 @@ namespace boom {
 			} while(false);
 		}
 		Vec2x2 GEpa::getNearestPair() const {
+			assert(!getResult());
+			assert(!IsNaN(_nvec.first));
+			assert(!IsNaN(_nvec.second));
 			return _nvec;
 		}
 		const Vec2& GEpa::getPVector() const {
+			assert(getResult());
+			assert(!IsNaN(_pvec));
 			return _pvec;
 		}
 

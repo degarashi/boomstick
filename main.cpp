@@ -36,9 +36,10 @@ void TestRigid() {
 	boom::RCoeff rc = {1,1,1,1,1};
 	RigidMgr rm(IItg::sptr(new itg::Eular), rc);
 	// 頂点を定義して、重心を求めそこを中心にして座標を変換
-	ConvexModel *c0 = ConvexModel::New({Vec2(0,0), Vec2(0,1), Vec2(1,1), Vec2(1,0)}),
-				*c1 = ConvexModel::New({Vec2(-2,0), Vec2(2,0), Vec2(2,-1), Vec2(-2,-1)});
-	c0->addOffset(Vec2(0,-0.1f));
+	constexpr float fc0 = 0.4f,
+					fc1 = 2.0f;
+	ConvexModel *c0 = ConvexModel::New({Vec2(0,0), Vec2(0,fc0), Vec2(fc0,fc0), Vec2(fc0,0)}),
+				*c1 = ConvexModel::New({Vec2(-fc1,0), Vec2(fc1,0), Vec2(fc1,-fc1), Vec2(-fc1,-fc1)});
 	AVec2 ofs0 = c0->getCenter(),
 		ofs1 = c1->getCenter();
 	c0->addOffset(-ofs0);
@@ -54,7 +55,7 @@ void TestRigid() {
 	pp[0]->setVelocity(Vec2(1,0));
 	pp[1]->setVelocity(Vec2(0,0));
 
-	auto spGrav = IResist::sptr(new resist::Gravity(Vec2(0,-9.8f)));
+	auto spGrav = IResist::sptr(new resist::Gravity(Vec2(0,-4.f)));
 	auto spCol = IResist::sptr(new resist::Impact);
 	for(int i=0 ; i<2 ; i++) {
 		rm.addA(lhR[i].get());
@@ -62,7 +63,7 @@ void TestRigid() {
 		lhR[i].ref()->addR(spCol);
 	}
 	for(int i=0 ; i<10 ; i++)
-		rm.simulate(1.f);
+		rm.simulate(0.01f);
 }
 int main(int argc, char **argv) {
 	TestRigid();

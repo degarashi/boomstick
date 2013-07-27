@@ -450,6 +450,10 @@ namespace boom {
 			// 直線がヒットしてるか判定後、始点と終点のチェック
 			bool hit(const LineCore& l) const;
 			ConvexCore& operator *= (const AMat32& m);
+			//! 頂点が時計回りになっているか
+			bool checkCW() const;
+			//! 頂点の並びを時計回りに修正
+			void adjustLoop();
 
 			std::ostream& dbgPrint(std::ostream& os) const;
 		};
@@ -474,7 +478,7 @@ namespace boom {
 				\param[in] inner 重複領域の内部点 */
 			static Convex GetOverlappingConvex(const IModel& m0, const IModel& m1, const Vec2& inner);
 		};
-		class ConvexModel : public IModelP<ConvexCore>, public Cache<ConvexCore>, public spn::CheckAlign<16,ConvexModel> {
+		class alignas(16) ConvexModel : public IModelP<ConvexCore>, public Cache<ConvexCore>, public spn::CheckAlign<16,ConvexModel> {
 			public:
 				ConvexModel(const ConvexModel& m) = default;
 				ConvexModel(std::initializer_list<Vec2> v);
@@ -683,7 +687,7 @@ namespace boom {
 				Vec2	_pvec;
 				Vec2x2	_nvec;
 			};
-			void _addAsv(const Vec2x2& v0, const Vec2x2& v1);
+			bool _addAsv(const Vec2x2& v0, const Vec2x2& v1);
 
 			/*! \param[in] n 計算した頂点の挿入先インデックス */
 			const Vec2x2& _minkowskiSub(const Vec2& dir, int n=-1);

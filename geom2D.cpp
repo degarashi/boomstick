@@ -128,10 +128,12 @@ namespace boom {
 		CircleCore CircleCore::operator * (const AMat32& m) const {
 			auto& m2 = reinterpret_cast<const spn::AMat22&>(m);
 			Vec2 tx(vCenter + Vec2(fRadius,0)),
-				ty(vCenter + Vec2(0,fRadius));
-			tx = tx * m2 - vCenter;
-			ty = ty * m2 - vCenter;
-			return CircleCore((vCenter.asVec3(1)*m),
+				ty(vCenter + Vec2(0,fRadius)),
+				ori(vCenter);
+			ori = ori.asVec3(1) * m;
+			tx = tx * m2 - ori;
+			ty = ty * m2 - ori;
+			return CircleCore(ori,
 							  spn::_sseSqrt(std::max(tx.len_sq(), ty.len_sq())));
 		}
 		// 半径のみ倍率をかける
@@ -210,6 +212,8 @@ namespace boom {
 		LNear LineCore::nearest(const Vec2& p) const {
 			Vec2 toP(p-point[0]),
 				toV1(point[1]-point[0]);
+			if(toV1.len_sq() <1e-6f)
+				return LNear(Vec2(), LINEPOS::NOTHIT);
 			float lenV1 = toV1.length();
 			toV1 *= _sseRcp22Bit(lenV1);
 			float d = toV1.dot(toP);
@@ -495,6 +499,30 @@ namespace boom {
 			}
 			return os;
 		}
+		bool ConvexCore::checkCW() const {
+			int nV = point.size();
+			if(nV < 3)
+				return false;
+			Vec2 c = (point[0] + point[1] + point[2]) * (1.f/3);
+			for(int i=0 ; i<nV-1 ; i++) {
+				if((point[i+1] - point[i]).cw(c-point[i]) < 0)
+					return false;
+			}
+			return (point[0] - point[nV-1]).cw(c-point[0]) >= 0;
+		}
+		void ConvexCore::adjustLoop() {
+			// point全部が凸包に使用される頂点と仮定
+			Vec2 c = (point[0] + point[1] + point[2]) * (1.f/3);
+			int nV = point.size();
+			using AngPair = std::pair<float, Vec2>;
+			std::vector<AngPair> tmp(nV);
+			for(int i=0 ; i<nV ; i++)
+				tmp[i] = AngPair{spn::Angle(point[i]-c), point[i]};
+			std::sort(tmp.begin(), tmp.end(), [](const AngPair& a0, const AngPair& a1) { return a0.first < a1.first; });
+
+			for(int i=0 ; i<nV ; i++)
+				point[i] = tmp[i].second;
+		}
 
 		Convex Convex::GetOverlappingConvex(const IModel& m0, const IModel& m1, const Vec2& inner) {
 			if(!m0.isInner(inner) || !m1.isInner(inner))
@@ -519,13 +547,9 @@ namespace boom {
 			ConvexCore cc = ConvexCore::FromConcave(v2);
 			// DualTransformで直線から点に変換
 			int nVD = cc.point.size();
-			for(auto& p : cc.point)
-				std::cout << p << std::endl;
 			v2.resize(nVD);
 			for(int i=0 ; i<nVD ; i++)
 				v2[i] = -Dual2(cc.point[i], cc.point[spn::CndSub(i+1, nVD)]) + inner;
-			for(auto& p : v2)
-				std::cout << p << std::endl;
 
 			return std::move(v2);
 		}
@@ -684,7 +708,7 @@ namespace boom {
 		}
 		ConvexCore2 ConvexCore::splitTwo(const StLineCore& l) const {
 			int nV = point.size();
-			PointL pt0(nV+1), pt1(nV+1);		// 最初に最大容量確保しておき、後で縮める
+			PointL pt0(nV*2), pt1(nV*2);		// 最初に最大容量確保しておき、後で縮める
 			Vec2* pDst[2] = {&pt0[0], &pt1[0]};
 
 			constexpr float DOT_THRESHOLD = 1e-5f;
@@ -806,6 +830,10 @@ namespace boom {
 					}
 				}
 			}
+
+			// 念の為チェック
+			for(int i=0 ; i<nV ; i++)
+				assert(c.vCenter.distance(point[i]) <= c.fRadius);
 			return c;
 		}
 		std::tuple<bool,Vec2,Vec2> ConvexCore::checkCrossingLine(const StLineCore& l) const {

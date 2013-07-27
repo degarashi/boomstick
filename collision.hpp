@@ -333,9 +333,7 @@ namespace boom {
 				// A -> B
 				if(!_node[TYPE_B].empty()) {
 					auto itrB_b = _node[TYPE_B].begin(),
-							itrE_b = _node[TYPE_B].end(),
-							itrE_b1 = itrE_b;
-					--itrE_b1;
+							itrE_b = _node[TYPE_B].end();
 
 					int nA = _node[TYPE_A].size();
 					int iCur=0;
@@ -345,7 +343,7 @@ namespace boom {
 						for(auto itr2=itrB_b ; itr2!=itrE_b ; ++itr2,++jCur) {
 							const auto& nodeB = static_cast<CAST>(*itr2);
 							if(nchk(nodeA, nodeB)) {
-								cr(iCur, jCur, *itr, *itr2, nchk.getInfo());
+								cr(iCur, jCur+nA, *itr, *itr2, nchk.getInfo());
 								++count;
 							}
 						}

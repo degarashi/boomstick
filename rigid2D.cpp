@@ -526,28 +526,28 @@ namespace boom {
 			_broadC.rem(BroadC::TYPE_B, id);
 		}
 		void RigidMgr::simulate(float dt) {
-			_broadC.iterate([](ERig& er) {
-				// ヒットカウントを初期化
-				er.resetHitCount();
-			});
-
 			IItg* itg = _itg.get();
 			int nR = _broadC.getNumObj(),
 				nItr = itg->numOfIteration();
 			itg->beginIteration(nR);
 			for(int i=0 ; i<nItr ; i++) {
+				_broadC.iterate([](ERig& er) {
+					// ヒットカウントを初期化
+					er.resetHitCount();
+				});
 				// 当たり判定結果は一回分だけとっておけば良い
 				_checkCollision();
 				for(int j=0 ; j<BroadC::NUM_TYPE ; j++) {
 					auto typ = static_cast<BroadC::TYPE>(j);
 					itg->advance(i, _broadC.begin(typ), _broadC.end(typ), _cresult, dt);
 				}
+				_broadC.iterate([this](ERig& er) {
+					// 不要なエントリを削除
+					er.removeOld(_npPool);
+				});
 			}
 			itg->endIteration();
-
 			_broadC.iterate([this](ERig& er) {
-				// 不要なエントリを削除
-				er.removeOld(_npPool);
 				// 次回の為に1フレーム前の姿勢を保存
 				er.savePose();
 			});
@@ -559,13 +559,11 @@ namespace boom {
 				hR1 = er1_.hRig;
 			ERig *er0 = &er0_,
 				*er1 = &er1_;
-			float sign = 1.f;
 			// ハンドルのインデックス値が小さいほうがエントリを格納する
-			if(hR0.getIndex() < hR1.getIndex()) {
+			if(hR0.getIndex() > hR1.getIndex()) {
 				std::swap(hR0, hR1);
 				std::swap(er0, er1);
 				std::swap(id0, id1);
-				sign = -1.f;
 			}
 
 			Rigid &r0 = *hR0.ref(),
@@ -581,7 +579,7 @@ namespace boom {
 
 				epa = boost::in_place(tm0, tm1);
 				// 前回の姿勢で衝突していたら配置当初から衝突していた可能性が高い
-				if(epa->getResult()) {
+				if(epa->getResult() || epa->getNearestPair().first.distance(epa->getNearestPair().second) < 1e-6f) {
 					// オブジェクトの中心座標を元に再度トライ
 					CircleCore cc0 = r0.getBCircle(),
 								cc1 = r1.getBCircle();
@@ -594,7 +592,7 @@ namespace boom {
 						dir *= _sseRcp22Bit(dist);
 
 					constexpr float MARGIN = 1.05f;
-					tm0.setOfs(cc1.vCenter + dir * (cc0.fRadius + cc1.fRadius) * MARGIN * sign);
+					tm0.setOfs(cc1.vCenter + dir * (cc0.fRadius + cc1.fRadius) * MARGIN);
 					epa = boost::in_place(tm0, tm1);
 					assert(!epa->getResult());
 				}
@@ -602,8 +600,8 @@ namespace boom {
 				// 2回目以降の接触: 前回の法線の向きに物体を適当に離して最近傍対を求める
 				Pose2D ps0 = static_cast<const Pose2D&>(r0.getPose()),
 						ps1 = static_cast<const Pose2D&>(r1.getPose());
-				float dist = (r0.getBCircle().fRadius + r1.getBCircle().fRadius) * 0.05f;
-				Vec2 ofs = b0->dir * dist * sign;
+				float dist = (r0.getBCircle().fRadius + r1.getBCircle().fRadius) * 0.005f;
+				Vec2 ofs = b0->dir * dist;
 				for(;;) {
 					ps0.setOfs(ps0.getOffset() + ofs);
 					ps1.setOfs(ps1.getOffset() - ofs);
@@ -611,14 +609,14 @@ namespace boom {
 					TModelR<RPose>	tm0(*r0.getModel().cref(), ps0),
 									tm1(*r1.getModel().cref(), ps1);
 					epa = boost::in_place(tm0, tm1);
-					if(!epa->getResult())
+					if(!epa->getResult() && epa->getNearestPair().first.distance(epa->getNearestPair().second) > 1e-5f)
 						break;
 				}
 			}
 			const Vec2x2& npair = epa->getNearestPair();
 			// 中点からhR0方向に伸びる直線が接触平面
 			b0->pos = inner;
-			b0->dir = (npair.second - npair.first).normalization() * sign;
+			b0->dir = (npair.first - npair.second).normalization();
 
 			try {
 				StLineCore st(b0->pos, b0->dir);
@@ -648,11 +646,16 @@ namespace boom {
 			if(nRemove > 0) {
 				int n = nHitCur+nHitNew;
 				NPID id = hitID;
-				while(--n >= 0) {
-					NPair* np = &pool.get(id);
-					id = np->nextID;
+				if(n==0)
+					hitID = invalid;
+				else {
+					NPair* np;
+					while(--n >= 0) {
+						np = &pool.get(id);
+						id = np->nextID;
+					}
+					np->nextID = invalid;
 				}
-
 				// 末尾まで全部削除
 				NPID nid;
 				do {
@@ -664,7 +667,7 @@ namespace boom {
 		}
 		spn::WithBool<RigidMgr::NPair&> RigidMgr::ERig::addHit(HRig hR, NP_Pool& pool) {
 			NPID id = hitID;
-			while(hitID != invalid) {
+			while(id != invalid) {
 				NPair* np = &pool.get(id);
 				if(np->hAnother == hR) {
 					++np->nFrame;
@@ -679,6 +682,7 @@ namespace boom {
 						NPair* npTop = &pool.get(hitID);
 						npTop->prevID = id;
 						np->nextID = hitID;
+						np->prevID = invalid;
 						hitID = id;
 					}
 					return spn::make_wb(false, *np);
@@ -727,23 +731,23 @@ namespace boom {
 					void _advance(const Vec2& p) {
 						_doSwitch();
 						auto& cur = _current();
-						cur.height = _nml.dir.dot(p-_nml.pos);
+						cur.height = std::fabs(_nml.dir.dot(p-_nml.pos));
 
 						// 物体Bから見た物体Aの相対速度
 						Vec2 vel = _rp0.getVelocAt(p) - _rp1.getVelocAt(p);
-						cur.velN = std::min(_nml.dir.dot(vel), 0.f);
-						cur.velT = _div.dot(vel);
+						float dt = _nml.dir.dot(vel);
+						cur.velN = -std::min(dt, 0.f);
+						cur.velT = _div.dot(vel) > 0 ? 1 : -1;
 						// 物体Aの重心からの相対座標 (直線方向に対して)
-						float d = -_div.dot(p);
-						cur.pos[0] = d + _div.dot(_rp0.getOffset());
-						cur.pos[1] = d + _div.dot(_rp1.getOffset());
+						cur.pos[0] = _div.dot(p - _rp0.getOffset());
+						cur.pos[1] = _div.dot(p - _rp1.getOffset());
 						cur.forceN = 0;
 					}
 					void _doSwitch() { _swI ^= 1; }
 					TmpIn& _current() { return _tmp[_swI]; }
 					TmpIn& _prev() { return _tmp[_swI^1]; }
 
-					void _calcForce(const ConvexCore& c, float sign0) {
+					void _calcForce(const ConvexCore& c, float sign0, float hosei) {
 						const auto& pts = c.point;
 						int nV = pts.size();
 						if(nV < 3)
@@ -761,32 +765,31 @@ namespace boom {
 							_advance(pts[idx]);
 							auto& cur = _current();
 							auto& pre = _prev();
-							if(std::fabs(cur.height) + std::fabs(pre.height) < 1e-4f)
-								continue;
 							float area = (cur.pos[0] - pre.pos[0]) * sign0;		// 線分の距離(面積) マイナスの場合も有り得る
+							float d_area = std::fabs(cur.pos[0] - pre.pos[0]) * hosei;
 							// ---- calc spring ----
 							// forceN(spring) = average(h0,h1) * area * spring_coeff
 							cur.forceN = (pre.height + cur.height) * 0.5f * area * _coeff.spring;
 							// torqueN(spring) = 1/3 * (p1h1 + (p1h2)/2 + (h1p2)/2 + p2h2) * area * spring_coeff
 							for(int j=0 ; j<2 ; j++)
-								p_tor[j] += (1.f/3) * (pre.pos[j]*pre.height + (pre.pos[j]*cur.height + cur.pos[j]*pre.height)*0.5f + cur.pos[j]*cur.height) * area * _coeff.spring;
+								p_tor[j] -= (1.f/3) * (pre.pos[j]*pre.height + (pre.pos[j]*cur.height + cur.pos[j]*pre.height)*0.5f + cur.pos[j]*cur.height) * area * _coeff.spring;
 
 							// ---- calc dumper ----
-							// forceN(dumper) = average(vn0, vn1) * area * dump_coeff
-							cur.forceN += (pre.velN + cur.velN) * 0.5f * area * _coeff.dumper;
+							// forceN(dumper) = average(vn0, vn1) * d_area * dump_coeff
+							cur.forceN += (pre.velN + cur.velN) * 0.5f * d_area * _coeff.dumper;
 							p_lin += cur.forceN;
 							// torqueN(dumper) = 1/3 * (p1vn1 + p1vn2/2 + p2vn1/2 + p2vn2) * area * dump_coeff
 							for(int j=0 ; j<2 ; j++)
-								p_tor[j] += (1.f/3) * (pre.pos[j]*pre.velN + (pre.pos[j]*cur.velN + cur.pos[j]*pre.velN)*0.5f + cur.pos[j]*cur.velN) * area * _coeff.dumper;
+								p_tor[j] -= (1.f/3) * (pre.pos[j]*pre.velN + (pre.pos[j]*cur.velN + cur.pos[j]*pre.velN)*0.5f + cur.pos[j]*cur.velN) * d_area * _coeff.dumper;
 
 							// ---- calc dynamic-friction ----
-							// forceN(fricD) = average(fd0, fd1) * area * fricD_coeff
+							// forceN(fricD) = average(fd0, fd1) * d_area * fricD_coeff
 							float fd[2] = {pre.velT * pre.forceN,
 											cur.velT * cur.forceN};
 							p_fdLin += (fd[0] + fd[1]) * 0.5f * _coeff.fricD;
 							// torqueN(fricD)
 							for(int j=0 ; j<2 ; j++)
-								p_fdTor[j] += (1.f/3) * (pre.pos[j]*fd[0] + (pre.pos[j]*fd[1] + cur.pos[j]*fd[0])*0.5f + cur.pos[j]*fd[1]) * area * _coeff.fricD;
+								p_fdTor[j] -= (1.f/3) * (pre.pos[j]*fd[0] + (pre.pos[j]*fd[1] + cur.pos[j]*fd[0])*0.5f + cur.pos[j]*fd[1]) * d_area * _coeff.fricD * sign0;
 							// TODO: calc static-friction
 						}
 						constexpr float sign[2] = {1,-1};
@@ -794,9 +797,9 @@ namespace boom {
 							auto& fc = _force(i);
 
 							fc.sdump.linear += _nml.dir * p_lin * sign[i];
-							fc.sdump.torque +=  p_tor[i] * sign[i];
+							fc.sdump.torque +=  p_tor[i];
 							fc.fricD.linear += _div * p_fdLin * sign[i];
-							fc.fricD.torque += p_fdTor[i] * sign[i];
+							fc.fricD.torque += p_fdTor[i];
 						}
 					}
 
@@ -804,17 +807,14 @@ namespace boom {
 					Tmp(const RPose &r0, const RPose &r1, const ConvexCore& cv, const StLineCore& nml, const RCoeff &coeff): _swI(0), _rp0(r0), _rp1(r1), _coeff(coeff), _nml(nml) {
 						// 衝突ライン(2D)の法線
 						_div = nml.dir * cs_mRot90[0];
+						if(_div.x < 0)
+							_div = -_div;
 
 						// 直線(断面)で2つに切ってそれぞれ計算
 						auto cvt = cv.splitTwo(StLineCore{nml.pos, _div});
-						std::cout << "1:";
-						cvt.first.dbgPrint(std::cout);
-						std::cout << std::endl << "2:";
-						cvt.second.dbgPrint(std::cout);
-						std::cout << std::endl;
-
-						_calcForce(cvt.first, 1.f);
-						_calcForce(cvt.second, -1.f);
+						float c = (cvt.first.point.size() >= 3 && cvt.second.point.size() >=3) ? 0.5f : 1.0f;
+						_calcForce(cvt.first, 1.f, c);
+						_calcForce(cvt.second, -1.f, c);
 					}
 					const DualRForce& getForce() const { return _force; }
 			};
@@ -834,7 +834,7 @@ namespace boom {
 			DualRForce CalcOV_Convex2(const Rigid& r0, const Rigid& r1, const Vec2& inner, const RCoeff& coeff, const StLineCore& div) {
 				// 領域算出
 				Convex cnv = Convex::GetOverlappingConvex(r0, r1, inner);
-				std::cout << "OverlappingConvex:" << std::endl << cnv << std::endl;
+				cnv.adjustLoop();
 				if(cnv.point.empty())
 					return DualRForce();
 				return CalcRF_Convex(r0, r1, coeff, cnv, div);
