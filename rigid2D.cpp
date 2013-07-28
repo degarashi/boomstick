@@ -717,6 +717,7 @@ namespace boom {
 						float height;		// 深度
 						float velN, velT;	// 衝突断面の相対速度の垂直、水平成分
 						float pos[2];		// 直線に射影した2D頂点は1次元の数値になる
+						Vec2	posv[2];
 						float forceN;		// 点に働く抗力
 					};
 
@@ -726,7 +727,7 @@ namespace boom {
 					const RPose			&_rp0,
 										&_rp1;
 					const RCoeff		&_coeff;
-					const StLineCore	&_nml;
+					StLineCore			_nml;
 					Vec2				_div;
 					DualRForce			_force = {};
 
@@ -739,17 +740,19 @@ namespace boom {
 						Vec2 vel = _rp0.getVelocAt(p) - _rp1.getVelocAt(p);
 						float dt = _nml.dir.dot(vel);
 						cur.velN = -std::min(dt, 0.f);
-						cur.velT = _div.dot(vel);
+						cur.velT = _div.dot(vel.normalization());
 						// 物体Aの重心からの相対座標 (直線方向に対して)
 						cur.pos[0] = _div.dot(p - _rp0.getOffset());
 						cur.pos[1] = _div.dot(p - _rp1.getOffset());
+						cur.posv[0] = p;
+						cur.posv[1] = p;
 						cur.forceN = 0;
 					}
 					void _doSwitch() { _swI ^= 1; }
 					TmpIn& _current() { return _tmp[_swI]; }
 					TmpIn& _prev() { return _tmp[_swI^1]; }
 
-					void _calcForce(const ConvexCore& c, float sign0, float hosei) {
+					void _calcForce(const ConvexCore& c, float sign0) {
 						const auto& pts = c.point;
 						int nV = pts.size();
 						if(nV < 3)
@@ -768,30 +771,36 @@ namespace boom {
 							auto& cur = _current();
 							auto& pre = _prev();
 							float area = (cur.pos[0] - pre.pos[0]) * sign0;		// 線分の距離(面積) マイナスの場合も有り得る
-							float d_area = std::fabs(cur.pos[0] - pre.pos[0]) * hosei;
+							float d_area = std::fabs(cur.pos[0] - pre.pos[0]);
 							// ---- calc spring ----
 							// forceN(spring) = average(h0,h1) * area * spring_coeff
-							cur.forceN = (pre.height + cur.height) * 0.5f * area * _coeff.spring;
+							cur.forceN = (pre.height + cur.height) * 0.5f * area;
+							p_lin +=  cur.forceN * _coeff.spring;
 							// torqueN(spring) = 1/3 * (p1h1 + (p1h2)/2 + (h1p2)/2 + p2h2) * area * spring_coeff
 							for(int j=0 ; j<2 ; j++)
 								p_tor[j] -= (1.f/3) * (pre.pos[j]*pre.height + (pre.pos[j]*cur.height + cur.pos[j]*pre.height)*0.5f + cur.pos[j]*cur.height) * area * _coeff.spring;
 
 							// ---- calc dumper ----
 							// forceN(dumper) = average(vn0, vn1) * d_area * dump_coeff
-							cur.forceN += (pre.velN + cur.velN) * 0.5f * d_area * _coeff.dumper;
-							p_lin += cur.forceN;
+							float tmp = (pre.velN + cur.velN) * 0.5f * d_area;
+							cur.forceN += tmp * _coeff.dumper;
+							p_lin += tmp * _coeff.dumper;
 							// torqueN(dumper) = 1/3 * (p1vn1 + p1vn2/2 + p2vn1/2 + p2vn2) * area * dump_coeff
+							const RPose* rpp[2] = {&_rp0, &_rp1};
 							for(int j=0 ; j<2 ; j++)
 								p_tor[j] -= (1.f/3) * (pre.pos[j]*pre.velN + (pre.pos[j]*cur.velN + cur.pos[j]*pre.velN)*0.5f + cur.pos[j]*cur.velN) * d_area * _coeff.dumper;
 
 							// ---- calc dynamic-friction ----
 							// forceN(fricD) = average(fd0, fd1) * d_area * fricD_coeff
-							float fd[2] = {pre.velT * pre.forceN,
+							float fd[2] = {pre.velT * cur.forceN,
 											cur.velT * cur.forceN};
 							p_fdLin += (fd[0] + fd[1]) * 0.5f * _coeff.fricD;
 							// torqueN(fricD)
-							for(int j=0 ; j<2 ; j++)
-								p_fdTor[j] -= (1.f/3) * (pre.pos[j]*fd[0] + (pre.pos[j]*fd[1] + cur.pos[j]*fd[0])*0.5f + cur.pos[j]*fd[1]) * d_area * _coeff.fricD * sign0;
+							for(int j=0 ; j<2 ; j++) {
+								float dr[2] = {_nml.dir.cw(rpp[j]->getOffset() - pre.posv[j]) > 0 ? 1.f : -1.f,
+												_nml.dir.cw(rpp[j]->getOffset() - cur.posv[j]) > 0 ? 1.f : -1.f};
+								p_fdTor[j] += (1.f/3) * (pre.pos[j]*fd[0]*dr[0] + (pre.pos[j]*fd[1]*dr[1] + cur.pos[j]*fd[0]*dr[0])*0.5f + cur.pos[j]*fd[1]*dr[1]) * d_area * _coeff.fricD * sign0;
+							}
 							// TODO: calc static-friction
 						}
 						constexpr float sign[2] = {1,-1};
@@ -799,9 +808,9 @@ namespace boom {
 							auto& fc = _force(i);
 
 							fc.sdump.linear += _nml.dir * p_lin * sign[i];
-							fc.sdump.torque +=  p_tor[i];
+							fc.sdump.torque +=  p_tor[i] * sign[i];
 							fc.fricD.linear += _div * p_fdLin * sign[i];
-							fc.fricD.torque += p_fdTor[i];
+							fc.fricD.torque += p_fdTor[i] * 0.1f;
 						}
 					}
 
@@ -809,14 +818,8 @@ namespace boom {
 					Tmp(const RPose &r0, const RPose &r1, const ConvexCore& cv, const StLineCore& nml, const RCoeff &coeff): _swI(0), _rp0(r0), _rp1(r1), _coeff(coeff), _nml(nml) {
 						// 衝突ライン(2D)の法線
 						_div = nml.dir * cs_mRot90[0];
-						if(_div.x < 0)
-							_div = -_div;
-
-						// 直線(断面)で2つに切ってそれぞれ計算
-						auto cvt = cv.splitTwo(StLineCore{nml.pos, _div});
-						float c = (cvt.first.point.size() >= 3 && cvt.second.point.size() >=3) ? 0.5f : 1.0f;
-						_calcForce(cvt.first, 1.f, c);
-						_calcForce(cvt.second, -1.f, c);
+						_nml.pos += _nml.dir * -10;
+						_calcForce(cv, 1.f);
 					}
 					const DualRForce& getForce() const { return _force; }
 			};
