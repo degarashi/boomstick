@@ -332,14 +332,14 @@ namespace boom {
 					auto st = r.refPose().refValue();
 					// 現フレームの加速度
 					auto acc = r.resist(i, cr);
-					st.acc += acc.linear / r.getArea(false);
-					st.rotAcc += acc.torque / r.getInertia(false);
-					// 次のフレームの位置
-					st.ofs += st.vel * dt;
-					st.ang += st.rotVel * dt;
+					st.acc += acc.linear * dt / r.getArea(false);
+					st.rotAcc += acc.torque * dt / r.getInertia(false);
 					// 次のフレームの速度
 					st.vel += st.acc * dt;
 					st.rotVel += st.rotAcc * dt;
+					// 次のフレームの位置
+					st.ofs += st.vel * dt;
+					st.ang += st.rotVel * dt;
 				}
 			}
 			// -------------------------- ImpEular --------------------------
@@ -411,7 +411,7 @@ namespace boom {
 				float dt2 = dt/2,
 						dt6 = dt/6;
 				int cur = offset,
-					nR = itrE-itr;
+					nR = _tvalue.size()/4;
 				auto *tv0 = &_tvalue[0],
 					*tv1 = &_tvalue[nR],
 					*tv2 = &_tvalue[2*nR],
@@ -425,13 +425,13 @@ namespace boom {
 							auto& ps = tv0[cur];
 
 							ps = dat;
+							dat.ofs += dat.vel * dt2;
+							dat.vel += dat.acc * dt2;
+							dat.ang += dat.rotVel * dt2;
+							dat.rotVel += dat.rotAcc * dt2;
 							auto acc = r.resist(cur, cr);		// 処理前の加速度
 							ps.acc = acc.linear / r.getArea(false);
 							ps.rotAcc = acc.torque / r.getInertia(false);
-							dat.ofs += dat.vel * dt2;
-							dat.vel += ps.acc * dt2;
-							dat.ang += dat.rotVel * dt2;
-							dat.rotVel += ps.rotAcc * dt2;
 
 							++itr;
 							++cur;
