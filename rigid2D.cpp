@@ -300,6 +300,9 @@ namespace boom {
 		// -------------------------- IResist --------------------------
 		namespace resist {
 			Gravity::Gravity(const Vec2& v): _grav(v) {}
+			void Gravity::setGravity(const Vec2& v) {
+				_grav = v;
+			}
 			void Gravity::resist(RForce::F& acc, const Rigid& r, int /*index*/, const CResult& /*cr*/) const {
 				float inv_area = _sseRcp22Bit(r.getModel().cref()->getArea(false));
 				acc.linear += _grav * _sseRcp22Bit(inv_area);
@@ -317,6 +320,10 @@ namespace boom {
 			}
 
 			Air::Air(float cLinear, float cRot): _cLinear(cLinear), _cRot(cRot) {}
+			void Air::setAir(float cLinear, float cRot) {
+				_cLinear = cLinear;
+				_cRot = cRot;
+			}
 			void Air::resist(RForce::F& acc, const Rigid& r, int index, const CResult& cr) const {
 				const RPose& ps = r.getPose();
 				acc.linear -= ps.getVelocity() * _cLinear;

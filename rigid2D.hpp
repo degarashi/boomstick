@@ -198,17 +198,21 @@ namespace boom {
 			};
 			//! 重力による加速度
 			class Gravity : public IResist {
-				Vec2	_grav;
+				Vec2	_grav = Vec2(0,0);
 				public:
+					Gravity() = default;
 					Gravity(const Vec2& v);
+					void setGravity(const Vec2& v);
 					void resist(RForce::F& acc, const Rigid& r, int index, const CResult& cr) const override;
 			};
 			//! 空気抵抗
 			/*! 速度に比例した抵抗を掛ける */
 			class Air : public IResist {
-				float	_cLinear, _cRot;
+				float	_cLinear=0, _cRot=0;
 				public:
+					Air() = default;
 					Air(float cLinear, float cRot);
+					void setAir(float cLinear, float cRot);
 					void resist(RForce::F& acc, const Rigid& r, int index, const CResult& cr) const override;
 			};
 		}
