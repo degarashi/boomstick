@@ -1,10 +1,14 @@
+#pragma once
 /*! 2D, 3Dを問わないコリジョンに関する定義 */
 #include <vector>
 #include <algorithm>
 #include <cassert>
+#define BOOST_PP_VARIADICS 1
+#include <cstring>
 #include <boost/optional.hpp>
 #include "spinner/layerbit.hpp"
 #include "spinner/noseq.hpp"
+#include "spinner/spn_math.hpp"
 
 namespace boom {
 	namespace c_ent {
