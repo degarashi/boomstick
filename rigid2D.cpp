@@ -507,7 +507,10 @@ namespace boom {
 		}
 
 		// -------------------------- RigidMgr --------------------------
-		RigidMgr::RigidMgr(IItg::csptr itg, const RCoeff& coeff): _itg(itg), _coeff(coeff) {}
+		RigidMgr::RigidMgr(IItg::csptr itg): _itg(itg) {}
+		void RigidMgr::setCoeff(const RCoeff& c) {
+			_coeff = c;
+		}
 		void RigidMgr::_checkCollision() {
 			_cresult.clear();
 			_cresult.setNumObjects(_broadC.getNumObj());

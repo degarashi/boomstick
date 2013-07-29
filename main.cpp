@@ -34,7 +34,8 @@ void TestRigid() {
 	std::unique_ptr<RigidRes> rmgr(new RigidRes);
 
 	boom::RCoeff rc = {1,1,1,1,1};
-	RigidMgr rm(IItg::sptr(new itg::Eular), rc);
+	RigidMgr rm(IItg::sptr(new itg::Eular));
+	rm.setCoeff(rc);
 	// 頂点を定義して、重心を求めそこを中心にして座標を変換
 	constexpr float fc0 = 0.4f,
 					fc1 = 2.0f;

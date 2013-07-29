@@ -106,14 +106,15 @@ namespace boom {
 			SPItg			_itg;		//!< 適用する積分アルゴリズム
 			void _checkCollision();		//! コリジョンチェックして内部変数に格納
 			// NOTE: ひとまずは反発係数固定での実装
-			RCoeff			_coeff;		//!< 力積計算に使う係数
-			CResult			_cresult;	//!< 力積をRigidから参照する為のクラス
+			RCoeff			_coeff = {};	//!< 力積計算に使う係数
+			CResult			_cresult;		//!< 力積をRigidから参照する為のクラス
 
 			public:
 				using iterator = typename BroadC::iterator;
 				using id_type = typename BroadC::id_type;
 
-				RigidMgr(const SPItg& itg, const RCoeff& coeff);
+				RigidMgr(const SPItg& itg);
+				void setCoeff(const RCoeff& coeff);
 				void simulate(float dt);
 				//! broad/narrow phase collisionに通った物体のペアを受け取る関数。Inner-pointを受け取り力積計算をする
 				/*!	BroadCが渡すオブジェクトに適合していればIModelだろうがなんだろうがOK
