@@ -676,8 +676,6 @@ namespace boom {
 			}
 			tmpB.index = spn::CndSub(tmpB.index, nV);
 			float d = (point[tmpB.index] - point[tmpA.index]).cw(pos - point[tmpA.index]);
-			auto pA = point[tmpA.index],
-					pB = point[tmpB.index];
 			IModel::POSITION posf;
 			if(d > 1e-6f)
 				posf = IModel::POSITION::INNER;

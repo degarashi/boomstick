@@ -59,11 +59,11 @@ namespace boom {
 			template <class TAG>
 			using flag_type = typename SelectType<CT::template Has<TAG>::result, FlagTrue, FlagFalse>::type;
 			template <class TAG>
-			using TypeD = decltype(TAG().get(Wrapper<CORE>()));
+			struct TypeD { using type = decltype(std::declval<TAG>().get(Wrapper<CORE>())); };
 			template <class TAG>
-			using TypeC = const decltype(TAG()())&;
+			struct TypeC { using type = const decltype(std::declval<TAG>()())&; };
 			template <class TAG>
-			using Detect = typename spn::SelectTypeT<CT::template Has<TAG>::result, TypeC, TypeD>::template type<TAG>;
+			using Detect = typename spn::SelectTypeT<CT::template Has<TAG>::result, TypeC, TypeD>::template type<TAG>::type;
 
 			const CORE& getCore() const { return _core; }
 			template <class TAG>
@@ -78,14 +78,14 @@ namespace boom {
 
 			// キャッシュ有効
 			template <class TAG>
-			TypeC<TAG> _getCache(FlagTrue) const {
+			typename TypeC<TAG>::type _getCache(FlagTrue) const {
 				if(_rflag & TV<TAG>::FLAG)
 					_core.getInfo(*this, TAG());
 				return std::get<TV<TAG>::POS>(_data);
 			}
 			// キャッシュ無効
 			template <class TAG>
-			TypeD<TAG> _getCache(FlagFalse) const {
+			typename TypeD<TAG>::type _getCache(FlagFalse) const {
 				return TAG().get(_core) * getCacheRatio<TAG>();
 			}
 			template <class TAG>

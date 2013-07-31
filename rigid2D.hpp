@@ -106,8 +106,8 @@ namespace boom {
 			SPItg			_itg;		//!< 適用する積分アルゴリズム
 			void _checkCollision();		//! コリジョンチェックして内部変数に格納
 			// NOTE: ひとまずは反発係数固定での実装
-			RCoeff			_coeff = {};	//!< 力積計算に使う係数
-			CResult			_cresult;		//!< 力積をRigidから参照する為のクラス
+			RCoeff			_coeff = {0,0,0,0,0};	//!< 力積計算に使う係数
+			CResult			_cresult;				//!< 力積をRigidから参照する為のクラス
 
 			public:
 				using iterator = typename BroadC::iterator;

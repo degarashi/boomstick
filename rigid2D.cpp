@@ -165,8 +165,8 @@ namespace boom {
 
 			retR._vel = _vel.l_intp(p1._vel, t);
 			retR._acc = _acc.l_intp(p1._acc, t);
-			retR._rotVel = spn::Lerp(_rotVel, p1._rotVel, t);
-			retR._rotAcc = spn::Lerp(_rotAcc, p1._rotAcc, t);
+			retR._rotVel = spn::Lerp(*_rotVel, *p1._rotVel, t);
+			retR._rotAcc = spn::Lerp(*_rotAcc, *p1._rotAcc, t);
 			return retR;
 		}
 		RPose::Value RPose::refValue() {
