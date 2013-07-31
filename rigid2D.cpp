@@ -113,6 +113,10 @@ namespace boom {
 			_rotVel = m;
 			++_velAccum;
 		}
+		void RPose::setAccel(const Vec2& a) {
+			_acc = a;
+			++_velAccum;
+		}
 		void RPose::setRotAccel(float a) {
 			_rotAcc = a;
 			++_velAccum;
