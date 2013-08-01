@@ -665,7 +665,7 @@ namespace boom {
 		class GEpa : public GSimplex {
 			constexpr static int MAX_VERT = 0x100;
 			using VPool = boost::object_pool<Vec2x2>;
-			static thread_local VPool tls_vPool;
+			static VPool tls_vPool;
 			using VList = std::array<Vec2x2*, MAX_VERT>;
 
 			VList	_vl;
