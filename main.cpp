@@ -39,16 +39,16 @@ void TestRigid() {
 	// 頂点を定義して、重心を求めそこを中心にして座標を変換
 	constexpr float fc0 = 0.4f,
 					fc1 = 2.0f;
-	ConvexModel *c0 = ConvexModel::New({Vec2(0,0), Vec2(0,fc0), Vec2(fc0,fc0), Vec2(fc0,0)}),
-				*c1 = ConvexModel::New({Vec2(-fc1,0), Vec2(fc1,0), Vec2(fc1,-fc1), Vec2(-fc1,-fc1)});
+	auto	c0 = ConvexModel::NewUF({Vec2(0,0), Vec2(0,fc0), Vec2(fc0,fc0), Vec2(fc0,0)}),
+			c1 = ConvexModel::NewUF({Vec2(-fc1,0), Vec2(fc1,0), Vec2(fc1,-fc1), Vec2(-fc1,-fc1)});
 	AVec2 ofs0 = c0->getCenter(),
 		ofs1 = c1->getCenter();
 	c0->addOffset(-ofs0);
 	c1->addOffset(-ofs1);
-	HLMdl lhC0 = mgr_rigid.acquireModel(c0),
-			lhC1 = mgr_rigid.acquireModel(c1);
-	HLRig lhR[2] = {mgr_rigid.acquireRigid(Rigid::New(lhC0)),
-					mgr_rigid.acquireRigid(Rigid::New(lhC1))};
+	HLMdl lhC0 = mgr_rigid.acquireModel(std::move(c0)),
+			lhC1 = mgr_rigid.acquireModel(std::move(c1));
+	HLRig lhR[2] = {mgr_rigid.acquireRigid(Rigid::NewUF(lhC0)),
+					mgr_rigid.acquireRigid(Rigid::NewUF(lhC1))};
 	RPose* pp[2] = {&lhR[0].ref()->refPose(),
 					&lhR[1].ref()->refPose()};
 	pp[0]->setOfs(ofs0);

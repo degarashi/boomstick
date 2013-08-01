@@ -132,9 +132,10 @@ namespace boom {
 			virtual std::ostream& dbgPrint(std::ostream& /*os*/) const { INVOKE_ERROR }
 			friend std::ostream& operator << (std::ostream& os, const IModel& mdl);
 		};
+		using UPModel = std::unique_ptr<IModel, void (*)(void*)>;
 		#define mgr_model	ModelMgr::_ref()
-		class ModelMgr : public spn::ResMgrA<std::unique_ptr<IModel>, ModelMgr> {};
-		DEF_HANDLE(ModelMgr, Mdl, std::unique_ptr<IModel>)
+		class ModelMgr : public spn::ResMgrA<UPModel, ModelMgr> {};
+		DEF_HANDLE(ModelMgr, Mdl, UPModel)
 
 		template <class T>
 		struct IModelP : IModel {
@@ -499,6 +500,8 @@ namespace boom {
 				CPos checkPosition(const Vec2& pos) const override;
 				Convex2 splitTwo(const StLineCore& line) const override;
 				std::ostream& dbgPrint(std::ostream& os) const override;
+
+				using CheckAlign::NewUF;
 		};
 
 		//! 剛体制御用

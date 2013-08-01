@@ -42,24 +42,27 @@ namespace boom {
 				RPose& refPose();
 				const RPose& getPose() const;
 
-				using CheckAlign<16,Rigid>::New;
+				using CheckAlign<16,Rigid>::NewUF;
 				void addR(const SPResist& sp);
 				//! 抵抗力を計算
 				/*! \param[in] index 通し番号 */
 				RForce::F resist(int index, const CResult& cr) const;
 		};
+		using UPRigid = decltype(Rigid::NewUF());
+
 		#define mgr_rigid reinterpret_cast<RigidRes&>(ModelMgr::_ref())
 		class RigidRes : public ModelMgr {
 			public:
-				LHdl acquireModel(IModel* mdl) {
-					return acquire(std::unique_ptr<IModel>(mdl));
+				// unique_ptrなのでポインタのコピーは不可。常にmoveで指定
+				LHdl acquireModel(UPModel&& mdl) {
+					return acquire(std::move(mdl));
 				}
-				AnotherLHandle<std::unique_ptr<Rigid>> acquireRigid(Rigid* pRigid) {
-					LHdl lh = acquire(std::unique_ptr<IModel>(pRigid));
-					return Cast<std::unique_ptr<Rigid>>(std::move(lh));
+				AnotherLHandle<UPRigid> acquireRigid(UPRigid&& rig) {
+					LHdl lh = acquire(std::move(rig));
+					return Cast<UPRigid>(std::move(lh));
 				}
 		};
-		DEF_HANDLE(RigidRes, Rig, std::unique_ptr<Rigid>)
+		DEF_HANDLE(RigidRes, Rig, UPRigid)
 
 		struct IItg;
 		//! 剛体マネージャ
