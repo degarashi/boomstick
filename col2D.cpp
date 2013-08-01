@@ -167,7 +167,7 @@ namespace boom {
 		GEpa::~GEpa() {
 			_clear();
 		}
-		GEpa::VPool thread_local GEpa::tls_vPool(GEpa::MAX_VERT);
+		GEpa::VPool GEpa::tls_vPool(GEpa::MAX_VERT);
 
 		Vec2x2* GEpa::_allocVert(int n) {
 			Vec2x2* p = tls_vPool.malloc();
