@@ -564,6 +564,12 @@ namespace boom {
 		void RigidMgr::remB(id_type id) {
 			_broadC.rem(BroadC::TYPE_B, id);
 		}
+		typename RigidMgr::BroadC::const_iterator RigidMgr::cbeginA() const {
+			return _broadC.cbegin(BroadC::TYPE_A);
+		}
+		typename RigidMgr::BroadC::const_iterator RigidMgr::cendA() const {
+			return _broadC.cend(BroadC::TYPE_A);
+		}
 		void RigidMgr::simulate(float dt) {
 			IItg* itg = _itg.get();
 			int nR = _broadC.getNumObj(),

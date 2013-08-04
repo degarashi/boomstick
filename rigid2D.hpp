@@ -136,6 +136,8 @@ namespace boom {
 				id_type addB(HRig hRig);
 				void remA(id_type id);
 				void remB(id_type id);
+				typename BroadC::const_iterator cbeginA() const;
+				typename BroadC::const_iterator cendA() const;
 		};
 
 		//! 位置と速度を与えた時にかかる加速度(抵抗力)を計算
