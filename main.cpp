@@ -60,9 +60,14 @@ void TestRigid() {
 	auto spCol = IResist::sptr(new resist::Impact);
 	for(int i=0 ; i<2 ; i++) {
 		rm.addA(lhR[i].get());
-		lhR[i].ref()->addR(spGrav);
-		lhR[i].ref()->addR(spCol);
+		auto& r = *lhR[i].ref();
+		r.addR(spGrav, 0xdead);
+		r.addR(spGrav);
+		r.addR(spCol);
+		r.remR(0xdead);
+		r.remR(Rigid::DEFAULT_ID);
 	}
+
 	for(int i=0 ; i<10 ; i++)
 		rm.simulate(0.01f);
 }

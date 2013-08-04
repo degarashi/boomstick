@@ -34,8 +34,10 @@ namespace boom {
 				constexpr static int NUM_RESIST = 4;
 				using SPResist = std::shared_ptr<IResist>;
 			private:
-				SPResist		_resist[NUM_RESIST];	//!< 抵抗計算用
+				SPResist	_resist[NUM_RESIST];	//!< 抵抗計算用
+				uint32_t	_rID[NUM_RESIST];
 			public:
+				constexpr static uint32_t DEFAULT_ID = ~0;
 				using TModelH<RPose>::TModelH;
 
 				// --- シミュレーションに関する関数など ---
@@ -43,7 +45,9 @@ namespace boom {
 				const RPose& getPose() const;
 
 				using CheckAlign<16,Rigid>::NewUF;
-				void addR(const SPResist& sp);
+				void addR(const SPResist& sp, uint32_t id=DEFAULT_ID);
+				void remR(uint32_t id);
+				void remRAll();
 				//! 抵抗力を計算
 				/*! \param[in] index 通し番号 */
 				RForce::F resist(int index, const CResult& cr) const;

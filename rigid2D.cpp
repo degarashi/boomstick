@@ -282,15 +282,35 @@ namespace boom {
 		RPose& Rigid::refPose() { return *this; }
 		const RPose& Rigid::getPose() const { return *this; }
 
-		void Rigid::addR(const SPResist& sp) {
-			for(int i=0 ; i<4 ; i++) {
+		void Rigid::addR(const SPResist& sp, uint32_t id) {
+			for(int i=0 ; i<NUM_RESIST ; i++) {
 				if(!_resist[i]) {
 					_resist[i] = sp;
+					_rID[i] = id;
 					return;
 				}
 			}
 			assert(false);
 		}
+		void Rigid::remR(uint32_t id) {
+			for(int i=0 ; i<NUM_RESIST ; i++) {
+				if(!_resist[i])
+					break;
+				if(_rID[i] == id) {
+					_resist[i] = nullptr;
+					for(int j=i ; j<NUM_RESIST-1 ; j++) {
+						_resist[j] = std::move(_resist[j+1]);
+						_rID[j] = _rID[j+1];
+					}
+					--i;
+				}
+			}
+		}
+		void Rigid::remRAll() {
+			for(auto& sp : _resist)
+				sp = nullptr;
+		}
+
 		RForce::F Rigid::resist(int index, const CResult& cr) const {
 			RForce::F res = {};
 			for(auto& sp : _resist) {
