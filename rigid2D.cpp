@@ -681,6 +681,9 @@ namespace boom {
 		RigidMgr::ERig::operator Rigid& () {
 			return *hRig.ref().get();
 		}
+		RigidMgr::ERig::operator HRig() const {
+			return hRig;
+		}
 		void RigidMgr::ERig::resetHitCount() {
 			nHitPrev = nHitCur;
 			nHitCur = nHitNew = 0;
