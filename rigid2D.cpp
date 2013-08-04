@@ -300,6 +300,31 @@ namespace boom {
 			}
 			return res;
 		}
+		void Rigid::applyForce(const RForce::F& f) {
+			RPose& rp = refPose();
+			rp.setAccel(rp.getAccel() + f.linear * _sseRcp22Bit(getArea()));
+			rp.setRotAccel(rp.getRotAccel() + f.torque * _sseRcp22Bit(getInertia()));
+		}
+		void Rigid::addForce(const Vec2& wpos, const Vec2& f) {
+			applyForce(CalcForce(getPose(), wpos, f));
+		}
+		void Rigid::addLinearForce(const Vec2& f) {
+			RPose& rp = refPose();
+			rp.setAccel(rp.getAccel() + f * _sseRcp22Bit(getArea()));
+		}
+		RForce::F Rigid::CalcForce(const RPose& rp, const Vec2& wpos, const Vec2& f) {
+			RForce::F ret;
+			// linear
+			ret.linear = f;
+
+			Vec2 tpos = rp.getOffset() - wpos;
+			float l = tpos.len_sq();
+			if(l > 1e-8f) {
+				// torque
+				ret.torque = f.cw(tpos);
+			}
+			return ret;
+		}
 
 		// -------------------------- IResist --------------------------
 		namespace resist {

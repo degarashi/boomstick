@@ -47,6 +47,11 @@ namespace boom {
 				//! 抵抗力を計算
 				/*! \param[in] index 通し番号 */
 				RForce::F resist(int index, const CResult& cr) const;
+				//! 質点に対して力を加える
+				void addForce(const Vec2& wpos, const Vec2& f);
+				void addLinearForce(const Vec2& f);
+				void applyForce(const RForce::F& f);
+				static RForce::F CalcForce(const RPose& rp, const Vec2& wpos, const Vec2& f);
 		};
 		using UPRigid = decltype(Rigid::NewUF());
 
@@ -216,6 +221,15 @@ namespace boom {
 					Air() = default;
 					Air(float cLinear, float cRot);
 					void setAir(float cLinear, float cRot);
+					void resist(RForce::F& acc, const Rigid& r, int index, const CResult& cr) const override;
+			};
+			//! 点ジョイント
+			class Point : public IResist {
+				Vec2	_pos;
+				public:
+					Point() = default;
+					Point(const Vec2& v);
+					void setPos();
 					void resist(RForce::F& acc, const Rigid& r, int index, const CResult& cr) const override;
 			};
 		}
