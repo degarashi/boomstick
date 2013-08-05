@@ -292,6 +292,16 @@ namespace boom {
 			}
 			assert(false);
 		}
+		namespace {
+			Rigid::SPResist g_invalidSP;
+		}
+		const Rigid::SPResist& Rigid::getR(uint32_t id) {
+			for(int i=0 ; i<NUM_RESIST ; i++) {
+				if(_resist[i] && _rID[i] == id)
+					return _resist[i];
+			}
+			return g_invalidSP;
+		}
 		void Rigid::remR(uint32_t id) {
 			for(int i=0 ; i<NUM_RESIST ; i++) {
 				if(!_resist[i])

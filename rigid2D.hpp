@@ -46,6 +46,8 @@ namespace boom {
 
 				using CheckAlign<16,Rigid>::NewUF;
 				void addR(const SPResist& sp, uint32_t id=DEFAULT_ID);
+				//! 登録時に付加したIDのresistインタフェースを取得
+				const SPResist& getR(uint32_t id);
 				void remR(uint32_t id);
 				void remRAll();
 				//! 抵抗力を計算
