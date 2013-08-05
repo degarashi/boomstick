@@ -342,7 +342,8 @@ namespace boom {
 			if(l > 1e-8f) {
 				// torque
 				ret.torque = f.cw(tpos);
-			}
+			} else
+				ret.torque = 0;
 			return ret;
 		}
 
