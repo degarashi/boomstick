@@ -121,4 +121,15 @@ namespace boom {
 		}
 		operator const BASE& () const { return *this; }
 	};
+	template <class Dat>
+	struct TagBase {
+		using Data = Dat;
+		Dat operator()();
+	};
+	#define DEF_TAG(classname, typ, funcname) \
+		struct classname : TagBase<typ> { \
+			template <class T> \
+			decltype(std::declval<T>().funcname()) get(const T& src) { \
+				return src.funcname(); } \
+			void get(...) {} };
 }
