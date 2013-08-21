@@ -11,6 +11,7 @@
 #include <cassert>
 #include <vector>
 #include <memory>
+#include <array>
 #define BOOST_PP_VARIADICS 1
 #include <boost/pool/object_pool.hpp>
 
