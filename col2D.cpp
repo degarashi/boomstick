@@ -46,7 +46,7 @@ namespace boom {
 			if(lens < DIST_THRESHOLD)
 				dir = Vec2(1,0);
 			else
-				dir *= spn::_sseRSqrt(lens);
+				dir *= spn::RSqrt(lens);
 
 			_minkowskiSub(dir, 0);
 			if(dir.dot(_vtx[0]) < -DOT_THRESHOLD) {
@@ -60,13 +60,13 @@ namespace boom {
 				_inner = _posB[0];
 				return true;
 			}
-			dir = _vtx[0] * spn::_sseRSqrt(lens) * -1.f;
+			dir = _vtx[0] * spn::RSqrt(lens) * -1.f;
 			_minkowskiSub(dir, 1);
 
 			const Vec2 ori(0);
 			Vec2 tmp = _vtx[1] - _vtx[0];
 			float tmpLen = tmp.length();
-			tmp *= _sseRcp22Bit(tmpLen);
+			tmp *= Rcp22Bit(tmpLen);
 			float r = tmp.dot(-_vtx[0]);
 			if(r > tmpLen)
 				return false;
@@ -75,7 +75,7 @@ namespace boom {
 			lens = tmp.len_sq();
 			if(lens < DIST_THRESHOLD) {
 				// ライン上に原点がある
-				_inner =_posB[0].l_intp(_posB[1], r * spn::_sseRcp22Bit(tmpLen));
+				_inner =_posB[0].l_intp(_posB[1], r * spn::Rcp22Bit(tmpLen));
 				_nVtx = 2;
 				return true;
 			}
@@ -222,7 +222,7 @@ namespace boom {
 			auto res = LineCore(v0.first, v1.first).nearest(c_origin);
 			if(res.second == LINEPOS::ONLINE) {
 				float len = res.first.length();
-				res.first *= _sseRcp22Bit(len);
+				res.first *= Rcp22Bit(len);
 				_asv.insert(LmLen{len, res.first, {&v0,&v1}});
 				return true;
 			}
@@ -318,7 +318,7 @@ namespace boom {
 						dir *= -1.f;
 					res.first = dir;
 				} else
-					res.first *= _sseRcp22Bit(len);
+					res.first *= Rcp22Bit(len);
 				_asv.insert(LmLen{len, res.first, {_vl[i], _vl[(i+1)%nV]}});
 			}
 		}
@@ -327,7 +327,7 @@ namespace boom {
 			float len = res.first.length();
 			LmLen lmlen;
 			lmlen.dist = len;
-			lmlen.dir *= _sseRcp22Bit(len);
+			lmlen.dir *= Rcp22Bit(len);
 			if(res.second != LINEPOS::ONLINE) {
 				lmlen.vtx[0] = lmlen.vtx[1] = _vl[(res.second == LINEPOS::BEGIN) ? 0 : 1];
 			} else {
@@ -378,7 +378,7 @@ namespace boom {
 						auto res = LineCore(_vtx[0], v).nearest(Vec2(0));
 						if(res.second == LINEPOS::ONLINE) {
 							float len = res.first.length();
-							_asv.insert(LmLen{len, res.first*_sseRcp22Bit(len), {_vl[0],_vl[1]}});
+							_asv.insert(LmLen{len, res.first*Rcp22Bit(len), {_vl[0],_vl[1]}});
 						}
 						else {
 							const auto& p = *_vl[0];

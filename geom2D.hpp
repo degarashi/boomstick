@@ -23,7 +23,7 @@ namespace boom {
 	using spn::Mat32;
 	using spn::Mat33;
 	using spn::AMat33;
-	using spn::_sseRcp22Bit;
+	using spn::Rcp22Bit;
 	using spn::CType;
 	using spn::CramersRule;
 	using spn::CramerDet;
@@ -47,7 +47,7 @@ namespace boom {
 				toV2(v2-v0),
 				toVT(vt-v0);
 		float det = spn::CramerDet(toV1, toV2);
-		return spn::CramersRule(toV1, toV2, toVT, _sseRcp22Bit(det));
+		return spn::CramersRule(toV1, toV2, toVT, Rcp22Bit(det));
 	}
 	//! 三角形(v0,v1,v2)のvtに対する重心比率をユーザー定義変数(f0,f1,f2)に適用した物を算出
 	/*! \param[in] v0 三角形座標0
@@ -68,7 +68,7 @@ namespace boom {
 	{
 		auto line(v1-v0),
 			line2(vt-v0);
-		float r = line2.length() * _sseRcp22Bit(line.length());
+		float r = line2.length() * Rcp22Bit(line.length());
 		return spn::Lerp(f0, f1, r);
 	}
 

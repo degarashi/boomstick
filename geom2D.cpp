@@ -27,7 +27,7 @@ namespace boom {
 							(st0.pos - st1.pos).dot(st1.dir));
 
 			m1 = m0 * m1;
-			m1 *= _sseRcp22Bit(d);
+			m1 *= Rcp22Bit(d);
 			return Vec2x2(st0.pos + st0.dir * clip0(m1.x),
 							st1.pos + st1.dir * clip1(m1.y));
 		}
@@ -134,7 +134,7 @@ namespace boom {
 			tx = tx * m2 - ori;
 			ty = ty * m2 - ori;
 			return CircleCore(ori,
-							  spn::_sseSqrt(std::max(tx.len_sq(), ty.len_sq())));
+							  spn::Sqrt(std::max(tx.len_sq(), ty.len_sq())));
 		}
 		// 半径のみ倍率をかける
 		CircleCore CircleCore::operator * (float s) const {
@@ -215,7 +215,7 @@ namespace boom {
 			if(toV1.len_sq() <1e-6f)
 				return LNear(Vec2(), LINEPOS::NOTHIT);
 			float lenV1 = toV1.length();
-			toV1 *= _sseRcp22Bit(lenV1);
+			toV1 *= Rcp22Bit(lenV1);
 			float d = toV1.dot(toP);
 			if(d <= 0)
 				return LNear(point[0], LINEPOS::BEGIN);
@@ -228,7 +228,7 @@ namespace boom {
 			Vec2 toP(p-point[0]),
 				toV1(point[1]-point[0]);
 			float len = toV1.length();
-			return toV1.dot(toP) * _sseRcp22Bit(len);
+			return toV1.dot(toP) * Rcp22Bit(len);
 		}
 		StLineCore LineCore::toStLine() const {
 			return StLineCore(point[0], (point[1]-point[0]).normalization());
@@ -692,7 +692,7 @@ namespace boom {
 			int nL = point.size();
 			AreaList al(nL);
 			iterate(std::ref(al));
-			float invarea = _sseRcp22Bit(al.sum);
+			float invarea = Rcp22Bit(al.sum);
 			float areaInv3 = invarea * (1.0f/3),
 					areaInv6 = invarea * (1.0f/6);
 			Vec2 center(0,0);
@@ -891,7 +891,7 @@ namespace boom {
 			return plane.getNormal() / -d;
 		}
 		Plane Dual(const Vec3& p) {
-			float invlen = _sseRcp22Bit(p.length());
+			float invlen = Rcp22Bit(p.length());
 			return Plane(p*invlen, -invlen);
 		}
 		namespace {
@@ -901,7 +901,7 @@ namespace boom {
 			Vec2 dir = (v1-v0).normalization();
 			float dist = dir.cw(-v0);
 			dist = std::max(MIN_DUAL2DIST, dist);
-			return dir * _sseRcp22Bit(dist);
+			return dir * Rcp22Bit(dist);
 		}
 		StLineCore Dual(const Vec2& v) {
 			Vec2 t0(0,-v.y),

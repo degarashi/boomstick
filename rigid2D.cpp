@@ -332,15 +332,15 @@ namespace boom {
 		}
 		void Rigid::applyForce(const RForce::F& f) {
 			RPose& rp = refPose();
-			rp.setAccel(rp.getAccel() + f.linear * _sseRcp22Bit(getArea()));
-			rp.setRotAccel(rp.getRotAccel() + f.torque * _sseRcp22Bit(getInertia()));
+			rp.setAccel(rp.getAccel() + f.linear * Rcp22Bit(getArea()));
+			rp.setRotAccel(rp.getRotAccel() + f.torque * Rcp22Bit(getInertia()));
 		}
 		void Rigid::addForce(const Vec2& wpos, const Vec2& f) {
 			applyForce(CalcForce(getPose(), wpos, f));
 		}
 		void Rigid::addLinearForce(const Vec2& f) {
 			RPose& rp = refPose();
-			rp.setAccel(rp.getAccel() + f * _sseRcp22Bit(getArea()));
+			rp.setAccel(rp.getAccel() + f * Rcp22Bit(getArea()));
 		}
 		RForce::F Rigid::CalcForce(const RPose& rp, const Vec2& wpos, const Vec2& f) {
 			RForce::F ret;
@@ -364,14 +364,14 @@ namespace boom {
 				_grav = v;
 			}
 			void Gravity::resist(RForce::F& acc, const Rigid& r, int /*index*/, const CResult& /*cr*/) const {
-				float inv_area = _sseRcp22Bit(r.getModel().cref()->getArea(false));
-				acc.linear += _grav * _sseRcp22Bit(inv_area);
+				float inv_area = Rcp22Bit(r.getModel().cref()->getArea(false));
+				acc.linear += _grav * Rcp22Bit(inv_area);
 			}
 
 			void Impact::resist(RForce::F& acc, const Rigid& r, int index, const CResult& cr) const {
 				auto& mdl = *r.getModel().cref().get();
-				float inv_area = _sseRcp22Bit(mdl.getArea(false));
-				float inv_inertia = _sseRcp22Bit(mdl.getInertia(false));
+				float inv_area = Rcp22Bit(mdl.getArea(false));
+				float inv_inertia = Rcp22Bit(mdl.getInertia(false));
 				auto fc = cr.getInfo().getInfo(index, 0);
 				auto& ff = fc->sdump;
 				auto& ff2 = fc->fricD;
@@ -667,7 +667,7 @@ namespace boom {
 					if(dist < 1e-5f)
 						dir = Vec2(1,0);
 					else
-						dir *= _sseRcp22Bit(dist);
+						dir *= Rcp22Bit(dist);
 
 					constexpr float MARGIN = 1.05f;
 					tm0.setOfs(cc1.vCenter + dir * (cc0.fRadius + cc1.fRadius) * MARGIN);

@@ -26,7 +26,7 @@ namespace boom {
 					++_count;
 				}
 				T get() const {
-					return _value * spn::_sseRcp22Bit(_count);
+					return _value * spn::Rcp22Bit(_count);
 				}
 		};
 		//! c_info::Pairsで使用: 値の合計を出す
