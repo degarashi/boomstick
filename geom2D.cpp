@@ -628,7 +628,7 @@ namespace boom {
 						   (float cw))
 
 				Tmp& operator = (const Tmp& t) {
-					_mm_store_ps(vec.m, _mm_load_ps(t.vec.m));
+					reg_store_ps(vec.m, reg_load_ps(t.vec.m));
 					return *this;
 				}
 			};

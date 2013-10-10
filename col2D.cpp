@@ -418,15 +418,15 @@ namespace boom {
 				{toV1.x, toV2.x, toVT.x},
 				{toV1.y, toV2.y, toVT.y}
 			};
-			__m128 xm[2] = {LOADPS_Z3(ar[0]), LOADPS_Z3(ar[1])};
-			xm[0] = spn::_mmDivPs(xm[0], _mm_load1_ps(&toV1.x));
-			xm[1] = _mm_add_ps(_mm_mul_ps(xm[0], _mm_load1_ps(&toV1.y)), xm[1]);
-			xm[1] = spn::_mmDivPs(xm[1], _mm_shuffle_ps(xm[1], xm[1], _MM_SHUFFLE(1,1,1,1)));
-			xm[0] = _mm_sub_ps(xm[0], _mm_mul_ps(xm[1], _mm_shuffle_ps(xm[0], xm[0], _MM_SHUFFLE(1,1,1,1))));
+			reg128 xm[2] = {LOADPS_Z3(ar[0]), LOADPS_Z3(ar[1])};
+			xm[0] = spn::_mmDivPs(xm[0], reg_load1_ps(&toV1.x));
+			xm[1] = reg_add_ps(reg_mul_ps(xm[0], reg_load1_ps(&toV1.y)), xm[1]);
+			xm[1] = spn::_mmDivPs(xm[1], reg_shuffle_ps(xm[1], xm[1], _REG_SHUFFLE(1,1,1,1)));
+			xm[0] = reg_sub_ps(xm[0], reg_mul_ps(xm[1], reg_shuffle_ps(xm[0], xm[0], _REG_SHUFFLE(1,1,1,1))));
 
 			Float2 ret;
-			_mm_store_ss(&ret.first, xm[0]);
-			_mm_store_ss(&ret.second, xm[1]);
+			reg_store_ss(&ret.first, xm[0]);
+			reg_store_ss(&ret.second, xm[1]);
 			return ret;
 		}
 
