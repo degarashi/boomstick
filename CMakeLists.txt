@@ -1,14 +1,11 @@
 cmake_minimum_required(VERSION 2.8)
+set(ARCHITECTURE x86)
 project(boomstick)
-
+include(spinner/CMakeAndroid.txt require)
+include(spinner/CMakeCompiler.txt require)
 include_directories(${PROJECT_SOURCE_DIR}/spinner)
-link_directories(${CMAKE_INSTALL_PREFIX}/lib)
-include(spinner/CMake0.txt require)
-
+link_directories(${CMAKE_INSTALL_PREFIX}/lib_${ARCHITECTURE})
 add_library(boomstick STATIC geom2D.cpp col2D.cpp rigid2D.cpp collision.cpp)
-add_executable(bs_test main.cpp)
-target_link_libraries(bs_test boomstick spinner boost_system)
-
-install(TARGETS boomstick bs_test
-	ARCHIVE DESTINATION lib
-	RUNTIME DESTINATION bin)
+install(TARGETS boomstick ARCHIVE DESTINATION lib_${ARCHITECTURE})
+file(GLOB HEADERS "./*.hpp")
+install(FILES ${HEADERS} DESTINATION include/boomstick)
