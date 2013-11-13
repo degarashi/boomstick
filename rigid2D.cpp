@@ -913,7 +913,7 @@ namespace boom {
 			DualRForce CalcOV_Circle2(const Rigid& r0, const Rigid& r1, const Vec2& inner, const RCoeff& coeff, const StLineCore& div) {
 				// 境界線分を計算して共通領域を2つに分けてそれぞれ積分
 				// 中身がCircleだと分かっているのでポインタの読み替え
-				throw std::runtime_error("not implemented yet");
+				AssertT(Trap, false, (std::domain_error)(const char*), "not implemented yet")
 			}
 			DualRForce CalcOV_Convex2(const Rigid& r0, const Rigid& r1, const Vec2& inner, const RCoeff& coeff, const StLineCore& div) {
 				// 領域算出
@@ -924,11 +924,11 @@ namespace boom {
 				return CalcRF_Convex(r0, r1, coeff, cnv, div);
 			}
 			//! 円とBox含む多角形
-			DualRForce CalcOV_CircleConvex(const Rigid& r0, const Rigid& r1, const Vec2& inner, const RCoeff& coeff, const StLineCore& div) {
+			DualRForce CalcOV_CircleConvex[[noreturn]](const Rigid& r0, const Rigid& r1, const Vec2& inner, const RCoeff& coeff, const StLineCore& div) {
 				PointL _pts;
 				// pts[0]とpts[nV-1]の間は円弧を表す
 				// 円弧部分は弓部で分けて凸包部分は三角形で計算し、残りは独自式で積分
-				throw std::runtime_error("not implemented yet");
+				AssertT(Trap, false, (std::domain_error)(const char*), "not implemented yet")
 			}
 		}
 

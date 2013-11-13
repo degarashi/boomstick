@@ -107,7 +107,7 @@ namespace boom {
 			//! ある座標が図形の内部に入っているか
 			virtual bool isInner(const Vec2& /*pos*/) const { return false; }
 
-			#define INVOKE_ERROR throw std::runtime_error(std::string("not supported function: ") + __func__);
+			#define INVOKE_ERROR Assert(Trap, false, "not supported function: ", __func__) throw 0;
 			//! 外郭を構成する頂点で、mdlにめり込んでいる物を抽出
 			/*! \return 時計回りでmdlにめり込んでいる頂点リスト。前後も含む */
 			virtual PosL getOverlappingPoints(const IModel& /*mdl*/, const Vec2& /*inner*/) const { INVOKE_ERROR }

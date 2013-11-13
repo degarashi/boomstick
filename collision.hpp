@@ -60,7 +60,7 @@ namespace boom {
 				template <class ID, class DAT>
 				void pushInfo(ID /*id0*/, ID /*id1*/, const DAT& /*dat*/) {}
 				template <class ID>
-				int getInfo(ID /*id0*/, ID /*id1*/) const { throw std::runtime_error("not supported"); }
+				int getInfo(ID /*id0*/, ID /*id1*/) const { Assert(Trap, false, "not supported") }
 		};
 		//! ColResultで使用: オブジェクト毎に値を合算する
 		template <class T, class ID>

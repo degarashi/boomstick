@@ -33,9 +33,9 @@ namespace boom {
 		}
 
 		CircleCore IModel::getBCircle() const {
-			throw std::runtime_error("not supported function"); }
+			Assert(Trap, false, "not supported function") throw 0; }
 		Convex2 IModel::splitTwo(const StLineCore& line) const {
-			throw std::runtime_error("not supported function"); }
+			Assert(Trap, false, "not supported function") throw 0; }
 
 		// ---------------------- Point ----------------------
 		float PointCore::distance(const LineCore& l) const {
@@ -85,7 +85,7 @@ namespace boom {
 			return pos.getMax(minV).getMin(maxV);
 		}
 		float BoxCore::inertia() const {
-			throw std::runtime_error("not implemented yet");
+			AssertT(Trap, false, (std::domain_error)(const char*), "not implemented yet") throw 0;
 		}
 		float BoxCore::area() const {
 			Vec2 sz = maxV - minV;
@@ -111,10 +111,10 @@ namespace boom {
 		// ---------------------- Circle ----------------------
 		CircleCore::CircleCore(const Vec2& c, float r): vCenter(c), fRadius(r) {}
 		float CircleCore::area() const {
-			throw std::domain_error("not implemented yet");
+			AssertT(Trap, false, (std::domain_error)(const char*), "not implemented yet") throw 0;
 		}
 		float CircleCore::inertia() const {
-			throw std::domain_error("not implemented yet");
+			AssertT(Trap, false, (std::domain_error)(const char*), "not implemented yet") throw 0;
 		}
 		Vec2 CircleCore::support(const Vec2& dir) const {
 			return dir * fRadius + vCenter;
@@ -292,7 +292,7 @@ namespace boom {
 			return p0.cw(p1) * 0.5f;
 		}
 		Vec2 PolyCore::support(const Vec2& dir) const {
-			throw std::runtime_error("");
+			AssertT(Trap, false, (std::domain_error)(const char*), "not implemented yet") throw 0;
 		}
 		void PolyCore::addOffset(const Vec2& ofs) {
 			for(int i=0 ; i<3 ; i++)
@@ -525,8 +525,7 @@ namespace boom {
 		}
 
 		Convex Convex::GetOverlappingConvex(const IModel& m0, const IModel& m1, const Vec2& inner) {
-			if(!m0.isInner(inner) || !m1.isInner(inner))
-				throw std::runtime_error("invalid inner point");
+			Assert(Trap, m0.isInner(inner) && m1.isInner(inner), "invalid inner point")
 
 			// DualTransformで直線から点に変換
 			int nV0 = m0.getNPoints(),
