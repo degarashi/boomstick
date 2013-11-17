@@ -128,6 +128,7 @@ namespace boom {
 	};
 	#define DEF_TAG(classname, typ, funcname) \
 		struct classname : TagBase<typ> { \
+			using value_type = typ; \
 			template <class T> \
 			decltype(std::declval<T>().funcname()) get(const T& src) { \
 				return src.funcname(); } \

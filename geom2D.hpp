@@ -107,7 +107,6 @@ namespace boom {
 			//! ある座標が図形の内部に入っているか
 			virtual bool isInner(const Vec2& /*pos*/) const { return false; }
 
-			#define INVOKE_ERROR Assert(Trap, false, "not supported function: ", __func__) throw 0;
 			//! 外郭を構成する頂点で、mdlにめり込んでいる物を抽出
 			/*! \return 時計回りでmdlにめり込んでいる頂点リスト。前後も含む */
 			virtual PosL getOverlappingPoints(const IModel& /*mdl*/, const Vec2& /*inner*/) const { INVOKE_ERROR }
@@ -116,11 +115,6 @@ namespace boom {
 
 			virtual float getArea(bool /*bInv*/) const { INVOKE_ERROR }
 			virtual float getInertia(bool /*bInv*/) const { INVOKE_ERROR }
-
-			#define DEF_CASTFUNC(typ) virtual boost::optional<typ&> castAs##typ() { return boost::none; } \
-				virtual boost::optional<const typ&> castAs##typ() const { auto ref = const_cast<IModel*>(this)->castAs##typ(); \
-					if(ref) return *ref; return boost::none; }
-			// DEF_CASTFUNC(Rigid)
 
 			// ---------- Convex専用 ----------
 			//! 物体を構成する頂点数を取得
@@ -133,7 +127,7 @@ namespace boom {
 			friend std::ostream& operator << (std::ostream& os, const IModel& mdl);
 		};
 		using UPModel = std::unique_ptr<IModel, void (*)(void*)>;
-		#define mgr_model	ModelMgr::_ref()
+		#define mgr_model	boom::geo2d::ModelMgr::_ref()
 		class ModelMgr : public spn::ResMgrA<UPModel, ModelMgr> {};
 		DEF_HANDLE(ModelMgr, Mdl, UPModel)
 
@@ -150,12 +144,6 @@ namespace boom {
 			float getInertia(bool bInv=false) const override; \
 			CircleCore getBCircle() const override;
 
-		enum class LINEPOS {
-			BEGIN,
-			END,
-			ONLINE,
-			NOTHIT
-		};
 		using LNear = std::pair<Vec2,LINEPOS>;
 
 		struct PointCore : Vec2 {

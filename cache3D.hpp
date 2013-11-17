@@ -4,12 +4,12 @@
 namespace boom {
 	namespace geo3d {
 		using spn::Vec3;
-		using spn::Mat44;
+		using spn::Mat33;
 
 		//! CacheTag: area
 		DEF_TAG(TagArea, float, area)
 		//! CacheTag: inertia
-		DEF_TAG(TagInertia, Mat44, inertia)
+		DEF_TAG(TagInertia, Mat33, inertia)
 		//! CacheTag: center
 		DEF_TAG(TagCenter, Vec3, center)
 
@@ -22,8 +22,8 @@ namespace boom {
 		template <class T> \
 		using Wrap = CoreRaw<T>; \
 		float area() const; \
-		Mat44 inertia() const; \
+		Mat33 inertia() const; \
 		Vec3 center() const; \
-		SphereCore bsphere() const;
+		Sphere bsphere() const;
 	}
 }

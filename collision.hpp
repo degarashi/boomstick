@@ -3,14 +3,34 @@
 #include <vector>
 #include <algorithm>
 #include <cassert>
-#define BOOST_PP_VARIADICS 1
 #include <cstring>
-#include <boost/optional.hpp>
 #include "spinner/layerbit.hpp"
 #include "spinner/noseq.hpp"
 #include "spinner/spn_math.hpp"
+#include "spinner/optional.hpp"
 
 namespace boom {
+	//! サポートされていない関数を読んだ時の実行時エラーを送出
+	#define INVOKE_ERROR Assert(Trap, false, "not supported function: ", __func__) throw 0;
+	//! IModelから指定の型にキャスト出来ればその参照を返す関数のデフォルト実装
+	#define DEF_CASTFUNC(typ) virtual spn::Optional<typ&> castAs##typ() { return spn::none; } \
+			virtual spn::Optional<const typ&> castAs##typ() const { auto ref = const_cast<IModel*>(this)->castAs##typ(); \
+			if(ref) return *ref; return spn::none; }
+	template <class T, class CT>
+	struct ITagP {
+		static uint32_t GetCID() { return CT::template Find<T>::result; }
+	};
+	template <class T, class CT>
+	struct IModelP : ITagP<T,CT>, T {
+		virtual uint32_t getCID() const override { return ITagP<T,CT>::GetCID(); }
+	};
+
+	enum class LINEPOS {
+		BEGIN,
+		END,
+		ONLINE,
+		NOTHIT
+	};
 	namespace c_ent {
 		//! c_info::Pairsで使用: 値の平均を計算する
 		template <class T>

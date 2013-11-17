@@ -433,11 +433,11 @@ namespace boom {
 		//! 固有のアルゴリズムによる衝突判定
 		bool HitCheck(const IModel& mdl0, const IModel& mdl1) {
 //			uint32_t id = (mdl0.getCID() << spn::NBits<CTGeo::size>::result) | mdl1.getCID();
-			AssertT(Trap, false, (std::domain_error)(const char*), "not implemented yet")
+			AssertT(Trap, false, (std::domain_error)(const char*), "not implemented yet") throw 0;
 		}
 		//! 固有のアルゴリズムでmdlFromのmdlToに対する最深点を算出
 		Vec2 HitPos(const IModel& mdlFrom, const IModel& mdlTo) {
-			AssertT(Trap, false, (std::domain_error)(const char*), "not implemented yet")
+			AssertT(Trap, false, (std::domain_error)(const char*), "not implemented yet") throw 0;
 		}
 	}
 }
