@@ -1,5 +1,5 @@
+//! 3D形状の定義
 #pragma once
-#include "collision.hpp"
 #include "geom.hpp"
 #include "spinner/resmgr.hpp"
 #include <memory>
@@ -17,11 +17,12 @@ namespace boom {
 		struct Poly;
 		struct Convex;
 		struct Frustum;
-		using CTGeo = spn::CType<Point, Sphere, Capsule, Line, AABB, OABB, Cone, Poly, Convex, Frustum>;
+// 		using CTGeo = spn::CType<Point, Sphere, Capsule, Line, AABB, OABB, Cone, Poly, Convex, Frustum>;
+		using CTGeo = spn::CType<Point, Line, Sphere, Capsule, Frustum>;
 		template <class T>
 		using ITagP = ITagP_base<T, CTGeo>;
 
-		struct Sphere {
+		struct Sphere : ITagP<Sphere> {
 			Vec3 center;
 			float radius;
 
@@ -33,8 +34,9 @@ namespace boom {
 			Mat33 bs_getInertia() const;
 			Vec3 support(const Vec3& dir) const;
 
-			bool hit(const Sphere& s) const;
-			bool hit(const Capsule& c) const;
+			spn::none_t hit(...) const;
+			bool hit(const Sphere& s) const { return false; }
+			bool hit(const Capsule& c) const { return false; }
 			Sphere() = default;
 			Sphere(const Vec3& c, float r);
 		};
@@ -68,7 +70,7 @@ namespace boom {
 		DEF_HANDLE(ModelMgr, Mdl, UPModel)
 
 		template <class T>
-		struct Model : ITagP<T>, T {
+		struct Model : IModelP_base<T, IModel> {
 			// 各種ルーチンの中継
 			Sphere im_getBSphere() const override { return T::bs_getBSphere(); }
 			Mat33 im_getInertia() const override { return T::bs_getInertia(); }
@@ -76,9 +78,6 @@ namespace boom {
 			Vec3 im_getCenter() const override { return T::bs_getCenter(); }
 			Vec3 im_getGCenter() const override { return T::bs_getGCenter(); }
 			Vec3 support(const Vec3& dir) const override { return T::support(dir); }
-
-			const void* getCore() const override { return static_cast<const T*>(this); }
-			uint32_t getCID() const override { return ITagP<T>::GetCID(); }
 		};
 
 		// ------------------ Cache system ------------------
@@ -90,16 +89,16 @@ namespace boom {
 
 		using CTTag = CCType<TagGCenter, TagCenter, TagInertia, TagArea, TagBSphere>;
 		template <class CORE>
-		class Cache : public ::boom::Cache<CTTag, CORE>, ITagP<CORE>, IModel {
+		class Cache : public ::boom::Cache<CTTag, CacheBase<CORE>>, public ITagP<CORE>, public IModel {
 			public:
-				using base = ::boom::Cache<CTTag, CORE>;
+				using base = ::boom::Cache<CTTag, CacheBase<CORE>>;
 				DEF_GETMETHOD(base, getBSphere, TagBSphere)
 				DEF_GETMETHOD(base, getInertia, TagInertia)
 				DEF_GETMETHOD(base, getArea, TagArea)
 				DEF_GETMETHOD(base, getCenter, TagCenter)
 				DEF_GETMETHOD(base, getGCenter, TagGCenter)
 
-				const void* getCore() const override { return &base::_core; }
+				const void* getCore() const override { return &base::getCoreRef(); }
 				uint32_t getCID() const override { return ITagP<CORE>::GetCID(); }
 		};
 		// --------------------------------------------------
@@ -114,13 +113,38 @@ namespace boom {
 			using Vec3::distance;
 			float distance(const Line& l) const;
 			LNear nearest(const Line& l) const;
-			bool hit(const Point& p) const;
+
+			spn::none_t hit(...) const;
+			bool hit(const Point& p) const { return false; }
 		};
 		using PointM = Model<Point>;
 		using PointC = Cache<Point>;
 
+		struct Line : ITagP<Line> {
+			Vec3	from, to;
+
+			Vec3 bs_getGCenter() const;
+			Vec3 bs_getCenter() const;
+			Sphere bs_getBSphere() const;
+			float bs_getArea() const;
+			Mat33 bs_getInertia() const;
+			Vec3 suppoer(const Vec3& dir) const;
+
+			spn::none_t hit(...) const;
+			bool hit(const Sphere& s) const { return false; }
+			bool hit(const Capsule& c) const { return false; }
+		};
+		using LineM = Model<Line>;
+		using LineC = Cache<Line>;
+
 		using SphereM = Model<Sphere>;
-		using SphereC = Cache<Sphere>;
+		class SphereC : public Cache<Sphere> {
+			public:
+				void setCenter(const Vec3& c) {
+					getCoreRef().center = c;
+					_invalidate<TagArea>();
+				}
+		};
 
 		struct Capsule : ITagP<Capsule> {
 			Vec3	from, to;
@@ -133,32 +157,33 @@ namespace boom {
 			Sphere bs_getBSPhere() const;
 			Vec3 support(const Vec3& dir) const;
 
-			bool hit(const Point& p) const;
-			bool hit(const Sphere& s) const;
-			bool hit(const Capsule& c) const;
+			spn::none_t hit(...) const;
+			bool hit(const Point& p) const { return false; }
+			bool hit(const Sphere& s) const { return false; }
+			bool hit(const Capsule& c) const { return false; }
 			Capsule() = default;
+			Capsule(const Capsule&) = default;
 			Capsule(const Vec3& beg, const Vec3& end, float r);
 		};
 		using CapsuleM = Model<Capsule>;
 		using CapsuleC = Cache<Capsule>;
-		template <class RT, class OBJ>
-		std::true_type Test(RT (OBJ::*)(Arg) = nullptr);
-		std::false_type Test(...);
 
-		struct Narrow {
-			using CFunc = bool (*)(const void*, const void*);
-			const static CFunc cs_cfunc[];
-			//! 当たり判定を行う関数をリストにセットする
+		struct Frustum : ITagP<Frustum> {
+			Vec3 from, to;
+			float fovV, aspect;
 
-			//! 当たり判定を行う関数ポインタを取得
-			static CFunc GetCFunc(const IModel* mdl0, const IModel* mdl1);
-			//! 2つの物体を当たり判定
-			static bool Hit(const IModel* mdl0, const IModel* mdl1);
-			//! mdl0を展開したものとmdl1を当たり判定
-			/*! \param[in] mdl0 展開する方のインタフェース
-				\param[in] mdl1 展開されない方のインタフェース
-				\param[in] bFirst 左右を入れ替えて判定している場合はtrue */
-			static bool HitL(const IModel* mdl0, const IModel* mdl1, bool bFirst);
+			Vec3 bs_getGCenter() const;
+			Vec3 bs_getCenter() const;
+			Sphere bs_getBSphere() const;
+			float bs_getArea() const;
+			Mat33 bs_getInertia() const;
+			Vec3 support(const Vec3& dir) const;
+
+			spn::none_t hit(...) const;
 		};
+		using FrustumM = Model<Frustum>;
+		using FrustumC = Cache<Frustum>;
+
+		using Narrow = ::boom::Narrow<CTGeo, IModel>;
 	}
 }

@@ -1,4 +1,5 @@
-#include "collision.hpp"
+//! 3D形状同士の当たり判定に関する実装 (hit関数)
+#include "geom3D.hpp"
 
 namespace boom {
 	namespace geo3d {

@@ -1,8 +1,10 @@
+//! 2D, 3D形状に共通するクラスの定義
 #pragma once
 #include "spinner/type.hpp"
 #include "spinner/misc.hpp"
 #include "spinner/matrix.hpp"
 #include "spinner/plane.hpp"
+#include "spinner/optional.hpp"
 
 namespace boom {
 	using spn::Vec2;
@@ -13,6 +15,28 @@ namespace boom {
 	using spn::AMat44;
 	using spn::AMat43;
 	using spn::Plane;
+	//! サポートされていない関数を読んだ時の実行時エラーを送出
+	#define INVOKE_ERROR Assert(Trap, false, "not supported function: ", __func__) throw 0;
+	//! IModelから指定の型にキャスト出来ればその参照を返す関数のデフォルト実装
+	#define DEF_CASTFUNC(typ) virtual spn::Optional<typ&> castAs##typ() { return spn::none; } \
+			virtual spn::Optional<const typ&> castAs##typ() const { auto ref = const_cast<IModel*>(this)->castAs##typ(); \
+			if(ref) return *ref; return spn::none; }
+	template <class T, class CT>
+	struct ITagP_base {
+		static constexpr uint32_t GetCID() { return CT::template Find<T>::result; }
+	};
+	template <class T, class MDL>
+	struct IModelP_base : MDL, T {
+		const void* getCore() const override { return static_cast<const T*>(this); }
+		uint32_t getCID() const override { return T::GetCID(); }
+	};
+	//! ラインの位置を示す
+	enum class LINEPOS {
+		Begin,		//!< 始点
+		End,		//!< 終点
+		OnLine,		//!< ライン上
+		NotHit
+	};
 
 	template <class... Ts>
 	struct CCType : spn::CType<Ts...> {
@@ -81,7 +105,7 @@ namespace boom {
 			//! COREから実際に返される型
 			using CTRET = typename CTTAG::template CAnother<CORE>::result;
 			//! キャッシュ変数を格納するメモリ領域
-			mutable uint8_t		_buff[CTRET::template SumN<CTRET::size-1, GetSize_Ref0>::result];
+			mutable uint8_t		_buff[CTRET::template SumN<CTRET::size, GetSize_Ref0>::result];
 			//! キャッシュ管理フラグ (ビットが1なら有効)
 			mutable uint32_t	_cacheFlag = 0;
 
@@ -100,8 +124,9 @@ namespace boom {
 			const T_OP<T>& _getInfo(std::false_type) const {
 				using spn::Bit;
 				// フラグが立って無ければ値を算出
-				if(!Bit::Check(_cacheFlag, FlagGet0<T>::get())) {
-					Bit::Set(_cacheFlag, FlagGet0<T>::get());
+				constexpr int flag = FlagGet0<T>::get();
+				if(!Bit::Check(_cacheFlag, flag)) {
+					Bit::Set(_cacheFlag, flag);
 					_setInfo(_core.CalcIt(T()));
 				}
 				return _getBuff<T>();
@@ -119,13 +144,118 @@ namespace boom {
 			//! 特定のフラグをリセットする
 			template <class... Tags>
 			void _invalidate() {
-				spn::Bit::Clear(_cacheFlag, spn::CType<Tags...>::template SumN<sizeof...(Tags)-1, FlagGet0>::result);
+				auto val = spn::CType<Tags...>::template SumN<sizeof...(Tags), FlagGet0>::result;
+				spn::Bit::Clear(_cacheFlag, val);
 			}
 		public:
 			template <class T>
 			const T_OP<T>& _getInfo() const {
 				constexpr int idx = CTTAG::template Find<T>::result;
-				return _getInfo<T>(std::false_type());
+				return _getInfo<T>(std::is_reference<decltype(T::get(std::declval<CORE>()))>());
 			}
+			const CORE& getCoreRef() const { return _core; }
+			CORE& getCoreRef() { return _core; }
 	};
+	DEF_CHECKMETHOD_OV(mdlhit, hit)
+	using ColFunc = bool (*)(const void*, const void*);
+
+	template <class CTG>
+	struct Narrow_Init0 {
+		template <class T0, class T1>
+		static bool Invoke(std::true_type, const T0& t0, const T1& t1) {
+			return t0.hit(t1); }
+		template <class T0, class T1>
+		static bool Invoke(std::false_type, const T0& t0, const T1& t1) {
+			Assert(Trap, false, "not implemented yet (or not supported?)") throw 0; }
+		template <class T0, class T1>
+		static bool _CFRaw(const T0& t0, const T1& t1, std::true_type) {
+			return Invoke(CheckMethod_mdlhit<T0, const T1&>(), t0, t1); }
+		template <class T0, class T1>
+		static bool _CFRaw(const T0& t0, const T1& t1, std::false_type) {
+			return Invoke(CheckMethod_mdlhit<T1, const T0&>(), t1, t0); }
+		//! リスト登録用関数ラッパ
+		template <int N0, int N1, class B0, class B1,
+					class = typename std::enable_if<spn::TType<B0,B1>::t_and::value>::type>
+		static bool CFRaw(const void* m0, const void* m1) {
+			using T0 = typename CTG::template At<N0>::type;
+			using T1 = typename CTG::template At<N1>::type;
+			return _CFRaw(*reinterpret_cast<const T0*>(m0),
+						  *reinterpret_cast<const T1*>(m1),
+						  typename spn::NType<T0::GetCID(), T1::GetCID()>::less_eq());
+		}
+		template <int N0, int N1, class B0, class B1,
+					class = int,
+					class = typename std::enable_if<spn::TType<B0,B1>::t_nand::value>::type>
+		static bool CFRaw(const void* m0, const void* m1) {
+			return false;
+		}
+	};
+	template <class CTG, int WIDE, int N>
+	struct Narrow_Init {
+		static void Init(ColFunc* dst) {
+			constexpr int Left = N >> WIDE,
+						Right = N&((1<<WIDE)-1);
+			*dst = Narrow_Init0<CTG>::template CFRaw<Left, Right,
+				typename spn::NType<Left, CTG::size>::less, typename spn::NType<Right, CTG::size>::less>;
+			Narrow_Init<CTG, WIDE, N-1>::Init(dst-1);
+		}
+	};
+	template <class CTG, int WIDE>
+	struct Narrow_Init<CTG, WIDE, -1> {
+		static void Init(ColFunc* dst) {}
+	};
+
+	//! Narrow-phase 判定関数群
+	template <class CTG, class IM>
+	struct Narrow {
+		constexpr static int WideBits = spn::CTBit::MSB_N<CTG::size>::result + 1,
+							ArraySize = 1<<(WideBits*2);
+		static ColFunc cs_cfunc[ArraySize];
+
+		//! 当たり判定を行う関数をリストにセットする
+		static void Initialize() {
+			Narrow_Init<CTG, WideBits, ArraySize-1>::Init(cs_cfunc+ArraySize-1);
+		}
+		//! 当たり判定を行う関数ポインタを取得
+		static ColFunc GetCFunc(int id0, int id1) {
+			return cs_cfunc[(id0 << WideBits) | id1];
+		}
+		template <class T0, class T1>
+		static bool Hit(const T0& t0, const T1& t1) {
+			constexpr int id0 = CTG::template Find<T0>::result,
+						id1 = CTG::template Find<T1>::result;
+			return GetCFunc(id0, id1)(&t0, &t1);
+		}
+		//! 2つの物体(階層構造可)を当たり判定
+		static bool Hit(const IM* mdl0, const IM* mdl1) {
+			if(GetCFunc(mdl0->getCID(), mdl1->getCID())(mdl0->getCore(), mdl1->getCore()))
+				return HitL(mdl1, mdl0, false);
+		}
+		//! mdl0を展開したものとmdl1を当たり判定
+		/*! \param[in] mdl0 展開する方のインタフェース
+			\param[in] mdl1 展開されない方のインタフェース
+			\param[in] bSwap 左右を入れ替えて判定している場合はtrue */
+		static bool HitL(const IM* mdl0, const IM* mdl1, bool bSwap) {
+			auto in = mdl0->getInner();
+			if(in.first != in.second) {
+				// ここで判定関数を取得
+				// Innerに含まれる子オブジェクトは全て同じ型 という前提
+				ColFunc cf = GetCFunc(in.first->getCID(), mdl1->getCID());
+				const void* core1 = mdl1->getCore();
+				do {
+					if(cf(in.first->getCore()), core1) {
+						if(HitL(mdl1, in.first, false))
+							return true;
+					}
+				} while(++in.first != in.second);
+			} else {
+				if(bSwap)
+					return false;
+				return HitL(mdl1, mdl0, true);
+			}
+			return false;
+		}
+	};
+	template <class CTG, class IM>
+	ColFunc Narrow<CTG, IM>::cs_cfunc[ArraySize];
 }
