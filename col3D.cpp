@@ -3,27 +3,24 @@
 
 namespace boom {
 	namespace geo3d {
-// 		Narrow::CFunc Narrow::GetFunc(const IModel* mdl0, const IModel* mdl1) {
-// 			return cs_cfunc[(mdl0->getCID() << 4) | mdl1->getCID()];
-// 		}
-// 		bool Narrow::Hit(const IModel* mdl0, const IModel* mdl1) {
-// 			auto cf = GetCFunc(mdl0, mdl1);
-// 			if(cf(mdl0->getCore(), mdl1->getCore()))
-// 				return hitL(mdl0, mdl1);
-// 			return false;
-// 		}
-// 		bool Narrow::HitL(const IModel* mdl0, const IModel* mdl1, bool bFinal) {
-// 			auto in = mdl0->getInner();
-// 			if(in.first != in.second) {
-// 				auto cf = GetCFunc(in.first, mdl1);
-// 				do {
-// 					if(cf(in.first, mdl1))
-// 						return hitL(mdl1, in.first, false);
-// 				} while(++in.first != in.second);
-// 			}
-// 			if(bFinal)
-// 				return false;
-// 			return hitL(mdl1, mdl0, true);
-// 		}
+		bool Sphere::hit(const Sphere& s) const {
+			return center.dist_sq(s.center) <= spn::Square(radius + s.radius);
+		}
+		bool Sphere::hit(const Line& l) const {
+			return l.dist_sq(center) <= spn::Square(radius);
+		}
+		bool Sphere::hit(const Capsule& c) const {
+			return c.seg.dist_sq(center) <= spn::Square(radius);
+		}
+		bool Sphere::hit(const Ray& r) const {
+			return r.nearest(center).dist_sq(center) <= spn::Square(radius);
+		}
+
+		bool Segment::hit(const Capsule& c) const {
+			return false;
+		}
+		bool Frustum::hit(const Frustum& c) const {
+			return false;
+		}
 	}
 }

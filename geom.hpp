@@ -15,6 +15,8 @@ namespace boom {
 	using spn::AMat44;
 	using spn::AMat43;
 	using spn::Plane;
+	using Vec2x2 = std::pair<Vec2, Vec2>;
+	using Vec3x2 = std::pair<Vec3, Vec3>;
 	//! サポートされていない関数を読んだ時の実行時エラーを送出
 	#define INVOKE_ERROR Assert(Trap, false, "not supported function: ", __func__) throw 0;
 	//! IModelから指定の型にキャスト出来ればその参照を返す関数のデフォルト実装
@@ -27,8 +29,37 @@ namespace boom {
 	};
 	template <class T, class MDL>
 	struct IModelP_base : MDL, T {
+		using T::T;
 		const void* getCore() const override { return static_cast<const T*>(this); }
 		uint32_t getCID() const override { return T::GetCID(); }
+	};
+	//! IModelインタフェースの子ノードイテレータ
+	template <class T>
+	struct PtrItr {
+		const uint8_t*	ptr;
+		const size_t	stride;
+
+		PtrItr(): ptr(nullptr), stride(0) {}
+		PtrItr(const void* p, size_t st):
+			ptr(reinterpret_cast<const uint8_t*>(p)), stride(st) {}
+		PtrItr& operator ++ () {
+			ptr += stride;
+			return *this;
+		}
+		bool operator == (const PtrItr& pi) const {
+			return ptr == pi.ptr; }
+		bool operator != (const PtrItr& pi) const {
+			return !(operator == (pi)); }
+		const T& operator * () const {
+			return *(operator -> ()); }
+		const T* operator -> () const {
+			return get(); }
+		const T* get() const {
+			return reinterpret_cast<const T*>(ptr); }
+		int operator - (const PtrItr& p) const {
+			auto diff = ptr - p.ptr;
+			return diff / stride;
+		}
 	};
 	//! ラインの位置を示す
 	enum class LINEPOS {
@@ -163,10 +194,12 @@ namespace boom {
 	struct Narrow_Init0 {
 		template <class T0, class T1>
 		static bool Invoke(std::true_type, const T0& t0, const T1& t1) {
+			// 専用アルゴリズムでの当たり判定
 			return t0.hit(t1); }
 		template <class T0, class T1>
 		static bool Invoke(std::false_type, const T0& t0, const T1& t1) {
-			Assert(Trap, false, "not implemented yet (or not supported?)") throw 0; }
+			//TODO: GJKアルゴリズムでの当たり判定
+			Assert(Trap, false, "not implemented yet (GJK algorithm)") throw 0; }
 		template <class T0, class T1>
 		static bool _CFRaw(const T0& t0, const T1& t1, std::true_type) {
 			return Invoke(CheckMethod_mdlhit<T0, const T1&>(), t0, t1); }
@@ -220,7 +253,9 @@ namespace boom {
 		static ColFunc GetCFunc(int id0, int id1) {
 			return cs_cfunc[(id0 << WideBits) | id1];
 		}
-		template <class T0, class T1>
+		template <class T0, class T1,
+			class = typename std::enable_if<!std::is_pointer<T0>::value>::type,
+			class = typename std::enable_if<!std::is_pointer<T1>::value>::type>
 		static bool Hit(const T0& t0, const T1& t1) {
 			constexpr int id0 = CTG::template Find<T0>::result,
 						id1 = CTG::template Find<T1>::result;
@@ -230,6 +265,7 @@ namespace boom {
 		static bool Hit(const IM* mdl0, const IM* mdl1) {
 			if(GetCFunc(mdl0->getCID(), mdl1->getCID())(mdl0->getCore(), mdl1->getCore()))
 				return HitL(mdl1, mdl0, false);
+			return false;
 		}
 		//! mdl0を展開したものとmdl1を当たり判定
 		/*! \param[in] mdl0 展開する方のインタフェース
@@ -243,8 +279,8 @@ namespace boom {
 				ColFunc cf = GetCFunc(in.first->getCID(), mdl1->getCID());
 				const void* core1 = mdl1->getCore();
 				do {
-					if(cf(in.first->getCore()), core1) {
-						if(HitL(mdl1, in.first, false))
+					if(cf(in.first->getCore(), core1)) {
+						if(HitL(mdl1, in.first.get(), false))
 							return true;
 					}
 				} while(++in.first != in.second);
