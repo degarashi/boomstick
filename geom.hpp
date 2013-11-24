@@ -222,19 +222,29 @@ namespace boom {
 			return false;
 		}
 	};
-	template <class CTG, int WIDE, int N>
-	struct Narrow_Init {
-		static void Init(ColFunc* dst) {
-			constexpr int Left = N >> WIDE,
-						Right = N&((1<<WIDE)-1);
-			*dst = Narrow_Init0<CTG>::template CFRaw<Left, Right,
-				typename spn::NType<Left, CTG::size>::less, typename spn::NType<Right, CTG::size>::less>;
-			Narrow_Init<CTG, WIDE, N-1>::Init(dst-1);
+	template <class CTG, int M, int N>
+	struct Narrow_InitB {
+		static void Init(ColFunc*& dst) {
+			*dst-- = Narrow_Init0<CTG>::template CFRaw<M,N,
+				typename spn::NType<M, CTG::size>::less, typename spn::NType<N, CTG::size>::less>;
+			Narrow_InitB<CTG, M, N-1>::Init(dst);
 		}
 	};
-	template <class CTG, int WIDE>
-	struct Narrow_Init<CTG, WIDE, -1> {
-		static void Init(ColFunc* dst) {}
+	template <class CTG, int M>
+	struct Narrow_InitB<CTG, M, -1> {
+		static void Init(ColFunc*& dst) {}
+	};
+
+	template <class CTG, int WIDE_M, int M>
+	struct Narrow_InitA {
+		static void Init(ColFunc*& dst) {
+			Narrow_InitB<CTG, M, WIDE_M-1>::Init(dst);
+			Narrow_InitA<CTG, WIDE_M, M-1>::Init(dst);
+		}
+	};
+	template <class CTG, int WIDE_M>
+	struct Narrow_InitA<CTG, WIDE_M, -1> {
+		static void Init(ColFunc*& dst) {}
 	};
 
 	//! Narrow-phase 判定関数群
@@ -246,7 +256,9 @@ namespace boom {
 
 		//! 当たり判定を行う関数をリストにセットする
 		static void Initialize() {
-			Narrow_Init<CTG, WideBits, ArraySize-1>::Init(cs_cfunc+ArraySize-1);
+			constexpr int WideM = (1<<WideBits);
+			ColFunc* cfp = cs_cfunc+ArraySize-1;
+			Narrow_InitA<CTG, WideM, WideM-1>::Init(cfp);
 		}
 		//! 当たり判定を行う関数ポインタを取得
 		static ColFunc GetCFunc(int id0, int id1) {
