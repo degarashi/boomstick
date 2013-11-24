@@ -5,16 +5,15 @@
 #include "spinner/matrix.hpp"
 #include "spinner/plane.hpp"
 #include "spinner/optional.hpp"
+#include "spinner/pose.hpp"
 
 namespace boom {
-	using spn::Vec2;
-	using spn::Vec3;
-	using spn::Mat33;
-	using spn::Mat43;
-	using spn::Mat44;
-	using spn::AMat44;
-	using spn::AMat43;
-	using spn::Plane;
+	using spn::Vec2; using spn::Vec3; using spn::Vec4;
+	using spn::AVec2; using spn::AVec3; using spn::AVec4;
+	using spn::Mat22; using spn::Mat32; using spn::Mat33; using spn::Mat43; using spn::Mat44;
+	using spn::AMat22; using spn::AMat32; using spn::AMat33; using spn::AMat43; using spn::AMat44; using spn::Plane;
+	using spn::Quat; using spn::AQuat;
+	using spn::Pose2D; using spn::Pose3D;
 	using Vec2x2 = std::pair<Vec2, Vec2>;
 	using Vec3x2 = std::pair<Vec3, Vec3>;
 	//! サポートされていない関数を読んだ時の実行時エラーを送出
