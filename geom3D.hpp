@@ -198,6 +198,7 @@ namespace boom {
 
 			spn::none_t hit(...) const;
 			bool hit(const Point& p) const;
+			bool hit(const Line& ls) const;
 		};
 		//! 直線
 		struct Line : ITagP<Line> {
@@ -214,6 +215,7 @@ namespace boom {
 			float dist_sq(const Vec3& p) const;
 
 			spn::none_t hit(...) const;
+			bool hit(const Line& ls) const;
 		};
 		//! 半直線
 		struct Ray : ITagP<Ray> {
