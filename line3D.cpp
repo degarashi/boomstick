@@ -23,6 +23,10 @@ namespace boom {
 			return nearest(p).dist_sq(p);
 		}
 
+		bool Line::hit(const Vec3& p) const {
+			Vec3 cp = NearestPoint(*this, p, [](float f){return f;});
+			return p.distance(cp) <= Point::NEAR_THRESHOLD;
+		}
 		bool Line::hit(const Line& ls) const {
 			auto fn = [](float f){return f;};
 			Vec3x2 res = NearestPoint(*this, ls, fn, fn);

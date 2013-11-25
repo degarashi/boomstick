@@ -13,6 +13,7 @@ namespace boom {
 	using spn::Mat22; using spn::Mat32; using spn::Mat33; using spn::Mat43; using spn::Mat44;
 	using spn::AMat22; using spn::AMat32; using spn::AMat33; using spn::AMat43; using spn::AMat44; using spn::Plane;
 	using spn::Quat; using spn::AQuat;
+	using spn::Plane; using spn::APlane;
 	using spn::Pose2D; using spn::Pose3D;
 	using Vec2x2 = std::pair<Vec2, Vec2>;
 	using Vec3x2 = std::pair<Vec3, Vec3>;

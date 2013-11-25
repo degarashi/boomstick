@@ -19,12 +19,8 @@ namespace boom {
 			return *this;
 		}
 
-		bool Point::hit(const Point& p) const {
+		bool Point::hit(const Vec3& p) const {
 			return distance(p) <= NEAR_THRESHOLD;
-		}
-		bool Point::hit(const Line& ls) const {
-			Vec3 cp = NearestPoint(ls, static_cast<const Vec3&>(*this), [](float f){return f;});
-			return distance(cp) <= NEAR_THRESHOLD;
 		}
 	}
 }

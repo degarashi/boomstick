@@ -46,5 +46,9 @@ namespace boom {
 		bool Sphere::hit(const Ray& r) const {
 			return r.nearest(center).dist_sq(center) <= spn::Square(radius);
 		}
+		bool Sphere::hit(const Segment& s) const {
+			Vec3 cp = NearestPoint(s.asLine(), center, [](float f){return f;});
+			return cp.dist_sq(center) <= spn::Square(radius);
+		}
 	}
 }

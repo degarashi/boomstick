@@ -31,5 +31,21 @@ namespace boom {
 			c.radius = radius;
 			return c;
 		}
+
+		bool Capsule::hit(const Vec3& p) const {
+			Vec3 cp = NearestPoint(seg.asLine(), p, [](float f){return spn::Saturate(f,0.f,1.f);});
+			return cp.dist_sq(p) <= spn::Square(radius);
+		}
+		namespace {
+			const auto fnSat = [](float f){ return spn::Saturate(f, 0.f,1.f); };
+		}
+		bool Capsule::hit(const Segment& s) const {
+			Vec3x2 res = NearestPoint(seg.asLine(), s.asLine(), fnSat, fnSat);
+			return res.first.dist_sq(res.second) <= spn::Square(radius);
+		}
+		bool Capsule::hit(const Capsule& c) const {
+			Vec3x2 res = NearestPoint(seg.asLine(), c.seg.asLine(), fnSat, fnSat);
+			return res.first.dist_sq(res.second) <= spn::Square(radius + c.radius);
+		}
 	}
 }

@@ -99,14 +99,6 @@ namespace boom {
 			}
 			return getDir() * (f0 / (f0+f1));
 		}
-
-		bool Segment::hit(const Capsule& c) const {
-			return false;
-		}
-		bool Segment::hit(const Sphere& s) const {
-			Vec3 cp = NearestPoint(asLine(), s.center, [](float f){return f;});
-			return cp.dist_sq(s.center) <= spn::Square(s.radius);
-		}
 		bool Segment::hit(const Plane& p) const {
 			return crossPointFit(p, 1e-5f);
 		}

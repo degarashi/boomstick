@@ -8,6 +8,7 @@
 namespace boom {
 	namespace geo3d {
 		using LNear = std::pair<Vec3,LINEPOS>;
+		struct Point;
 		struct Sphere;
 		struct Line;
 		struct Ray;
@@ -17,7 +18,7 @@ namespace boom {
 		struct AABB;
 		struct Convex;
 		struct Cone;
-		using CTGeo = spn::CType<Sphere, Line, Ray, Segment, Capsule, Frustum, AABB, Cone>;//, Convex>;
+		using CTGeo = spn::CType<AABB, Frustum, Cone, Capsule, Sphere, Segment, Ray, Line, Point>; // Convex
 		template <class T>
 		using ITagP = ITagP_base<T, CTGeo>;
 
@@ -43,10 +44,11 @@ namespace boom {
 			Sphere operator * (const AMat43& m) const;
 
 			spn::none_t hit(...) const;
-			bool hit(const Line& l) const;
 			bool hit(const Ray& r) const;
 			bool hit(const Sphere& s) const;
 			bool hit(const Capsule& c) const;
+			bool hit(const Line& ls) const;
+			bool hit(const Segment& s) const;
 
 			static Sphere Cover(MdlItr mI, MdlItr mE);
 		};
@@ -197,8 +199,7 @@ namespace boom {
 			const Vec3& support(const Vec3& dir) const;
 
 			spn::none_t hit(...) const;
-			bool hit(const Point& p) const;
-			bool hit(const Line& ls) const;
+			bool hit(const Vec3& p) const;
 		};
 		//! 直線
 		struct Line : ITagP<Line> {
@@ -215,6 +216,7 @@ namespace boom {
 			float dist_sq(const Vec3& p) const;
 
 			spn::none_t hit(...) const;
+			bool hit(const Vec3& p) const;
 			bool hit(const Line& ls) const;
 		};
 		//! 半直線
@@ -267,8 +269,6 @@ namespace boom {
 			spn::Optional<Vec3> crossPointFit(const Plane& plane, float threshold) const;
 
 			spn::none_t hit(...) const;
-			bool hit(const Sphere& s) const;
-			bool hit(const Capsule& c) const;
 			bool hit(const Plane& p) const;
 		};
 		//! カプセル
@@ -287,9 +287,9 @@ namespace boom {
 			Capsule operator * (const AMat43& m) const;
 
 			spn::none_t hit(...) const;
-			bool hit(const Point& p) const { return false; }
-			bool hit(const Sphere& s) const { return false; }
-			bool hit(const Capsule& c) const { return false; }
+			bool hit(const Vec3& p) const;
+			bool hit(const Segment& s) const;
+			bool hit(const Capsule& c) const;
 		};
 		using CapsuleM = Model<Capsule>;
 		using CapsuleC = Cache<CacheBase<Capsule>>;
@@ -314,19 +314,36 @@ namespace boom {
 		/*! 距離1,幅1,高さ1の四角錐を基本としFovの調整はスケーリングで対応 */
 		struct Frustum : ITagP<Frustum>, public Pose3D {
 			struct Points {
-				enum POS { LT,RT,LB,RB, NUM_POS };
 				union {
 					struct {
-						Vec3 center,
-							pt[NUM_POS];
+						Vec3 center;
+						union {
+							struct { Vec3 leftTop, rightTop, leftBottom, rightBottom; };
+							Vec3 corner[4];
+						};
 					};
-					Vec3 ar[NUM_POS+1];
+					Vec3 ar[5];
 				};
 				Points() = default;
+				Points(const Vec3& cen, const Vec3& lt, const Vec3& rt, const Vec3& lb, const Vec3& rb);
 				Points(const Points& pts);
-				Points& operator = (const Points& pts);
 				bool hit(const Plane& p) const;
+				Points& operator = (const Points& pts);
+				Points operator * (const AMat43& m) const;
 			};
+			struct Planes {
+				union {
+					struct { Plane left, right, bottom, top, front; };
+					Plane ar[5];
+				};
+				Planes() = default;
+				Planes(const Plane& pL, const Plane& pR, const Plane& pB, const Plane& pT, const Plane& pF);
+				Planes(const Planes& ps);
+				Planes& operator = (const Planes& ps);
+				Planes operator * (const AMat43& m) const;
+			};
+			const static Points cs_pointsLocal;
+			const static Planes cs_planesLocal;
 
 			Frustum() = default;
 			using Pose3D::Pose3D;
@@ -345,12 +362,13 @@ namespace boom {
 
 			spn::none_t hit(...) const;
 			bool hit(const Sphere& s) const;
+			bool hit(const Cone& c) const;
 			bool hit(const Frustum& f) const;
-			bool hit(const Cone& cone) const;
-			bool hit(const Plane& plane) const;
+			bool hit(const Plane& p) const;
 
 			//! 5頂点と引数の平面との距離をコールバックで順次受け取る
-			void iterateLocalPlane(const Plane& plane, std::function<void (float)> cb) const;
+			/*! \param[in] cb [(0=中央,1以降はPoints::POSの順番と同じ), 面との距離] */
+			void iterateLocalPlane(const Plane& plane, std::function<void (int, float)> cb) const;
 			//! 上、右の平面法線を計算(但しローカル)
 			Vec3x2 getUpRightLocalDir() const;
 			//! 辺がAを通過しているか
@@ -360,9 +378,9 @@ namespace boom {
 			//! 面との相対位置
 			int checkSide(const Plane& plane, float threshold) const;
 			//! 四錐台の4 + 1頂点を計算
-			/*! \param[in] bWorld ワールド座標系出力フラグ
-				\param[in] */
+			/*! \param[in] bWorld ワールド座標系出力フラグ */
 			Points getPoints(bool bWorld) const;
+			Planes getPlanes(bool bWorld) const;
 			//! 指定された行列で変換した時の透視平面上での大きさ
 			spn::Rect get2DRect(const AMat43& mV, const AMat44& mP) const;
 		};
@@ -384,12 +402,12 @@ namespace boom {
 			std::pair<Vec3,float> nearestPoint(const Plane& plane) const;
 
 			spn::none_t hit(...) const;
-// 			bool hit(const Vec3& p) const;
-// 			bool hit(const Segment& s) const;
-// 			bool hit(const Plane& p) const;
+			bool hit(const Vec3& p) const;
+			bool hit(const Plane& p) const;
+			bool hit(const Segment& s) const;
 
-// 			Vec3 support(const Vec3& dir) const;
-// 			Cone& operator * (const AMat43& m) const;
+			Vec3 support(const Vec3& dir) const;
+			Cone operator * (const AMat43& m) const;
 		};
 		//! AxisAligned Box
 		struct AABB : ITagP<AABB> {
@@ -410,7 +428,7 @@ namespace boom {
 
 			spn::none_t hit(...) const;
 			bool hit(const AABB& ab) const;
-			bool hit(const Plane& plane) const;
+			bool hit(const Plane& p) const;
 		};
 
 		//! Narrow Phase判定
@@ -426,7 +444,22 @@ namespace boom {
 		//! 直線(線分)の最近傍点対
 		template <class CLIP0, class CLIP1>
 		inline Vec3x2 NearestPoint(const Line& ls0, const Line& ls1, CLIP0 clip0, CLIP1 clip1) {
-			return Vec3x2();
+			float d = ls0.dir.dot(ls0.dir) * ls1.dir.dot(ls1.dir) - spn::Square(ls0.dir.dot(ls1.dir));
+			if(std::fabs(d) <= Point::NEAR_THRESHOLD) {
+				// 2つの直線は平行
+				return Vec3x2(ls0.pos, NearestPoint(ls1, ls0.pos, [](float f){return f;}));
+			}
+			Mat22 m(ls1.dir.dot(ls1.dir), ls0.dir.dot(ls1.dir),
+					ls0.dir.dot(ls1.dir), ls0.dir.dot(ls0.dir));
+			float fv[2] = {(ls1.pos - ls0.pos).dot(ls0.dir),
+							(ls0.pos - ls1.pos).dot(ls1.dir)};
+			float fvt[2] = {m.ma[0][0]*fv[0] + m.ma[0][1]*fv[1],
+							m.ma[1][0]*fv[0] + m.ma[1][1]*fv[1]};
+			fvt[0] *= 1/d;
+			fvt[1] *= 1/d;
+
+			return Vec3x2(Vec3(ls0.pos + ls0.dir*clip0(fvt[0])),
+							Vec3(ls1.pos + ls1.dir*clip1(fvt[1])));
 		}
 	}
 }
