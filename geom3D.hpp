@@ -3,10 +3,26 @@
 #include "geom.hpp"
 #include "spinner/resmgr.hpp"
 #include "spinner/size.hpp"
+#include "spinner/layerbit.hpp"
 #include <memory>
+#include <unordered_set>
 
 namespace boom {
+	namespace geo2d {
+		struct Convex;
+	}
 	namespace geo3d {
+		struct ConvexUD_Col;
+		template <class, class>
+		class Convex;
+		using ColCv = Convex<Vec3, ConvexUD_Col>;
+
+		constexpr float DOT_TOLERANCE = 1e-4f,
+						CREATE_PLANE_DIST = 5e2f,
+						PORTALBOX_VOLUME = 5e2f,
+						VTX_NEAR_TOLERANCE = 1e-5f,
+						NEARPLANE_TOLERANCE = 1e-3f,
+						LINEAR_TOLERANCE = 1.0f - 1e-6f;
 		using LNear = std::pair<Vec3,LINEPOS>;
 		struct Point;
 		struct Sphere;
@@ -16,9 +32,10 @@ namespace boom {
 		struct Capsule;
 		struct Frustum;
 		struct AABB;
-		struct Convex;
 		struct Cone;
-		using CTGeo = spn::CType<AABB, Frustum, Cone, Capsule, Sphere, Segment, Ray, Line, Point>; // Convex
+		struct Cylinder;
+		struct ConvexP;
+		using CTGeo = spn::CType<ConvexP, AABB, Frustum, Cone, Cylinder, Capsule, Sphere, Segment, Ray, Line, Point>;
 		template <class T>
 		using ITagP = ITagP_base<T, CTGeo>;
 
@@ -272,8 +289,7 @@ namespace boom {
 			bool hit(const Plane& p) const;
 		};
 		//! カプセル
-		struct Capsule : ITagP<Capsule> {
-			Segment seg;
+		struct Capsule : ITagP<Capsule>, Segment {
 			float	radius;
 
 			// ---- cacheable functions ----
@@ -290,6 +306,8 @@ namespace boom {
 			bool hit(const Vec3& p) const;
 			bool hit(const Segment& s) const;
 			bool hit(const Capsule& c) const;
+
+			using ITagP<Capsule>::GetCID;
 		};
 		using CapsuleM = Model<Capsule>;
 		using CapsuleC = Cache<CacheBase<Capsule>>;
@@ -429,6 +447,174 @@ namespace boom {
 			spn::none_t hit(...) const;
 			bool hit(const AABB& ab) const;
 			bool hit(const Plane& p) const;
+		};
+		//! 各座標を格納するまでもないけどポリゴンを管理したい時のクラス
+		/*! CnvPとセットで使用する */
+		struct Idx3 {
+			Idx3*	_neighbor[3];	//!< 隣接するポリゴン. エッジ順
+			Plane	_plane;
+			uint8_t	_id[3],			//!< 構成する頂点のインデックス
+					_pid;			//!< ポリゴンインデックス
+			public:
+				Idx3();
+				//! インデックスだけ初期化
+				Idx3(int i0, int i1, int i2, int pid);
+				//! 初期化と同時にポリゴン平面を計算
+				Idx3(int i0, int i1, int i2, const Vec3List& vtx, int pid);
+				void flip();
+				void iterateEdge(std::function<void (int,int,Idx3*)> cb);
+				const Plane& getPlane() const;
+				int getID(int n) const;
+				std::pair<int,int> getEdge(int n) const;
+				void rewriteNeighbor(int idx, Idx3* p, bool bOther=false);
+				void initNeighbor(Idx3* p0, Idx3* p1, Idx3* p2);
+				Idx3* getNeighbor(int n);
+				int findEdge(int id) const;
+		};
+		using Idx3List = std::vector<Idx3>;
+		using IdxP3Set = std::unordered_set<Idx3*>;
+		//! quickhullをする際の補助クラス
+		class CnvP {
+			class PolyF : public spn::FreeObj<Idx3,false> {
+				public:
+					PolyF(int n): FreeObj(n) {}
+					template <class... Args>
+					Ptr get(Args&&... args) {
+						return FreeObj::get(std::forward<Args>(args)..., getNextID());
+					}
+			};
+			//! ポリゴン張り直しをする場合のリストクラス
+			struct PolyEdge {
+				int 	_srcIdx[2];
+				Idx3* 	_dstPoly;			//!< 接続先ポリゴン (_srcIdx[1]から始まるエッジ)
+				PolyEdge(Idx3* poly, int idx0, int idx1) {
+					_dstPoly = poly;
+					_srcIdx[0] = idx0;
+					_srcIdx[1] = idx1;
+				}
+			};
+			using PEVec = std::vector<PolyEdge>;
+			using PtrL = std::array<PolyF::Ptr, 0x100>;
+			using VCand = std::array<uint8_t, 0x100>;
+			using UseVID = std::array<uint8_t, 0x100>;
+
+			PolyF		_poly;			//!< ポリゴンの実体
+			PtrL		_pcand,			//!< ポリゴン候補リスト
+						_pface;			//!< ポリゴン確定リスト
+			VCand		_vcand;			//!< 頂点候補リスト
+			UseVID		_useVID;		//!< 現在凸殻に使われている頂点の参照回数)
+			int			_pcCur,
+						_pfCur,
+						_vcCur;
+			const Vec3List& _vtx;
+			//! 頂点カウントのイテレーションを高速に行うためのビット配列 (レイヤー)
+			spn::LayerBitArray<0x100, uint8_t>		_bfVID;
+
+			void _addRefVID(int vid);
+			void _unRefVID(int vid);
+			PolyF::Ptr& _addPoly(int i0, int i1, int i2);	//!< ポリゴン生成 & 頂点リストへの追加など
+			void _remPoly(Idx3* p);					//!< ポリゴンのメモリ解放 & 頂点リストからの解除など
+			Idx3* _pickPoly();						//!< 候補ポリゴンから1つポリゴンを抜き出す (本当は何か基準が要る)
+			void _remTopPoly();						//!< 前回選ばれた候補を削除
+			/*! @param[out] dstI 消去されるポリゴンリスト
+				@param[out] dst 新たに面を張るエッジリスト
+				@param[in] vert 基準頂点
+				@param[in] poly これから処理するポリゴン */
+			void _enumEdge(PEVec& dst, IdxP3Set& dstI, const Vec3& vert, Idx3* poly);		//!< ポリゴン張りなおす際にどのエッジが境界か調べる
+			void _check();
+
+			public:
+				CnvP(const int (&initial)[4], const Vec3List& vtx);	//!< 必ず4面体から探索を始める
+				bool quickHull();
+				Idx3List getResult(Vec3List& dstV) const;
+		};
+		//! 凸包
+		class ConvexP : public ITagP<ConvexP> {
+			Vec3List	_vtx;
+			enum RFLAG {
+				RFL_GCENTER = 0x01,
+				RFL_POLYFACE = 0x02
+			};
+			mutable uint32_t	_rflg;
+			mutable	Idx3List	_pface;		//! 凸包ポリゴンインデックス
+			mutable Vec3		_vGCenter;	//!< 重心座標
+
+			void _init(int) {}
+			template <class... Args>
+			void _init(int idx, const Vec3& v, Args&&... args) {
+				_vtx[idx] = v;
+				_init(idx+1, std::forward<Args>(args)...);
+			}
+
+			public:
+				ConvexP();
+				ConvexP(const Vec3* src, int n);
+				ConvexP(ConvexP&& c);
+				ConvexP(Vec3List&& src);
+
+				template <class... Args>
+				ConvexP(const Vec3& v, Args&&... args): _vtx(sizeof...(args)+1) {
+					_init(0, v, std::forward<Args>(args)...);
+				}
+				void addVtx(const Vec3& v);
+				const Vec3List& getVtxArray() const;
+				const Vec3& getVtx(int n) const;
+				int getNVtx() const;
+				void popVtx();
+				//! quickHull法を用いて凸多面体にする
+				/*! ついでにポリゴンインデックスをキャッシュ */
+				bool quickHull();
+				bool hasPoint(const Vec3& p);
+				void swap(ConvexP& c) noexcept;
+
+				static Vec3 DualTransform(const Plane& plane);
+				static Plane DualTransform(const Vec3& p);
+				static Vec3List DualTransform(const PlaneList& plL);
+				Vec3List exportDualTransform();
+				void dualTransform(Vec3List& dst, const Vec3& dir, const Vec3& pos);
+				ConvexP operator + (const Vec3& ofs) const;
+				ConvexP operator - (const Vec3& ofs) const;
+				ConvexP& operator += (const Vec3& ofs);
+				ConvexP& operator -= (const Vec3& ofs);
+				const Idx3List& getPolyFace();
+
+				// ---- cacheable functions ----
+				const Vec3& bs_getGCenter() const;
+				const Vec3& bs_getCenter() const;
+				Sphere bs_getBSphere() const;
+				float bs_getArea() const;
+				Mat33 bs_getInertia() const;
+				AABB bs_getAABB() const;
+				// -----------------------------
+				Vec3 support(const Vec3& dir) const;
+
+				// すべてGJK法で衝突判定するのでここには判定関数を記述しない
+				spn::none_t hit(...) const;
+		};
+		//! 円柱
+		struct Cylinder : ITagP<Cylinder>, Capsule {
+			// ---- cacheable functions ----
+			Vec3 bs_getGCenter() const;
+			Vec3 bs_getCenter() const;
+			Sphere bs_getBSphere() const;
+			float bs_getArea() const;
+			Mat33 bs_getInertia() const;
+			// -----------------------------
+			Vec3 support(const Vec3& dir) const;
+			Cylinder operator * (const AMat43& m) const;
+
+			// 底面と上面を計算し平面を返す
+			Vec3x2 getBeginPlaneV() const;
+			Vec3x2 getEndPlaneV() const;
+			Plane getBeginPlane() const;
+			Plane getEndPlane() const;
+
+			// 凸ポリゴンを円柱ローカル座標に変換し上面と底面でクリップ
+			void translateLocal(ColCv& cp) const;
+			Vec3 translateLocal(const Vec3& vec) const;
+
+			spn::none_t hit(...) const;
+			using ITagP<Cylinder>::GetCID;
 		};
 
 		//! Narrow Phase判定

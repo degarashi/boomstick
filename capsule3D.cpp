@@ -4,13 +4,13 @@ namespace boom {
 	namespace geo3d {
 		// --------------------- Capsule ---------------------
 		Vec3 Capsule::bs_getCenter() const {
-			return seg.bs_getCenter();
+			return bs_getCenter();
 		}
 		Vec3 Capsule::bs_getGCenter() const {
-			return seg.bs_getGCenter();
+			return bs_getGCenter();
 		}
 		Sphere Capsule::bs_getBSphere() const {
-			auto s = seg.bs_getBSphere();
+			auto s = bs_getBSphere();
 			s.radius += radius;
 			return s;
 		}
@@ -21,30 +21,30 @@ namespace boom {
 			INVOKE_ERROR
 		}
 		Vec3 Capsule::support(const Vec3& dir) const {
-			if((seg.to - seg.from).dot(dir) > 0)
-				return Sphere(seg.to, radius).support(dir);
-			return Sphere(seg.from, radius).support(dir);
+			if((to - from).dot(dir) > 0)
+				return Sphere(to, radius).support(dir);
+			return Sphere(from, radius).support(dir);
 		}
 		Capsule Capsule::operator * (const AMat43& m) const {
 			Capsule c;
-			c.seg = seg * m;
+			static_cast<Segment&>(c) = static_cast<Segment&>(c) * m;
 			c.radius = radius;
 			return c;
 		}
 
 		bool Capsule::hit(const Vec3& p) const {
-			Vec3 cp = NearestPoint(seg.asLine(), p, [](float f){return spn::Saturate(f,0.f,1.f);});
+			Vec3 cp = NearestPoint(asLine(), p, [](float f){return spn::Saturate(f,0.f,1.f);});
 			return cp.dist_sq(p) <= spn::Square(radius);
 		}
 		namespace {
 			const auto fnSat = [](float f){ return spn::Saturate(f, 0.f,1.f); };
 		}
 		bool Capsule::hit(const Segment& s) const {
-			Vec3x2 res = NearestPoint(seg.asLine(), s.asLine(), fnSat, fnSat);
+			Vec3x2 res = NearestPoint(asLine(), s.asLine(), fnSat, fnSat);
 			return res.first.dist_sq(res.second) <= spn::Square(radius);
 		}
 		bool Capsule::hit(const Capsule& c) const {
-			Vec3x2 res = NearestPoint(seg.asLine(), c.seg.asLine(), fnSat, fnSat);
+			Vec3x2 res = NearestPoint(asLine(), c.asLine(), fnSat, fnSat);
 			return res.first.dist_sq(res.second) <= spn::Square(radius + c.radius);
 		}
 	}

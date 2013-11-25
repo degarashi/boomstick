@@ -7,5 +7,7 @@
 namespace boom {
 	namespace geo2d {
 		using LNear = std::pair<Vec3,LINEPOS>;
+		struct Convex {
+		};
 	}
 }

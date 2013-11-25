@@ -17,6 +17,9 @@ namespace boom {
 	using spn::Pose2D; using spn::Pose3D;
 	using Vec2x2 = std::pair<Vec2, Vec2>;
 	using Vec3x2 = std::pair<Vec3, Vec3>;
+	using Vec3List = std::vector<Vec3>;
+	using PlaneList = std::vector<Plane>;
+	using IndexList = std::vector<uint16_t>;
 	//! サポートされていない関数を読んだ時の実行時エラーを送出
 	#define INVOKE_ERROR Assert(Trap, false, "not supported function: ", __func__) throw 0;
 	//! IModelから指定の型にキャスト出来ればその参照を返す関数のデフォルト実装

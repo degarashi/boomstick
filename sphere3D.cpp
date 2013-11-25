@@ -41,7 +41,7 @@ namespace boom {
 			return l.dist_sq(center) <= spn::Square(radius);
 		}
 		bool Sphere::hit(const Capsule& c) const {
-			return c.seg.dist_sq(center) <= spn::Square(radius);
+			return c.dist_sq(center) <= spn::Square(radius);
 		}
 		bool Sphere::hit(const Ray& r) const {
 			return r.nearest(center).dist_sq(center) <= spn::Square(radius);
