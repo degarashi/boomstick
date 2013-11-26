@@ -15,11 +15,56 @@ namespace boom {
 	using spn::Quat; using spn::AQuat;
 	using spn::Plane; using spn::APlane;
 	using spn::Pose2D; using spn::Pose3D;
+	using spn::Bit;
+	using Float2 = std::pair<float,float>;
+	using Int2 = std::pair<int,int>;
+	using Int2x2 = std::pair<Int2,Int2>;
+	using Uint2 = std::pair<uint32_t, uint32_t>;
 	using Vec2x2 = std::pair<Vec2, Vec2>;
 	using Vec3x2 = std::pair<Vec3, Vec3>;
 	using Vec3List = std::vector<Vec3>;
 	using PlaneList = std::vector<Plane>;
 	using IndexList = std::vector<uint16_t>;
+
+	//! 90度回転行列(2D)
+	extern const AMat22 cs_mRot90[2];
+	//! v0とv1で表される面積の2倍
+	float Area_x2(const Vec2& v0, const Vec2& v1);
+	float Area_x2(const Vec3& v0, const Vec3& v1);
+	//! 三角形(v0,v1,v2)のvtに対する重心比率
+	/*! \return first: (v1-v0)の比率 <br>
+				second: (v2-v0)の比率 */
+	inline Vec2 TriangleRatio(const Vec2& v0, const Vec2& v1, const Vec2& v2, const Vec2& vt) {
+		Float2 ret;
+		Vec2 	toV1(v1-v0),
+				toV2(v2-v0),
+				toVT(vt-v0);
+		float det = spn::CramerDet(toV1, toV2);
+		return spn::CramersRule(toV1, toV2, toVT, spn::Rcp22Bit(det));
+	}
+	//! 三角形(v0,v1,v2)のvtに対する重心比率をユーザー定義変数(f0,f1,f2)に適用した物を算出
+	/*! \param[in] v0 三角形座標0
+		\param[in] f0 ユーザー定義変数
+		\return 補間された値 */
+	template <class T>
+	T TriangleLerp(const Vec2& v0, const Vec2& v1, const Vec2& v2, const Vec2& vt,
+					const T& f0, const T& f1, const T& f2)
+	{
+		auto res = TriangleRatio(v0,v1,v2,vt);
+		auto toT01 = f1-f0,
+			toT02 = f2-f0;
+		return (toT01 * res.x) + (toT02 * res.y) + f0;
+	}
+	template <class T>
+	T LineLerp(const Vec2& v0, const Vec2& v1, const Vec2& vt,
+				const T& f0, const T& f1)
+	{
+		auto line(v1-v0),
+			line2(vt-v0);
+		float r = line2.length() * spn::Rcp22Bit(line.length());
+		return spn::Lerp(f0, f1, r);
+	}
+
 	//! サポートされていない関数を読んだ時の実行時エラーを送出
 	#define INVOKE_ERROR Assert(Trap, false, "not supported function: ", __func__) throw 0;
 	//! IModelから指定の型にキャスト出来ればその参照を返す関数のデフォルト実装
@@ -37,7 +82,6 @@ namespace boom {
 		uint32_t getCID() const override { return T::GetCID(); }
 	};
 	//! IModelインタフェースの子ノードイテレータ
-	template <class T>
 	struct PtrItr {
 		const uint8_t*	ptr;
 		const size_t	stride;
@@ -53,10 +97,7 @@ namespace boom {
 			return ptr == pi.ptr; }
 		bool operator != (const PtrItr& pi) const {
 			return !(operator == (pi)); }
-		const T& operator * () const {
-			return *(operator -> ()); }
-		const T* operator -> () const {
-			return get(); }
+		template <class T>
 		const T* get() const {
 			return reinterpret_cast<const T*>(ptr); }
 		int operator - (const PtrItr& p) const {
@@ -64,12 +105,80 @@ namespace boom {
 			return diff / stride;
 		}
 	};
+	using MdlIP = std::pair<PtrItr, PtrItr>;
+
+	//! 2D/3D共通
+	struct IModelNode {
+		IModelNode* pParent = nullptr;
+		virtual ~IModelNode() {}
+
+		//! 子に変更があった事を親ノードに(あれば)伝える
+		virtual void notifyChange();
+		virtual void applyChange();
+		//! 子ノードの取得
+		virtual MdlIP getInner() const;
+		//! モデルの実体
+		virtual const void* getCore() const = 0;
+		//! 最寄りのユーザーデータを取得
+		/*! このノードが持っていればそれを返し、無ければ親を遡って探す */
+		virtual void* getUserData() const;
+
+		friend std::ostream& operator << (std::ostream& os, const IModelNode& mdl);
+	};
+	//! 子ノードを含むIModelインタフェース
+	template <class IM, class CHILD, class COVER, class UD=spn::none_t>
+	struct ModelCh : IModelP_base<CHILD, IM> {
+		using ChL = std::vector<CHILD>;
+		COVER	_cover;
+		ChL		_chL;
+		bool	_bChange = false;
+		UD		_udata;
+
+		template <class MC>
+		void addChild(MC&& mc) {
+			_chL.push_back(std::forward<MC>(mc));
+			_bChange = true;
+		}
+		CHILD& operator [](int n) { return _chL[n]; }
+		const CHILD& operator [](int n) const { return _chL[n]; }
+
+		MdlIP getInner() const override {
+			if(_chL.empty())
+				return MdlIP();
+			int nC = _chL.size();
+			return MdlIP(MdlItr(&_chL[0], sizeof(CHILD)), MdlItr(&_chL[nC-1], sizeof(CHILD)));
+		}
+		void applyChange() override {
+			if(_bChange) {
+				_bChange = false;
+				for(auto& c : _chL)
+					c.applyChange();
+				auto mip = getInner();
+				COVER::Cover(mip.first, mip.second);
+			}
+		}
+		virtual void* getUserData() {
+			return _getUserData(std::is_same<spn::none_t, UD>());
+		}
+		void* _getUserData(std::true_type) {
+			return (IM::pParent) ? IM::pParent->getUserData() : nullptr;
+		}
+		void* _getUserData(std::false_type) {
+			return &_udata;
+		}
+	};
 	//! ラインの位置を示す
-	enum class LINEPOS {
+	enum class LinePos {
 		Begin,		//!< 始点
 		End,		//!< 終点
 		OnLine,		//!< ライン上
 		NotHit
+	};
+	//! 凸包の位置を示す
+	enum class ConvexPos {
+		Inner,
+		OnLine,
+		Outer
 	};
 
 	template <class... Ts>
@@ -291,11 +400,11 @@ namespace boom {
 			if(in.first != in.second) {
 				// ここで判定関数を取得
 				// Innerに含まれる子オブジェクトは全て同じ型 という前提
-				ColFunc cf = GetCFunc(in.first->getCID(), mdl1->getCID());
+				ColFunc cf = GetCFunc(in.first.template get<IM>()->getCID(), mdl1->getCID());
 				const void* core1 = mdl1->getCore();
 				do {
-					if(cf(in.first->getCore(), core1)) {
-						if(HitL(mdl1, in.first.get(), false))
+					if(cf(in.first.template get<IM>()->getCore(), core1)) {
+						if(HitL(mdl1, in.first.template get<IM>(), false))
 							return true;
 					}
 				} while(++in.first != in.second);

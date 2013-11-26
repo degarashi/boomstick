@@ -10,7 +10,7 @@ namespace boom {
 		Vec3 Sphere::support(const Vec3& dir) const {
 			return center + dir*radius;
 		}
-		Sphere Sphere::Cover(MdlItr mI, MdlItr mE) {
+		Sphere Sphere::Cover(PtrItr mI, PtrItr mE) {
 			Sphere sp(Vec3(0),0);
 			int n = mE - mI;
 			if(n == 0)
@@ -18,12 +18,12 @@ namespace boom {
 
 			auto mI2 = mI;
 			while(mI2 != mE)
-				sp.center += mI2->im_getCenter();
+				sp.center += mI2.get<IModel>()->im_getCenter();
 			sp.center /= n;
 
 			while(mI != mE) {
-				Sphere s2 = mI->im_getBSphere();
-				float d = sp.center.distance(mI->im_getCenter()) + s2.radius/2;
+				Sphere s2 = mI.get<IModel>()->im_getBSphere();
+				float d = sp.center.distance(mI.get<IModel>()->im_getCenter()) + s2.radius/2;
 				if(sp.radius < d)
 					sp.radius = d;
 			}

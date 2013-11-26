@@ -27,18 +27,18 @@ namespace boom {
 			return r * rlen;
 		}
 		LNear Segment::nearest(const Vec3& p) const {
-			LINEPOS lpos;
+			LinePos lpos;
 			float len = from.distance(to);
 			Vec3 res = NearestPoint(asLine(), p, [&lpos, len](float f) ->float{
 				if(f < 0.0f) {
-					lpos = LINEPOS::Begin;
+					lpos = LinePos::Begin;
 					return 0;
 				}
 				if(f > len) {
-					lpos = LINEPOS::End;
+					lpos = LinePos::End;
 					return len;
 				}
-				lpos = LINEPOS::OnLine;
+				lpos = LinePos::OnLine;
 				return f;
 			});
 			return LNear(res, lpos);

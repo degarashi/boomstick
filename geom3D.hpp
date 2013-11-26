@@ -23,7 +23,7 @@ namespace boom {
 						VTX_NEAR_TOLERANCE = 1e-5f,
 						NEARPLANE_TOLERANCE = 1e-3f,
 						LINEAR_TOLERANCE = 1.0f - 1e-6f;
-		using LNear = std::pair<Vec3,LINEPOS>;
+		using LNear = std::pair<Vec3,LinePos>;
 		struct Point;
 		struct Sphere;
 		struct Line;
@@ -39,9 +39,6 @@ namespace boom {
 		template <class T>
 		using ITagP = ITagP_base<T, CTGeo>;
 
-		struct IModel;
-		using MdlItr = PtrItr<IModel>;
-		using MdlIP = std::pair<MdlItr, MdlItr>;
 		struct Sphere : ITagP<Sphere> {
 			Vec3 center;
 			float radius;
@@ -67,25 +64,11 @@ namespace boom {
 			bool hit(const Line& ls) const;
 			bool hit(const Segment& s) const;
 
-			static Sphere Cover(MdlItr mI, MdlItr mE);
+			static Sphere Cover(PtrItr mI, PtrItr mE);
 		};
-		struct IModel {
-			IModel* pParent = nullptr;
-			//! 子に変更があった事を親ノードに(あれば)伝える
-			virtual void notifyChange();
-			virtual void applyChange();
-			//! 子ノードの取得
-			virtual MdlIP getInner() const;
-			//! モデルの実体
-			virtual const void* getCore() const = 0;
-			//! 最寄りのユーザーデータを取得
-			/*! このノードが持っていればそれを返し、無ければ親を遡って探す */
-			virtual void* getUserData() const;
+		struct IModel : ::boom::IModelNode {
 			//! 形状の通し番号
 			virtual uint32_t getCID() const = 0;
-
-			friend std::ostream& operator << (std::ostream& os, const IModel& mdl);
-
 			// ---- cacheable functions ----
 			virtual Sphere im_getBSphere() const = 0;
 			virtual Mat33 im_getInertia() const = 0;
@@ -111,46 +94,6 @@ namespace boom {
 			Vec3 im_getCenter() const override { return T::bs_getCenter(); }
 			Vec3 im_getGCenter() const override { return T::bs_getGCenter(); }
 			Vec3 im_support(const Vec3& dir) const override { return T::support(dir); }
-		};
-		//! 子ノードを含むIModelインタフェース
-		template <class M, class UD=spn::none_t>
-		struct ModelCh : IModelP_base<M, IModel> {
-			using ChL = std::vector<M>;
-			Sphere	_cover = Sphere(Vec3(0),0);
-			ChL		_chL;
-			bool	_bChange = false;
-			UD		_udata;
-
-			template <class MC>
-			void addChild(MC&& mc) {
-				_chL.push_back(std::forward<MC>(mc));
-				_bChange = true;
-			}
-			M& operator [](int n) { return _chL[n]; }
-			const M& operator [](int n) const { return _chL[n]; }
-
-			MdlIP getInner() const override {
-				if(_chL.empty())
-					return MdlIP();
-				int nC = _chL.size();
-				return MdlIP(MdlItr(&_chL[0], sizeof(M)), MdlItr(&_chL[nC-1], sizeof(M)));
-			}
-			void applyChange() override {
-				if(_bChange) {
-					_bChange = false;
-					for(auto& c : _chL)
-						c.applyChange();
-				}
-			}
-			virtual void* getUserData() {
-				return _getUserData(std::is_same<spn::none_t, UD>());
-			}
-			void* _getUserData(std::true_type) {
-				return (IModel::pParent) ? IModel::pParent->getUserData() : nullptr;
-			}
-			void* _getUserData(std::false_type) {
-				return &_udata;
-			}
 		};
 		// ------------------ Cache system ------------------
 		DEF_CACHETAG(TagCenter, spn::Vec3, bs_getCenter)
@@ -647,5 +590,6 @@ namespace boom {
 			return Vec3x2(Vec3(ls0.pos + ls0.dir*clip0(fvt[0])),
 							Vec3(ls1.pos + ls1.dir*clip1(fvt[1])));
 		}
+		#undef DEF_INVALID_BSFUNCS
 	}
 }
