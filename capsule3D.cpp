@@ -9,8 +9,8 @@ namespace boom {
 		Vec3 Capsule::bs_getGCenter() const {
 			return bs_getGCenter();
 		}
-		Sphere Capsule::bs_getBSphere() const {
-			auto s = bs_getBSphere();
+		Sphere Capsule::bs_getBVolume() const {
+			auto s = bs_getBVolume();
 			s.radius += radius;
 			return s;
 		}

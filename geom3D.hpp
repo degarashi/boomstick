@@ -50,7 +50,7 @@ namespace boom {
 			// ---- cacheable functions ----
 			const Vec3& bs_getGCenter() const;
 			const Vec3& bs_getCenter() const;
-			const Sphere& bs_getBSphere() const;
+			const Sphere& bs_getBVolume() const;
 			float bs_getArea() const;
 			Mat33 bs_getInertia() const;
 			// -----------------------------
@@ -70,7 +70,7 @@ namespace boom {
 			//! 形状の通し番号
 			virtual uint32_t getCID() const = 0;
 			// ---- cacheable functions ----
-			virtual Sphere im_getBSphere() const = 0;
+			virtual Sphere im_getBVolume() const = 0;
 			virtual Mat33 im_getInertia() const = 0;
 			virtual float im_getArea() const = 0;
 			virtual Vec3 im_getCenter() const = 0;
@@ -88,7 +88,7 @@ namespace boom {
 			using IModelP_base<T, IModel>::IModelP_base;
 			//TODO: 対応したルーチンを持っているか自動で判定して、無ければ例外を投げる仕組み
 			// 各種ルーチンの中継
-			Sphere im_getBSphere() const override { return T::bs_getBSphere(); }
+			Sphere im_getBVolume() const override { return T::bs_getBVolume(); }
 			Mat33 im_getInertia() const override { return T::bs_getInertia(); }
 			float im_getArea() const override { return T::bs_getArea(); }
 			Vec3 im_getCenter() const override { return T::bs_getCenter(); }
@@ -100,7 +100,7 @@ namespace boom {
 		// DEF_CACHETAG(TagGCenter, spn::Vec3, bs_getGCenter)
 		// DEF_CACHETAG(TagInertia, spn::Mat33, bs_getInertia)
 		// DEF_CACHETAG(TagArea, float, bs_getArea)
-		// DEF_CACHETAG(TagBSphere, Sphere, bs_getBSphere)
+		// DEF_CACHETAG(TagBSphere, Sphere, bs_getBVolume)
 		// using CTTag = CCType<TagGCenter, TagCenter, TagInertia, TagArea, TagBSphere>;
 		// template <class CORE>
 		// class Cache : public ::boom::Cache<CTTag, CacheBase<CORE>>, public ITagP<CORE>, public IModel {
@@ -112,7 +112,7 @@ namespace boom {
 		// 		DEF_GETMETHOD(base, getCenter, TagCenter)
 		// 		DEF_GETMETHOD(base, getGCenter, TagGCenter)
 		//
-		// 		Sphere im_getBSphere() const override { return getBSphere(); }
+		// 		Sphere im_getBVolume() const override { return getBSphere(); }
 		// 		Mat33 im_getInertia() const override { return getInertia(); }
 		// 		float im_getArea() const override { return getArea(); }
 		// 		Vec3 im_getCenter() const override { return getCenter(); }
@@ -139,7 +139,7 @@ namespace boom {
 		#define DEF_INVALID_BSFUNCS \
 			const Vec3& bs_getGCenter() const { INVOKE_ERROR } \
 			const Vec3& bs_getCenter() const { INVOKE_ERROR } \
-			const Sphere& bs_getBSphere() const { INVOKE_ERROR } \
+			const Sphere& bs_getBVolume() const { INVOKE_ERROR } \
 			const float& bs_getArea() const { INVOKE_ERROR } \
 			const Mat33& bs_getInertia() const { INVOKE_ERROR } \
 			const Vec3& support(const Vec3& dir) const { INVOKE_ERROR }
@@ -152,7 +152,7 @@ namespace boom {
 			// ---- cacheable functions ----
 			const Vec3& bs_getGCenter() const;
 			const Vec3& bs_getCenter() const;
-			Sphere bs_getBSphere() const;
+			Sphere bs_getBVolume() const;
 			const float& bs_getArea() const;
 			const Mat33& bs_getInertia() const;
 			// -----------------------------
@@ -205,7 +205,7 @@ namespace boom {
 			// ---- cacheable functions ----
 			Vec3 bs_getGCenter() const;
 			Vec3 bs_getCenter() const;
-			Sphere bs_getBSphere() const;
+			Sphere bs_getBVolume() const;
 			const float& bs_getArea() const { INVOKE_ERROR }
 			// -----------------------------
 			const Vec3& support(const Vec3& dir) const;
@@ -238,7 +238,7 @@ namespace boom {
 			// ---- cacheable functions ----
 			Vec3 bs_getCenter() const;
 			Vec3 bs_getGCenter() const;
-			Sphere bs_getBSphere() const;
+			Sphere bs_getBVolume() const;
 			float bs_getArea() const;
 			Mat33 bs_getInertia() const;
 			// -----------------------------
@@ -314,7 +314,7 @@ namespace boom {
 			// ---- cacheable functions ----
 			Vec3 bs_getGCenter() const;
 			Vec3 bs_getCenter() const;
-			Sphere bs_getBSphere() const;
+			Sphere bs_getBVolume() const;
 			float bs_getArea() const;
 			Mat33 bs_getInertia() const;
 			// -----------------------------
@@ -353,7 +353,7 @@ namespace boom {
 			// ---- cacheable functions ----
 			Vec3 bs_getGCenter() const;
 			Vec3 bs_getCenter() const;
-			Sphere bs_getBSphere() const;
+			Sphere bs_getBVolume() const;
 			float bs_getArea() const;
 			Mat33 bs_getInertia() const;
 			// -----------------------------
@@ -380,7 +380,7 @@ namespace boom {
 			// ---- cacheable functions ----
 			Vec3 bs_getGCenter() const;
 			Vec3 bs_getCenter() const;
-			Sphere bs_getBSphere() const;
+			Sphere bs_getBVolume() const;
 			float bs_getArea() const;
 			Mat33 bs_getInertia() const;
 			// -----------------------------
@@ -524,7 +524,7 @@ namespace boom {
 				// ---- cacheable functions ----
 				const Vec3& bs_getGCenter() const;
 				const Vec3& bs_getCenter() const;
-				Sphere bs_getBSphere() const;
+				Sphere bs_getBVolume() const;
 				float bs_getArea() const;
 				Mat33 bs_getInertia() const;
 				AABB bs_getAABB() const;
@@ -539,7 +539,7 @@ namespace boom {
 			// ---- cacheable functions ----
 			Vec3 bs_getGCenter() const;
 			Vec3 bs_getCenter() const;
-			Sphere bs_getBSphere() const;
+			Sphere bs_getBVolume() const;
 			float bs_getArea() const;
 			Mat33 bs_getInertia() const;
 			// -----------------------------

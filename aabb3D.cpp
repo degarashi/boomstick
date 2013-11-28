@@ -25,7 +25,7 @@ namespace boom {
 		Vec3 AABB::bs_getCenter() const {
 			return bs_getGCenter();
 		}
-		Sphere AABB::bs_getBSphere() const {
+		Sphere AABB::bs_getBVolume() const {
 			auto tmp = vmax-vmin;
 			int idx;
 			if(tmp.x > tmp.y)

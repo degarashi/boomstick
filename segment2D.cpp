@@ -75,7 +75,7 @@ namespace boom {
 		Vec2 Segment::bs_getCenter() const {
 			return (from + to) * 0.5f;
 		}
-		Circle Segment::bs_getBCircle() const {
+		Circle Segment::bs_getBVolume() const {
 			return Circle(from + to * 0.5f,
 							from.distance(to));
 		}

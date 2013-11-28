@@ -17,7 +17,7 @@ namespace boom {
 									- point[2].dot(point[0])
 									- point[0].dot(point[1]));
 		}
-		Circle Poly::bs_getBCircle() const {
+		Circle Poly::bs_getBVolume() const {
 			int id = getObtuseCorner();
 			if(id >= 0) {
 				// 鈍角を持っていれば直径を使う

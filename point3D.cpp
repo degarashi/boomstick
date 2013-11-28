@@ -8,7 +8,7 @@ namespace boom {
 		const Vec3& Point::bs_getCenter() const {
 			return *this;
 		}
-		Sphere Point::bs_getBSphere() const {
+		Sphere Point::bs_getBVolume() const {
 			return Sphere(*this, NEAR_THRESHOLD);
 		}
 		const float& Point::bs_getArea() const {

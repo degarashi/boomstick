@@ -9,7 +9,7 @@ namespace boom {
 		Vec3 Segment::bs_getCenter() const {
 			return bs_getGCenter();
 		}
-		Sphere Segment::bs_getBSphere() const {
+		Sphere Segment::bs_getBVolume() const {
 			auto v = bs_getCenter();
 			return Sphere(v, (to-from).length()/2);
 		}

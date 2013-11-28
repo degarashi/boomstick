@@ -34,7 +34,7 @@ namespace boom {
 			float bs_getArea() const;
 			float bs_getInertia() const;
 			const Vec2& bs_getCenter() const;
-			const Circle& bs_getBCircle() const;
+			const Circle& bs_getBVolume() const;
 			// -----------------------------
 			Vec2 support(const Vec2& dir) const;
 			bool isInner(const Vec2& pos) const;
@@ -55,7 +55,7 @@ namespace boom {
 			virtual Vec2 im_getCenter() const = 0;
 			virtual float im_getArea() const = 0;
 			virtual float im_getInertia() const = 0;
-			virtual Circle im_getBCircle() const = 0;
+			virtual Circle im_getBVolume() const = 0;
 			// -----------------------------
 			//! サポート射像
 			/*! 均等でないスケーリングは対応しない、移動は後でオフセット、回転はdirを逆にすれば代用可
@@ -85,7 +85,7 @@ namespace boom {
 		struct Model : IModelP_base<T, IModel> {
 			using IModelP_base<T, IModel>::IModelP_base;
 			// 各種ルーチンの中継
-			Circle im_getBCircle() const override { return T::bs_getBCircle(); }
+			Circle im_getBVolume() const override { return T::bs_getBVolume(); }
 			float im_getInertia() const override { return T::bs_getInertia(); }
 			float im_getArea() const override { return T::bs_getArea(); }
 			Vec2 im_getCenter() const override { return T::bs_getCenter(); }
@@ -149,7 +149,7 @@ namespace boom {
 			const float& bs_getArea() const;
 			const float& bs_getInertia() const;
 			const Vec2& bs_getCenter() const;
-			Circle bs_getBCircle() const;
+			Circle bs_getBVolume() const;
 			// -----------------------------
 			using Vec2::Vec2;
 			using Vec2::distance;
@@ -166,7 +166,7 @@ namespace boom {
 			const float& bs_getArea() const {INVOKE_ERROR} \
 			const float& bs_getInertia() const {INVOKE_ERROR} \
 			const Vec2& bs_getCenter() const {INVOKE_ERROR} \
-			const Circle& bs_getBCircle() const {INVOKE_ERROR}
+			const Circle& bs_getBVolume() const {INVOKE_ERROR}
 		//! 直線
 		struct Line : ITagP<Line> {
 			Vec2	pos, dir;
@@ -211,7 +211,7 @@ namespace boom {
 			const float& bs_getArea() const {INVOKE_ERROR}
 			const float& bs_getInertia() const {INVOKE_ERROR}
 			Vec2 bs_getCenter() const;
-			Circle bs_getBCircle() const;
+			Circle bs_getBVolume() const;
 			// -----------------------------
 			Vec2 support(const Vec2& dir) const;
 
@@ -245,7 +245,7 @@ namespace boom {
 			float bs_getArea() const;
 			float bs_getInertia() const;
 			Vec2 bs_getCenter() const;
-			Circle bs_getBCircle() const;
+			Circle bs_getBVolume() const;
 			// -----------------------------
 			Vec2 support(const Vec2& dir) const;
 			Vec2 nearest(const Vec2& pos) const;
@@ -262,7 +262,7 @@ namespace boom {
 			float bs_getArea() const;
 			float bs_getInertia() const;
 			Vec2 bs_getCenter() const;
-			Circle bs_getBCircle() const;
+			Circle bs_getBVolume() const;
 			// -----------------------------
 			bool isInTriangle(const Vec2& p) const;
 			std::pair<Vec2,int> nearest(const Vec2& p) const;
@@ -314,7 +314,7 @@ namespace boom {
 			static Convex FromConcave(const PointL& src);
 			// ---- cacheable functions ----
 			float bs_getArea() const;
-			Circle bs_getBCircle() const;
+			Circle bs_getBVolume() const;
 			// -----------------------------
 			/*! 同時に求めると少し効率が良い為 */
 			std::tuple<float,float,Vec2> area_inertia_center() const;

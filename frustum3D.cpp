@@ -71,7 +71,7 @@ namespace boom {
 		Vec3 Frustum::bs_getCenter() const {
 			return bs_getGCenter();
 		}
-		Sphere Frustum::bs_getBSphere() const {
+		Sphere Frustum::bs_getBVolume() const {
 			auto pts = getPoints(true);
 			Vec3 c = bs_getCenter();
 			float len = c.dist_sq(pts.center);

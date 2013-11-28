@@ -14,7 +14,7 @@ namespace boom {
 		const Vec2& Point::support(const Vec2& dir) const { return *this; }
 		const float& Point::bs_getArea() const { INVOKE_ERROR }
 		const Vec2& Point::bs_getCenter() const { return *this; }
-		Circle Point::bs_getBCircle() const {
+		Circle Point::bs_getBVolume() const {
 			// 円の半径が0だと点同士の時にヒットしないので微量含める
 			return Circle(*this, NEAR_THRESHOLD);
 		}

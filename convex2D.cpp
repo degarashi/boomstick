@@ -411,7 +411,7 @@ namespace boom {
 		void Convex::splitThis(const Line& l) {
 			split(l);
 		}
-		Circle Convex::bs_getBCircle() const {
+		Circle Convex::bs_getBVolume() const {
 			// 多分遅いアルゴリズムだが、今はこれで我慢
 			// 全ての3点の組み合わせを調べる
 			int nV = point.size();
@@ -422,7 +422,7 @@ namespace boom {
 				for(int j=i+1 ; j<nV-1 ; j++) {
 					for(int k=j+1 ; k<nV ; k++) {
 						Poly p(point[i], point[j], point[k]);
-						auto tc = p.bs_getBCircle();
+						auto tc = p.bs_getBVolume();
 						if(c.fRadius < tc.fRadius)
 							c = tc;
 					}

@@ -12,7 +12,7 @@ namespace boom {
 		const Vec2& Circle::bs_getCenter() const {
 			return vCenter;
 		}
-		const Circle& Circle::bs_getBCircle() const {
+		const Circle& Circle::bs_getBVolume() const {
 			return *this;
 		}
 		Vec2 Circle::support(const Vec2& dir) const {

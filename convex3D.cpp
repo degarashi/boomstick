@@ -337,7 +337,7 @@ namespace boom {
 			return _vGCenter;
 		}
 		const Vec3& ConvexP::bs_getCenter() const { return bs_getGCenter(); }
-		Sphere ConvexP::bs_getBSphere() const { INVOKE_ERROR }
+		Sphere ConvexP::bs_getBVolume() const { INVOKE_ERROR }
 		float ConvexP::bs_getArea() const { INVOKE_ERROR }
 		Mat33 ConvexP::bs_getInertia() const { INVOKE_ERROR }
 		AABB ConvexP::bs_getAABB() const {

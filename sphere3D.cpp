@@ -4,7 +4,7 @@ namespace boom {
 	namespace geo3d {
 		const Vec3& Sphere::bs_getCenter() const { return center; }
 		const Vec3& Sphere::bs_getGCenter() const { return center; }
-		const Sphere& Sphere::bs_getBSphere() const { return *this; }
+		const Sphere& Sphere::bs_getBVolume() const { return *this; }
 		float Sphere::bs_getArea() const { INVOKE_ERROR }
 		Mat33 Sphere::bs_getInertia() const { INVOKE_ERROR }
 		Vec3 Sphere::support(const Vec3& dir) const {
@@ -22,7 +22,7 @@ namespace boom {
 			sp.center /= n;
 
 			while(mI != mE) {
-				Sphere s2 = mI.get<IModel>()->im_getBSphere();
+				Sphere s2 = mI.get<IModel>()->im_getBVolume();
 				float d = sp.center.distance(mI.get<IModel>()->im_getCenter()) + s2.radius/2;
 				if(sp.radius < d)
 					sp.radius = d;

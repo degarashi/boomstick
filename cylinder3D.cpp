@@ -3,7 +3,7 @@
 
 namespace boom {
 	namespace geo3d {
-		Sphere Cylinder::bs_getBSphere() const{
+		Sphere Cylinder::bs_getBVolume() const{
 			Sphere sp;
 			// 中心座標計算
 			sp.center = bs_getCenter();
