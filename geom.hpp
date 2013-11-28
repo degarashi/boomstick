@@ -117,6 +117,7 @@ namespace boom {
 		virtual void applyChange();
 		//! 子ノードの取得
 		virtual MdlIP getInner() const;
+		virtual bool hasInner() const;
 		//! モデルの実体
 		virtual const void* getCore() const = 0;
 		//! 最寄りのユーザーデータを取得
@@ -387,8 +388,11 @@ namespace boom {
 		}
 		//! 2つの物体(階層構造可)を当たり判定
 		static bool Hit(const IM* mdl0, const IM* mdl1) {
-			if(GetCFunc(mdl0->getCID(), mdl1->getCID())(mdl0->getCore(), mdl1->getCore()))
-				return HitL(mdl1, mdl0, false);
+			if(GetCFunc(mdl0->getCID(), mdl1->getCID())(mdl0->getCore(), mdl1->getCore())) {
+				if(mdl0->hasInner() | mdl1->hasInner())
+					return HitL(mdl1, mdl0, false);
+				return true;
+			}
 			return false;
 		}
 		//! mdl0を展開したものとmdl1を当たり判定
@@ -410,7 +414,7 @@ namespace boom {
 				} while(++in.first != in.second);
 			} else {
 				if(bSwap)
-					return false;
+					return true;
 				return HitL(mdl1, mdl0, true);
 			}
 			return false;

@@ -20,6 +20,7 @@ namespace boom {
 	}
 	void IModelNode::applyChange() {}
 	MdlIP IModelNode::getInner() const { return MdlIP(); }
+	bool IModelNode::hasInner() const { return false; }
 	void* IModelNode::getUserData() const { return nullptr; }
 
 	namespace geo2d {
