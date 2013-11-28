@@ -206,6 +206,7 @@ namespace boom {
 			Vec3 bs_getGCenter() const;
 			Vec3 bs_getCenter() const;
 			Sphere bs_getBVolume() const;
+			Mat33 bs_getInertia() const { INVOKE_ERROR }
 			const float& bs_getArea() const { INVOKE_ERROR }
 			// -----------------------------
 			const Vec3& support(const Vec3& dir) const;
@@ -231,6 +232,8 @@ namespace boom {
 			spn::none_t hit(...) const;
 			bool hit(const Plane& p) const;
 		};
+		using SegmentM = Model<Segment>;
+
 		//! カプセル
 		struct Capsule : ITagP<Capsule>, Segment {
 			float	radius;

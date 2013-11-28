@@ -74,7 +74,7 @@ namespace boom {
 			virtual int getNPoints() const { INVOKE_ERROR }
 			virtual Vec2 getPoint(int n) const { INVOKE_ERROR }
 			virtual CPos checkPosition(const Vec2& pos) const { INVOKE_ERROR }
-			virtual Convex2 splitTwo(const Line& ls) const { INVOKE_ERROR }
+// 			virtual Convex2 splitTwo(const Line& ls) const { INVOKE_ERROR }
 		};
 		using UPModel = std::unique_ptr<IModel>;
 		#define mgr_model2d (::boom::geo2d::ModelMgr::_ref())
