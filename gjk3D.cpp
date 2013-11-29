@@ -9,7 +9,7 @@ namespace boom {
 
 		// ---------------------- GSimplex ----------------------
 		GSimplex::GSimplex(const IModel& m0, const IModel& m1): _m0(m0), _m1(m1) {
-			_clear();
+			_gjkMethod();
 		}
 		void GSimplex::_clear() {
 			_nVtx = 0;
@@ -30,6 +30,7 @@ namespace boom {
 			if(_checkDuplication(v))
 				return true;
 
+			AssertP(Trap, !v.isNaN())
 			if(_nVtx == 4) {
 				// 不要な頂点を省く
 				AssertP(Trap, id >= 0)
@@ -73,9 +74,15 @@ namespace boom {
 				if(_retryCount == 0) {
 					// ポリゴンと点の最短距離
 					auto res = poly.nearest(ori);
-					_nearP = res.first;
-					if(res.second)
-						return std::make_tuple(Vec3(_nearP.normalization()), Result::Default, -1);
+					if(res.second) {
+						auto v = res.first;
+						v.len_sq();
+						float lens = res.first.len_sq();
+						if(lens > 1e-6f) {
+							_nearP = res.first;
+							return std::make_tuple(res.first * spn::Rcp22Bit(lens), Result::Default, -1);
+						}
+					}
 				}
 				int rc = _retryCount;
 				if(rc == 0)
@@ -162,7 +169,12 @@ namespace boom {
 			// 4面体が原点を内包した: true
 
 			// 1個目の頂点
-			Vec3 dir = (_m1.im_getCenter() - _m0.im_getCenter()).normalization();
+			Vec3 dir = _m1.im_getCenter() - _m0.im_getCenter();
+			float lens = dir.len_sq();
+			if(lens < 1e-6f)
+				dir = Vec3(1,0,0);
+			else
+				dir *= spn::Rcp22Bit(lens);
 			Vec3 pos0 = _m0.im_support(-dir),
 				pos1 = _m1.im_support(dir);
 			_vtx[0] = pos0 - pos1;
@@ -300,7 +312,13 @@ namespace boom {
 			return std::make_tuple(id0, id1, id2);
 		}
 		EConvex::EConvex(const GSimplex& gs, const IModel& m0, const IModel& m1):
-			ConvexP(&gs.getVtx(0), gs.getNVtx()), _m0(m0), _m1(m1) {}
+			ConvexP(&gs.getVtx(0), gs.getNVtx()), _m0(m0), _m1(m1)
+		{
+			std::tie(_dir, _dist) = _epaMethod();
+		}
+		std::pair<Vec3,float> EConvex::getAvoidVector() const {
+			return std::make_pair(_dir, _dist);
+		}
 		std::pair<Vec3,float> EConvex::_epaMethod() {
 			// 点が4個に満たない場合の処理
 			int nV = getNVtx();

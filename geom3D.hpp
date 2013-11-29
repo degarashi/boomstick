@@ -685,6 +685,7 @@ namespace boom {
 
 			public:
 				EConvex(const GSimplex& gs, const IModel& m0, const IModel& m1);
+				std::pair<Vec3, float> getAvoidVector() const;
 		};
 		//! ミンコフスキー差を求める
 		Vec3 MinkowskiSub(const IModel& m0, const IModel& m1, const Vec3& dir);
