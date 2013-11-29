@@ -461,7 +461,7 @@ namespace boom {
 		Vec3 Dual(const Plane& plane);
 
 		//! Narrow Phase判定
-		using Narrow = ::boom::Narrow<CTGeo, IModel>;
+		using Narrow = ::boom::Narrow<CTGeo, GSimplex, IModel>;
 
 		template <class CLIP>
 		inline Vec2 NearestPoint(const Line& ls, const Vec2& p, CLIP clip) {
@@ -489,5 +489,13 @@ namespace boom {
 							ls1.pos + ls1.dir * clip1(m1.y));
 		}
 		#undef DEF_INVALID_BSFUNCS
+
+		struct Types {
+			using CTGeo = CTGeo;
+			using MMgr = ModelMgr;
+			using IModel = IModel;
+			using GJK = GSimplex;
+			using Narrow = Narrow;
+		};
 	}
 }

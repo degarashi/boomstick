@@ -362,7 +362,7 @@ namespace boom {
 	};
 
 	//! Narrow-phase 判定関数群
-	template <class CTG, class IM>
+	template <class CTG, class GJK, class IM>
 	struct Narrow {
 		constexpr static int WideBits = spn::CTBit::MSB_N<CTG::size>::result + 1,
 							ArraySize = 1<<(WideBits*2);
@@ -420,6 +420,6 @@ namespace boom {
 			return false;
 		}
 	};
-	template <class CTG, class IM>
-	ColFunc Narrow<CTG, IM>::cs_cfunc[ArraySize];
+	template <class CTG, class GJK, class IM>
+	ColFunc Narrow<CTG, GJK, IM>::cs_cfunc[ArraySize];
 }

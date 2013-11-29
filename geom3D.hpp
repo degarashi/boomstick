@@ -563,8 +563,15 @@ namespace boom {
 			using ITagP<Cylinder>::GetCID;
 		};
 
+		//! GJK法による衝突判定
+		class GSimplex {
+			public:
+				GSimplex(const IModel& m0, const IModel& m1) {}
+				bool getResult() const { return false; }
+		};
+
 		//! Narrow Phase判定
-		using Narrow = ::boom::Narrow<CTGeo, IModel>;
+		using Narrow = ::boom::Narrow<CTGeo, GSimplex, IModel>;
 
 		//! 点から一番近い直線(線分)上の点
 		template <class CLIP>
@@ -594,5 +601,13 @@ namespace boom {
 							Vec3(ls1.pos + ls1.dir*clip1(fvt[1])));
 		}
 		#undef DEF_INVALID_BSFUNCS
+
+		struct Types {
+			using CTGeo = CTGeo;
+			using MMgr = ModelMgr;
+			using IModel = IModel;
+			using GJK = GSimplex;
+			using Narrow = Narrow;
+		};
 	}
 }

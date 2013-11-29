@@ -109,30 +109,29 @@ namespace boom {
 			}
 	};
 	template <template <class,class> class BC,
-				class CTG,
-				class MMGR,
-				class IM,
+				class Types,
 				class UD>
-	class ColMgr : public spn::ResMgrA<ColMem<ColMgr<BC,CTG,MMGR,IM,UD>,
-											typename MMGR::LHdl,
-											typename BC<decltype(std::declval<IM>().im_getBVolume()), IM>::IDType,
+	class ColMgr : public spn::ResMgrA<ColMem<ColMgr<BC,Types,UD>,
+											typename Types::MMgr::LHdl,
+											typename BC<decltype(std::declval<typename Types::IModel>().im_getBVolume()), typename Types::IModel>::IDType,
 											UD>,
-										ColMgr<BC,CTG,MMGR,IM,UD>>,
-					public Narrow<CTG,IM>
+										ColMgr<BC,Types,UD>>,
+					public Types::Narrow
 	{
 		public:
-			using BVolume = decltype(std::declval<IM>().im_getBVolume());
+			using IModel = typename Types::IModel;
+			using MMgr = typename Types::MMgr;
 			using user_t = UD;
-			using this_t = ColMgr<BC, CTG, MMGR, IM, user_t>;
-			using BroadC = BC<BVolume, IM>;
+			using BVolume = decltype(std::declval<IModel>().im_getBVolume());
+			using this_t = ColMgr<BC, Types, user_t>;
+			using BroadC = BC<BVolume, IModel>;
 			using NSID = typename BroadC::IDType;
-			using HMdl = typename MMGR::SHdl;
-			using HLMdl = typename MMGR::LHdl;
+			using HMdl = typename MMgr::SHdl;
+			using HLMdl = typename MMgr::LHdl;
 			using CMem = ColMem<this_t, HLMdl, NSID, user_t>;
 			using base = spn::ResMgrA<CMem, this_t>;
 			using HCol = typename base::SHdl;
 			using HLCol = typename base::LHdl;
-			using IModel = IM;
 			// 単方向リスト
 			struct Hist {
 				HCol	hCol;
@@ -141,7 +140,7 @@ namespace boom {
 				Hist(HCol hc, int nf): hCol(hc), nFrame(nf), nextOffset(0) {}
 			};
 		private:
-			using narrow = Narrow<CTG,IM>;
+			using Narrow = typename Types::Narrow;
 			using FrameCount = std::vector<std::pair<HCol, int>>;
 			using HistVec = std::vector<Hist>;
 			using RemList = std::vector<HLCol>;
@@ -210,7 +209,7 @@ namespace boom {
 			ColMgr(): _broadC([this](spn::SHandle sh){
 								return HCol(sh).cref().getBVolume(); })
 			{
-				narrow::Initialize();
+				Narrow::Initialize();
 			}
 			~ColMgr() {
 				_doRelease(true);
@@ -255,7 +254,7 @@ namespace boom {
 
 					HCol hc0(sh0), hc1(sh1);
 					// 詳細判定
-					if(narrow::Hit(hc0.ref().getModel(), hc1.ref().getModel())) {
+					if(Narrow::Hit(hc0.ref().getModel(), hc1.ref().getModel())) {
 						auto fn = [this, &hist](HCol hc0, HCol hc1){
 							auto &c0 = hc0.ref(),
 								&c1 = hc1.ref();
