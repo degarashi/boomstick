@@ -570,9 +570,6 @@ namespace boom {
 				bool getResult() const { return false; }
 		};
 
-		//! Narrow Phase判定
-		using Narrow = ::boom::Narrow<CTGeo, GSimplex, IModel>;
-
 		//! 点から一番近い直線(線分)上の点
 		template <class CLIP>
 		inline Vec3 NearestPoint(const Line& ls, const Vec3& p, CLIP clip) {
@@ -607,7 +604,7 @@ namespace boom {
 			using MMgr = ModelMgr;
 			using IModel = IModel;
 			using GJK = GSimplex;
-			using Narrow = Narrow;
+			using Narrow = ::boom::Narrow<Types>;
 		};
 	}
 }

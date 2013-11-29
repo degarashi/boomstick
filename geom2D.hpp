@@ -364,7 +364,8 @@ namespace boom {
 			spn::none_t hit(...) const;
 			std::ostream& dbgPrint(std::ostream& os) const;
 		};
-		//! ヒットチェックだけ
+		//! GJK法による衝突判定
+		/*! ヒットチェックのみ。衝突時は内部点を出力可 */
 		class GSimplex {
 			protected:
 				const IModel	&_m0, &_m1;
@@ -383,6 +384,7 @@ namespace boom {
 				//! 衝突時: 内部点を取得
 				const Vec2& getInner() const;
 		};
+		//! GJKで最近傍対を求める
 		/*! 常に頂点リストを時計回りに保つ */
 		class GEpa : public GSimplex {
 			constexpr static int MAX_VERT = 0x100;
@@ -436,20 +438,14 @@ namespace boom {
 			public:
 				GEpa(const IModel& m0, const IModel& m1);
 				~GEpa();
+				/*! 非衝突時に有効
+					\return A側の最近傍点, B側の最近傍点 */
 				Vec2x2 getNearestPair() const;
+				//! 衝突を回避するための最短移動ベクトル(A側)
 				const Vec2& getPVector() const;
 		};
-		//! GJK法による衝突判定
-		/*! \return 衝突していればその座標 */
-		spn::Optional<Vec2> GJKMethod(const IModel& m0, const IModel& m1);
-		//! GJKで最近傍対を求める
-		/*! \return 衝突の有無(bool)
-					nohit: m0側の最近傍点(Vec2), hit: m0側最深点
-					nohit: m1側の最近傍点(Vec2), hit: 最短移動ベクトル */
-		std::tuple<bool,Vec2,Vec2> GJKPair(const IModel& m0, const IModel& m1);
 		//! ミンコフスキー差を求める
 		Vec2 MinkowskiSub(const IModel& m0, const IModel& m1, const Vec2& dir);
-
 		//! DualTransform (point2D -> line2D)
 		Line Dual(const Vec2& v);
 		//! DualTransform (line2D -> point2D)
@@ -459,9 +455,6 @@ namespace boom {
 		Plane Dual(const Vec3& v);
 		//! DualTransform (plane -> point3D)
 		Vec3 Dual(const Plane& plane);
-
-		//! Narrow Phase判定
-		using Narrow = ::boom::Narrow<CTGeo, GSimplex, IModel>;
 
 		template <class CLIP>
 		inline Vec2 NearestPoint(const Line& ls, const Vec2& p, CLIP clip) {
@@ -495,7 +488,7 @@ namespace boom {
 			using MMgr = ModelMgr;
 			using IModel = IModel;
 			using GJK = GSimplex;
-			using Narrow = Narrow;
+			using Narrow = ::boom::Narrow<Types>;
 		};
 	}
 }

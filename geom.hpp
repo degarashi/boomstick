@@ -303,31 +303,38 @@ namespace boom {
 	DEF_CHECKMETHOD_OV(mdlhit, hit)
 	using ColFunc = bool (*)(const void*, const void*);
 
-	template <class CTG>
+	template <class Types>
 	struct Narrow_Init0 {
+		using CTGeo = typename Types::CTGeo;
+		using GJK = typename Types::GJK;
+		using IModel = typename Types::IModel;
+
 		template <class T0, class T1>
-		static bool Invoke(std::true_type, const T0& t0, const T1& t1) {
+		static bool Invoke(std::true_type, const IModel* t0, const IModel* t1) {
 			// 専用アルゴリズムでの当たり判定
-			return t0.hit(t1); }
+			return reinterpret_cast<const T0*>(t0->getCore())->hit(*reinterpret_cast<const T1*>(t1->getCore()));
+		}
 		template <class T0, class T1>
-		static bool Invoke(std::false_type, const T0& t0, const T1& t1) {
-			//TODO: GJKアルゴリズムでの当たり判定
-			Assert(Trap, false, "not implemented yet (GJK algorithm)") throw 0; }
+		static bool Invoke(std::false_type, const IModel* t0, const IModel* t1) {
+			//GJKアルゴリズムでの当たり判定
+			GJK gjk(*t0,*t1);
+			return gjk.getResult();
+		}
 		template <class T0, class T1>
-		static bool _CFRaw(const T0& t0, const T1& t1, std::true_type) {
-			return Invoke(CheckMethod_mdlhit<T0, const T1&>(), t0, t1); }
+		static bool _CFRaw(const IModel* t0, const IModel* t1, std::true_type) {
+			return Invoke<T0,T1>(CheckMethod_mdlhit<T0, const T1&>(), t0, t1); }
 		template <class T0, class T1>
-		static bool _CFRaw(const T0& t0, const T1& t1, std::false_type) {
-			return Invoke(CheckMethod_mdlhit<T1, const T0&>(), t1, t0); }
+		static bool _CFRaw(const IModel* t0, const IModel* t1, std::false_type) {
+			return Invoke<T1,T0>(CheckMethod_mdlhit<T1, const T0&>(), t1, t0); }
 		//! リスト登録用関数ラッパ
 		template <int N0, int N1, class B0, class B1,
 					class = typename std::enable_if<spn::TType<B0,B1>::t_and::value>::type>
 		static bool CFRaw(const void* m0, const void* m1) {
-			using T0 = typename CTG::template At<N0>::type;
-			using T1 = typename CTG::template At<N1>::type;
-			return _CFRaw(*reinterpret_cast<const T0*>(m0),
-						  *reinterpret_cast<const T1*>(m1),
-						  typename spn::NType<T0::GetCID(), T1::GetCID()>::less_eq());
+			using T0 = typename CTGeo::template At<N0>::type;
+			using T1 = typename CTGeo::template At<N1>::type;
+			return _CFRaw<T0,T1>(reinterpret_cast<const IModel*>(m0),
+								 reinterpret_cast<const IModel*>(m1),
+								 typename spn::NType<T0::GetCID(), T1::GetCID()>::less_eq());
 		}
 		template <int N0, int N1, class B0, class B1,
 					class = int,
@@ -336,43 +343,57 @@ namespace boom {
 			return false;
 		}
 	};
-	template <class CTG, int M, int N>
+	template <class Types, int M, int N>
 	struct Narrow_InitB {
 		static void Init(ColFunc*& dst) {
-			*dst-- = Narrow_Init0<CTG>::template CFRaw<M,N,
-				typename spn::NType<M, CTG::size>::less, typename spn::NType<N, CTG::size>::less>;
-			Narrow_InitB<CTG, M, N-1>::Init(dst);
+			using CTGeo = typename Types::CTGeo;
+			*dst-- = Narrow_Init0<Types>::template CFRaw<M,N,
+				typename spn::NType<M, CTGeo::size>::less, typename spn::NType<N, CTGeo::size>::less>;
+			Narrow_InitB<Types, M, N-1>::Init(dst);
 		}
 	};
-	template <class CTG, int M>
-	struct Narrow_InitB<CTG, M, -1> {
+	template <class Types, int M>
+	struct Narrow_InitB<Types, M, -1> {
 		static void Init(ColFunc*& dst) {}
 	};
 
-	template <class CTG, int WIDE_M, int M>
+	template <class Types, int WIDE_M, int M>
 	struct Narrow_InitA {
 		static void Init(ColFunc*& dst) {
-			Narrow_InitB<CTG, M, WIDE_M-1>::Init(dst);
-			Narrow_InitA<CTG, WIDE_M, M-1>::Init(dst);
+			Narrow_InitB<Types, M, WIDE_M-1>::Init(dst);
+			Narrow_InitA<Types, WIDE_M, M-1>::Init(dst);
 		}
 	};
-	template <class CTG, int WIDE_M>
-	struct Narrow_InitA<CTG, WIDE_M, -1> {
+	template <class Types, int WIDE_M>
+	struct Narrow_InitA<Types, WIDE_M, -1> {
 		static void Init(ColFunc*& dst) {}
 	};
 
 	//! Narrow-phase 判定関数群
-	template <class CTG, class GJK, class IM>
+	template <class Types>
 	struct Narrow {
-		constexpr static int WideBits = spn::CTBit::MSB_N<CTG::size>::result + 1,
+		using CTGeo = typename Types::CTGeo;
+		using IModel = typename Types::IModel;
+		using GJK = typename Types::GJK;
+
+		constexpr static int WideBits = spn::CTBit::MSB_N<CTGeo::size>::result + 1,
 							ArraySize = 1<<(WideBits*2);
 		static ColFunc cs_cfunc[ArraySize];
 
+		template <class T>
+		struct IModelSP : IModel {
+			const T& source;
+			IModelSP(const T& src): source(src) {}
+			using VEC = decltype(std::declval<IModel>().im_support(Vec2()));
+			VEC im_support(const VEC& v) const override {
+				return source.support(v);
+			}
+		};
 		//! 当たり判定を行う関数をリストにセットする
 		static void Initialize() {
 			constexpr int WideM = (1<<WideBits);
 			ColFunc* cfp = cs_cfunc+ArraySize-1;
-			Narrow_InitA<CTG, WideM, WideM-1>::Init(cfp);
+			Narrow_InitA<Types, WideM, WideM-1>::Init(cfp);
 		}
 		//! 当たり判定を行う関数ポインタを取得
 		static ColFunc GetCFunc(int id0, int id1) {
@@ -382,13 +403,15 @@ namespace boom {
 			class = typename std::enable_if<!std::is_pointer<T0>::value>::type,
 			class = typename std::enable_if<!std::is_pointer<T1>::value>::type>
 		static bool Hit(const T0& t0, const T1& t1) {
-			constexpr int id0 = CTG::template Find<T0>::result,
-						id1 = CTG::template Find<T1>::result;
-			return GetCFunc(id0, id1)(&t0, &t1);
+			constexpr int id0 = CTGeo::template Find<T0>::result,
+						id1 = CTGeo::template Find<T1>::result;
+			IModelSP<T0> tmp0(t0);
+			IModelSP<T1> tmp1(t1);
+			return GetCFunc(id0, id1)(&tmp0, &tmp1);
 		}
 		//! 2つの物体(階層構造可)を当たり判定
-		static bool Hit(const IM* mdl0, const IM* mdl1) {
-			if(GetCFunc(mdl0->getCID(), mdl1->getCID())(mdl0->getCore(), mdl1->getCore())) {
+		static bool Hit(const IModel* mdl0, const IModel* mdl1) {
+			if(GetCFunc(mdl0->getCID(), mdl1->getCID())(mdl0, mdl1)) {
 				if(mdl0->hasInner() | mdl1->hasInner())
 					return HitL(mdl1, mdl0, false);
 				return true;
@@ -399,16 +422,16 @@ namespace boom {
 		/*! \param[in] mdl0 展開する方のインタフェース
 			\param[in] mdl1 展開されない方のインタフェース
 			\param[in] bSwap 左右を入れ替えて判定している場合はtrue */
-		static bool HitL(const IM* mdl0, const IM* mdl1, bool bSwap) {
+		static bool HitL(const IModel* mdl0, const IModel* mdl1, bool bSwap) {
 			auto in = mdl0->getInner();
 			if(in.first != in.second) {
 				// ここで判定関数を取得
 				// Innerに含まれる子オブジェクトは全て同じ型 という前提
-				ColFunc cf = GetCFunc(in.first.template get<IM>()->getCID(), mdl1->getCID());
+				ColFunc cf = GetCFunc(in.first.template get<IModel>()->getCID(), mdl1->getCID());
 				const void* core1 = mdl1->getCore();
 				do {
-					if(cf(in.first.template get<IM>()->getCore(), core1)) {
-						if(HitL(mdl1, in.first.template get<IM>(), false))
+					if(cf(in.first.template get<IModel>()->getCore(), core1)) {
+						if(HitL(mdl1, in.first.template get<IModel>(), false))
 							return true;
 					}
 				} while(++in.first != in.second);
@@ -420,6 +443,6 @@ namespace boom {
 			return false;
 		}
 	};
-	template <class CTG, class GJK, class IM>
-	ColFunc Narrow<CTG, GJK, IM>::cs_cfunc[ArraySize];
+	template <class Types>
+	ColFunc Narrow<Types>::cs_cfunc[ArraySize];
 }
