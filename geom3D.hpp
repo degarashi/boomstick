@@ -6,6 +6,7 @@
 #include "spinner/layerbit.hpp"
 #include <memory>
 #include <unordered_set>
+#include <map>
 
 namespace boom {
 	namespace geo2d {
@@ -614,13 +615,79 @@ namespace boom {
 			using ITagP<Cylinder>::GetCID;
 		};
 
-		//! GJK法による衝突判定
+		//! GJK法による衝突判定(3D)
+		/*! ヒットチェックのみ。衝突時は内部点を出力可 */
 		class GSimplex {
-			public:
-				GSimplex(const IModel& m0, const IModel& m1) {}
-				bool getResult() const { return false; }
-		};
+			enum class Result {
+				Default,
+				Hit,
+				NoHit
+			};
+			//! 頂点数は最大でも4
+			constexpr static int NUM_VERT = 4;
 
+			Vec3	_vtx[NUM_VERT];
+			Vec3	_posB[NUM_VERT];
+			int		_nVtx;
+			Result	_hr;
+
+			const IModel &_m0, &_m1;
+
+			const static Vec3 cs_randVec[6];	//!< 2点以下でNOHITになった時の方向決めに使用
+			const static int cs_index[4][4];	//!< 4面体インデックス (最後は使われてない番号)
+			int			_retryCount;
+			int			_nearIDX;		//!< 4面体のどの面を使ったか
+			Vec3		_nearPosB;		//!< _nearIDXが負数の場合はこちらを使う
+			Vec3		_nearP;			//!< nearestDir()の結果の座標
+
+			//! minkowski差を, 重複してなければ追加 (不要な頂点の削除)
+			bool _addVtx(const Vec3& vA, const Vec3& vB, int id);
+			//! 次に探索すべき方向を求める
+			/*! @return 算出された方向, 衝突と判定できるか(0=未定, 1=衝突, -1=非衝突), 4面体において使用されなかった頂点 */
+			std::tuple<Vec3,Result,int> getNearestDir();
+			//! 既存の頂点と重複を調べる
+			bool _checkDuplication(const Vec3& v) const;
+			void _clear();
+			bool _gjkMethod();
+
+			public:
+				GSimplex(const IModel& m0, const IModel& m1);
+				bool getResult() const;
+				Vec3x2 getNearestPair() const;
+				Vec3 getInterPoint() const;
+				int getNVtx() const;
+				const Vec3& getVtx(int n) const;
+		};
+		//! EPS法で用いる凸包クラス
+		class EConvex : public ConvexP {
+			static uint32_t _ComposeIDX(int id0, int id1, int id2);
+			static std::tuple<int,int,int> _DecompIDX(uint32_t id);
+
+			// 新しい点は末尾に追加していく
+			using MapD_ID = std::multimap<float, Idx3>;
+			using MapID_D = std::map<uint32_t, float>;	//!< 10bitずつ小さい順に上位ビットから並べる
+			MapD_ID		_d_id;	// distance -> index
+			MapID_D		_id_d;	// index -> distance
+
+			//! 新たにFaceを追加 (2つのmapに登録)
+			void _addPoly(int idx0, int idx1, int idx2);
+			void _addPoly(const Idx3List& src);
+			//! Faceを削除 (2つのmapから解除)
+			void _delPoly(uint32_t id);
+			//! MinkowskiSubで新たに凸包の頂点を探して追加 (ダブったら何もしない)
+			bool _dividePoly(const IModel& m0, const IModel& m1, const Idx3& poly, const Vec3& dir);
+
+			const IModel	&_m0, &_m1;
+			Vec3	_dir;
+			float	_dist;
+
+			std::pair<Vec3,float> _epaMethod();
+
+			public:
+				EConvex(const GSimplex& gs, const IModel& m0, const IModel& m1);
+		};
+		//! ミンコフスキー差を求める
+		Vec3 MinkowskiSub(const IModel& m0, const IModel& m1, const Vec3& dir);
 		//! 点から一番近い直線(線分)上の点
 		template <class CLIP>
 		inline Vec3 NearestPoint(const Line& ls, const Vec3& p, CLIP clip) {

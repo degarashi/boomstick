@@ -357,7 +357,7 @@ namespace boom {
 			spn::none_t hit(...) const;
 			std::ostream& dbgPrint(std::ostream& os) const;
 		};
-		//! GJK法による衝突判定
+		//! GJK法による衝突判定(2D)
 		/*! ヒットチェックのみ。衝突時は内部点を出力可 */
 		class GSimplex {
 			protected:

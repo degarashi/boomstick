@@ -180,21 +180,8 @@ namespace boom {
 				Sphere calcSphere() const;
 
 				//! 行列変換
-				Convex& operator *= (const AMat43& m) {
-					int nv = getNVtx();
-					for(int i=0 ; i<nv ; i++)
-						refPos(i).asVec4(1) *= m;
-					return *this;
-				}
-				Convex operator * (const AMat43& m) const {
-					int nv = getNVtx();
-					Convex c(nv);
-					using V = typename std::decay<decltype(c.refPos(0))>::type;
-					for(int i=0 ; i<nv ; i++)
-						c.refPos(i) = V(getPos(i).asVec4(1) * m);
-					c.refUserData() = getUserData();
-					return c;
-				}
+				Convex& operator *= (const AMat43& m);
+				Convex operator * (const AMat43& m) const;
 				//! 最小座標，最大座標計算
 				Vec3x2 calcMinMax() const;
 				//! 行列変換した後の最小座標，最大座標計算
@@ -203,13 +190,7 @@ namespace boom {
 					return c.calcMinMax();
 				}
 				//! 歪みのない座標系に変換した後の最小座標，最大座標
-				Vec3x2 calcMinMax(const Vec3& xAxis, const Vec3& yAxis, const Vec3& zAxis) const {
-					AMat43 mat;
-					mat.setColumn(0, xAxis.asVec4(0));
-					mat.setColumn(1, yAxis.asVec4(0));
-					mat.setColumn(2, zAxis.asVec4(0));
-					return calcMinMax(mat);
-				}
+				Vec3x2 calcMinMax(const Vec3& xAxis, const Vec3& yAxis, const Vec3& zAxis) const;
 
 				void addOfsVec(const Vec3& ofs);		//!< オフセットを加える
 				Convex cloneReverse() const;			//!< ポリゴンを裏返して出力

@@ -26,6 +26,7 @@ namespace boom {
 			_vtx.resize(nv);
 		}
 		DEF(void)::degeneration() {
+			constexpr auto nth = Point::NEAR_THRESHOLD;
 			int nVtx = _vtx.size();
 			if(spn::Bit::ChClear(_rflg, RFLG_DEGENERATE)) {
 				// 頂点が2つ以下の場合は何もしない
@@ -36,7 +37,7 @@ namespace boom {
 				int wcur = 1;
 				const Vec3* tv = &getPos(0);
 				for(int i=1 ; i<nv ; i++) {
-					if(tv->dist_sq(getPos(i)) > spn::Square(Point::NEAR_THRESHOLD)) {
+					if(tv->dist_sq(getPos(i)) > spn::Square(nth)) {
 						_vtx[wcur++] = _vtx[i];
 						tv = &getPos(i);
 					}
@@ -50,7 +51,7 @@ namespace boom {
 					AssertP(Trap, !getPos(i).isNaN(), "Poly::removeDegenerate()\n重複頂点を削除した後に重複頂点が発見されました")
 
 				// 始点と終端チェック
-				if(wcur > 1 && getPos(0).dist_sq(getPos(wcur-1)) <= spn::Square(Point::NEAR_THRESHOLD)) {
+				if(wcur > 1 && getPos(0).dist_sq(getPos(wcur-1)) <= spn::Square(nth)) {
 					nVtx--;
 					spn::Bit::Set(_rflg, RFLG_CENTER|RFLG_CPOINT);
 				}
@@ -851,6 +852,32 @@ namespace boom {
 			std::swap(_vCPoint, c._vCPoint);
 			std::swap(_plane, c._plane);
 			std::swap(_rflg, c._rflg);
+		}
+		DEF_TEMP
+		Convex<VType,UD>& Convex<VType,UD>::operator *= (const AMat43& m) {
+			int nv = getNVtx();
+			for(int i=0 ; i<nv ; i++) {
+				auto& p = refPos(i);
+				p = p.asVec4(1) * m;
+			}
+			return *this;
+		}
+		DEF_TEMP
+		Convex<VType,UD> Convex<VType,UD>::operator * (const AMat43& m) const {
+			int nv = getNVtx();
+			Convex c(nv);
+			using V = typename std::decay<decltype(c.refPos(0))>::type;
+			for(int i=0 ; i<nv ; i++)
+				c.refPos(i) = V(getPos(i).asVec4(1) * m);
+			c.refUserData() = getUserData();
+			return c;
+		}
+		DEF(Vec3x2)::calcMinMax(const Vec3& xAxis, const Vec3& yAxis, const Vec3& zAxis) const {
+			AMat43 mat;
+			mat.setColumn(0, xAxis.asVec4(0));
+			mat.setColumn(1, yAxis.asVec4(0));
+			mat.setColumn(2, zAxis.asVec4(0));
+			return calcMinMax(mat);
 		}
 		// 適時実体化
 		template class Convex<spn::Vec3, ConvexUD_Col>;
