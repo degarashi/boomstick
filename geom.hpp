@@ -391,6 +391,17 @@ namespace boom {
 		static void Init(ColFunc*& dst) {}
 	};
 
+	template <class T, class IM>
+	struct IModelSP : IM {
+		const T& source;
+		IModelSP(const T& src): source(src) {}
+		using VEC = decltype(std::declval<IM>().im_getCenter());
+		VEC im_support(const VEC& v) const override {
+			return source.support(v);
+		}
+		const void* getCore() const override {
+			return static_cast<const T*>(&source); }
+	};
 	//! Narrow-phase 判定関数群
 	template <class Types>
 	struct Narrow {
@@ -402,17 +413,6 @@ namespace boom {
 							ArraySize = 1<<(WideBits*2);
 		static ColFunc cs_cfunc[ArraySize];
 
-		template <class T>
-		struct IModelSP : IModel {
-			const T& source;
-			IModelSP(const T& src): source(src) {}
-			using VEC = decltype(std::declval<IModel>().im_support(Vec2()));
-			VEC im_support(const VEC& v) const override {
-				return source.support(v);
-			}
-			const void* getCore() const override {
-				return static_cast<const T*>(&source); }
-		};
 		//! 当たり判定を行う関数をリストにセットする
 		static void Initialize() {
 			constexpr int WideM = (1<<WideBits);
@@ -429,8 +429,8 @@ namespace boom {
 		static bool Hit(const T0& t0, const T1& t1) {
 			constexpr int id0 = CTGeo::template Find<T0>::result,
 						id1 = CTGeo::template Find<T1>::result;
-			IModelSP<T0> tmp0(t0);
-			IModelSP<T1> tmp1(t1);
+			IModelSP<T0, IModel> tmp0(t0);
+			IModelSP<T1, IModel> tmp1(t1);
 			return GetCFunc(id0, id1)(&tmp0, &tmp1);
 		}
 		//! 2つの物体(階層構造可)を当たり判定

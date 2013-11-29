@@ -69,6 +69,9 @@ namespace boom {
 			virtual Vec2 toWorldDir(const Vec2& v) const { return v; }
 			virtual spn::Optional<const AMat32&> getToLocal() const { return spn::none; }
 			virtual spn::Optional<const AMat32&> getToWorld() const { return spn::none; }
+			const static AMat32 cs_idMat;
+			const AMat32& getToLocalI() const;
+			const AMat32& getToWorldI() const;
 		};
 		using UPModel = std::unique_ptr<IModel>;
 		#define mgr_model2d (::boom::geo2d::ModelMgr::_ref())
@@ -102,20 +105,29 @@ namespace boom {
 				TModel(const IModel& mdl, const AMat32& mw): _model(mdl), _mToWorld(mw) { _calcInv(); }
 				TModel(HMdl hMdl, const AMat32& mw): _model(hMdl), _mToWorld(mw) { _calcInv(); }
 
-				Circle im_getBVolume() const override { return _model.get().im_getBVolume(); }
-				float im_getInertia() const override { return _model.get().im_getInertia(); }
-				float im_getArea() const override { return _model.get().im_getArea(); }
-				Vec2 im_getCenter() const override { return _model.get().im_getCenter(); }
-				Vec2 im_support(const Vec2& dir) const override { return _model.get().im_support(dir); }
-				bool im_isInner(const Vec2& pos) const override { return _model.get().im_isInner(pos); }
+				Circle im_getBVolume() const override {
+					return toWorld(_model.get().im_getBVolume()); }
+				float im_getInertia() const override {
+					return _model.get().im_getInertia() * _mToWorld; }
+				float im_getArea() const override {
+					return _model.get().im_getArea(); }
+				Vec2 im_getCenter() const override {
+					return toWorld(_model.get().im_getCenter()); }
+				Vec2 im_support(const Vec2& dir) const override {
+					return toWorldDir(_model.get().im_support(toLocalDir(dir))); }
+				bool im_isInner(const Vec2& pos) const override {
+					return _model.get().im_isInner(toLocal(pos)); }
 
-				Vec2 toLocal(const Vec2& v) const override { return v.asVec3(1) * _mToLocal; }
-				Vec2 toLocalDir(const Vec2& v) const override { return v.asVec3(0) * _mToLocal; }
-				Vec2 toWorld(const Vec2& v) const override { return v.asVec3(1) * _mToWorld; }
-				Vec2 toWorldDir(const Vec2& v) const override { return v.asVec3(0) * _mToWorld; }
+				Vec2 toLocal(const Vec2& v) const override {
+					return v.asVec3(1) * _mToLocal; }
+				Vec2 toLocalDir(const Vec2& v) const override {
+					return v.asVec3(0) * _mToLocal; }
+				Vec2 toWorld(const Vec2& v) const override {
+					return v.asVec3(1) * _mToWorld; }
+				Vec2 toWorldDir(const Vec2& v) const override {
+					return v.asVec3(0) * _mToWorld; }
 				spn::Optional<const AMat32&> getToLocal() const override { return _mToLocal; }
 				spn::Optional<const AMat32&> getToWorld() const override { return _mToWorld; }
-
 				uint32_t getCID() const override { return ITagP<T>::GetCID(); }
 				const void* getCore() const override { return _model.get().getCore(); }
 		};

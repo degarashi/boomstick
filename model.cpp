@@ -1,4 +1,5 @@
 #include "geom2D.hpp"
+#include "geom3D.hpp"
 
 namespace boom {
 	const AMat22 cs_mRot90[2] = {
@@ -23,7 +24,31 @@ namespace boom {
 	bool IModelNode::hasInner() const { return false; }
 	void* IModelNode::getUserData() const { return nullptr; }
 
+	namespace geo3d {
+		const AMat43 IModel::cs_idMat(AMat43::TagIdentity);
+		const AMat43& IModel::getToLocalI() const {
+			auto op = getToLocal();
+			if(op) return *op;
+			return cs_idMat;
+		}
+		const AMat43& IModel::getToWorldI() const {
+			auto op = getToWorld();
+			if(op) return *op;
+			return cs_idMat;
+		}
+	}
 	namespace geo2d {
+		const AMat32 IModel::cs_idMat(AMat32::TagIdentity);
+		const AMat32& IModel::getToLocalI() const {
+			auto op = getToLocal();
+			if(op) return *op;
+			return cs_idMat;
+		}
+		const AMat32& IModel::getToWorldI() const {
+			auto op = getToWorld();
+			if(op) return *op;
+			return cs_idMat;
+		}
 /*
 		// -------------------------- TModel --------------------------
 		template <class MDL, class BASE>

@@ -84,6 +84,9 @@ namespace boom {
 			virtual Vec3 toWorldDir(const Vec3& v) const { return v; }
 			virtual spn::Optional<const AMat43&> getToLocal() const { return spn::none; }
 			virtual spn::Optional<const AMat43&> getToWorld() const { return spn::none; }
+			const static AMat43 cs_idMat;
+			const AMat43& getToLocalI() const;
+			const AMat43& getToWorldI() const;
 		};
 		using UPModel = std::unique_ptr<IModel>;
 		#define mgr_model3d (::boom::geo3d::ModelMgr::_ref())
@@ -117,12 +120,18 @@ namespace boom {
 				TModel(const IModel& mdl, const AMat43& mw): _model(mdl), _mToWorld(mw) { _calcInv(); }
 				TModel(HMdl hMdl, const AMat43& mw): _model(hMdl), _mToWorld(mw) { _calcInv(); }
 
-				Sphere im_getBVolume() const override { return _model.get().im_getBVolume(); }
-				Mat33 im_getInertia() const override { return _model.get().im_getInertia(); }
-				float im_getArea() const override { return _model.get().im_getArea(); }
-				Vec3 im_getCenter() const override { return _model.get().im_getCenter(); }
-				Vec3 im_getGCenter() const override { return _model.get().im_getGCenter(); }
-				Vec3 im_support(const Vec3& dir) const override { return _model.get().im_support(dir); }
+				Sphere im_getBVolume() const override {
+					return _model.get().im_getBVolume() * _mToWorld; }
+				Mat33 im_getInertia() const override {
+					return _model.get().im_getInertia() * _mToWorld; }
+				float im_getArea() const override {
+					return _model.get().im_getArea(); }
+				Vec3 im_getCenter() const override {
+					return toWorld(_model.get().im_getCenter()); }
+				Vec3 im_getGCenter() const override {
+					return toWorld(_model.get().im_getGCenter()); }
+				Vec3 im_support(const Vec3& dir) const override {
+					return toWorldDir(_model.get().im_support(toLocalDir(dir))); }
 
 				Vec3 toLocal(const Vec3& v) const override {
 					return v.asVec4(1) * _mToLocal; }
