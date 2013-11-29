@@ -77,6 +77,13 @@ namespace boom {
 			virtual Vec3 im_getGCenter() const = 0;
 			// -----------------------------
 			virtual Vec3 im_support(const Vec3& dir) const = 0;
+
+			virtual Vec3 toLocal(const Vec3& v) const { return v; }
+			virtual Vec3 toLocalDir(const Vec3& v) const { return v; }
+			virtual Vec3 toWorld(const Vec3& v) const { return v; }
+			virtual Vec3 toWorldDir(const Vec3& v) const { return v; }
+			virtual spn::Optional<const AMat43&> getToLocal() const { return spn::none; }
+			virtual spn::Optional<const AMat43&> getToWorld() const { return spn::none; }
 		};
 		using UPModel = std::unique_ptr<IModel>;
 		#define mgr_model3d (::boom::geo3d::ModelMgr::_ref())
@@ -94,6 +101,41 @@ namespace boom {
 			Vec3 im_getCenter() const override { return T::bs_getCenter(); }
 			Vec3 im_getGCenter() const override { return T::bs_getGCenter(); }
 			Vec3 im_support(const Vec3& dir) const override { return T::support(dir); }
+		};
+		//! IModelに行列変換をプラス
+		template <class T>
+		class TModel : public ITagP<T>, public IModel {
+			using VMdl = VModel<ModelMgr>;
+			VMdl		_model;
+			AMat43 		_mToWorld,
+						_mToLocal;
+			void _calcInv() {
+				_mToWorld.convertA44().inversion(reinterpret_cast<AMat44&>(_mToLocal));
+			}
+			public:
+				TModel(const TModel&) = default;
+				TModel(const IModel& mdl, const AMat43& mw): _model(mdl), _mToWorld(mw) { _calcInv(); }
+				TModel(HMdl hMdl, const AMat43& mw): _model(hMdl), _mToWorld(mw) { _calcInv(); }
+
+				Sphere im_getBVolume() const override { return _model.get().im_getBVolume(); }
+				Mat33 im_getInertia() const override { return _model.get().im_getInertia(); }
+				float im_getArea() const override { return _model.get().im_getArea(); }
+				Vec3 im_getCenter() const override { return _model.get().im_getCenter(); }
+				Vec3 im_getGCenter() const override { return _model.get().im_getGCenter(); }
+				Vec3 im_support(const Vec3& dir) const override { return _model.get().im_support(dir); }
+
+				Vec3 toLocal(const Vec3& v) const override {
+					return v.asVec4(1) * _mToLocal; }
+				Vec3 toLocalDir(const Vec3& v) const override {
+					return v.asVec4(0) * _mToLocal; }
+				Vec3 toWorld(const Vec3& v) const override {
+					return v.asVec4(1) * _mToWorld; }
+				Vec3 toWorldDir(const Vec3& v) const override {
+					return v.asVec4(1) * _mToWorld; }
+				spn::Optional<const AMat43&> getToLocal() const override { return _mToLocal; }
+				spn::Optional<const AMat43&> getToWorld() const override { return _mToWorld; }
+				const void* getCore() const override { return _model.get().getCore(); }
+				uint32_t getCID() const override { return ITagP<T>::GetCID(); }
 		};
 		// ------------------ Cache system ------------------
 		DEF_CACHETAG(TagCenter, spn::Vec3, bs_getCenter)

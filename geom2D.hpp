@@ -49,8 +49,6 @@ namespace boom {
 		};
 
 		struct IModel : ::boom::IModelNode {
-			using CPos = std::pair<ConvexPos, int>;
-			using PosL = std::pair<bool, PointL>;
 			// ---- cacheable functions ----
 			virtual Vec2 im_getCenter() const = 0;
 			virtual float im_getArea() const = 0;
@@ -63,18 +61,14 @@ namespace boom {
 			virtual Vec2 im_support(const Vec2& dir) const = 0;
 			//! ある座標が図形の内部に入っているか
 			virtual bool im_isInner(const Vec2& pos) const = 0;
-			//! 外郭を構成する頂点で、mdlにめり込んでいる物を抽出
-			/*! Circle, Line, Ray以外対応
-				\return 時計回りでmdlにめり込んでいる頂点リスト。前後も含む */
-			virtual PosL getOverlappingPoints(const IModel& mdl, const Vec2& inner) const { INVOKE_ERROR }
 			virtual uint32_t getCID() const = 0;
-			// ---------- Convex専用 ----------
-			//! 物体を構成する頂点数を取得
-			/*! Circle, Lineなど物によってはサポートしていない */
-			virtual int getNPoints() const { INVOKE_ERROR }
-			virtual Vec2 getPoint(int n) const { INVOKE_ERROR }
-			virtual CPos checkPosition(const Vec2& pos) const { INVOKE_ERROR }
-// 			virtual Convex2 splitTwo(const Line& ls) const { INVOKE_ERROR }
+
+			virtual Vec2 toLocal(const Vec2& v) const { return v; }
+			virtual Vec2 toLocalDir(const Vec2& v) const { return v; }
+			virtual Vec2 toWorld(const Vec2& v) const { return v; }
+			virtual Vec2 toWorldDir(const Vec2& v) const { return v; }
+			virtual spn::Optional<const AMat32&> getToLocal() const { return spn::none; }
+			virtual spn::Optional<const AMat32&> getToWorld() const { return spn::none; }
 		};
 		using UPModel = std::unique_ptr<IModel>;
 		#define mgr_model2d (::boom::geo2d::ModelMgr::_ref())
@@ -94,50 +88,37 @@ namespace boom {
 		};
 		//! 座標変換ありのモデル基底
 		/*! Modelに被せる形で使う */
-		template <class MDL, class BASE>
-		class TModel : public IModelP_base<BASE, IModel> {
-			MDL		_model;
-			const IModel& _getModel(const HLMdl& mdl) const;
-			const IModel& _getModel(const IModel& mdl) const;
-
+		template <class T>
+		class TModel : public ITagP<T>, public IModel {
+			using VMdl = VModel<ModelMgr>;
+			VMdl	_model;
+			AMat32	_mToWorld,
+					_mToLocal;
+			void _calcInv() {
+				_mToWorld.convertA33().inversion(reinterpret_cast<AMat33&>(_mToLocal));
+			}
 			public:
 				TModel(const TModel&) = default;
-				TModel(const MDL& mdl);
-				template <class... T>
-				TModel(const MDL& mdl, T&&... args): BASE(std::forward<T>(args)...), _model(mdl) {}
-				const MDL& getModel() const;
+				TModel(const IModel& mdl, const AMat32& mw): _model(mdl), _mToWorld(mw) { _calcInv(); }
+				TModel(HMdl hMdl, const AMat32& mw): _model(hMdl), _mToWorld(mw) { _calcInv(); }
 
-				bool isInner(const Vec2& pos) const override;
-				IModel::PosL getOverlappingPoints(const IModel& mdl, const Vec2& inner) const override;
-				// ---------- Convex専用 ----------
-				int getNPoints() const override;
-				Vec2 getPoint(int n) const override;
-				IModel::CPos checkPosition(const Vec2& pos) const override;
-				Convex2 splitTwo(const Line& ls) const override;
+				Circle im_getBVolume() const override { return _model.get().im_getBVolume(); }
+				float im_getInertia() const override { return _model.get().im_getInertia(); }
+				float im_getArea() const override { return _model.get().im_getArea(); }
+				Vec2 im_getCenter() const override { return _model.get().im_getCenter(); }
+				Vec2 im_support(const Vec2& dir) const override { return _model.get().im_support(dir); }
+				bool im_isInner(const Vec2& pos) const override { return _model.get().im_isInner(pos); }
+
+				Vec2 toLocal(const Vec2& v) const override { return v.asVec3(1) * _mToLocal; }
+				Vec2 toLocalDir(const Vec2& v) const override { return v.asVec3(0) * _mToLocal; }
+				Vec2 toWorld(const Vec2& v) const override { return v.asVec3(1) * _mToWorld; }
+				Vec2 toWorldDir(const Vec2& v) const override { return v.asVec3(0) * _mToWorld; }
+				spn::Optional<const AMat32&> getToLocal() const override { return _mToLocal; }
+				spn::Optional<const AMat32&> getToWorld() const override { return _mToWorld; }
+
+				uint32_t getCID() const override { return ITagP<T>::GetCID(); }
+				const void* getCore() const override { return _model.get().getCore(); }
 		};
-		class TR_Mat {
-			AMat32	_mToLocal,
-					_mToWorld;
-			public:
-				static struct tagInverse {} TagInverse;
-				TR_Mat() = default;
-				TR_Mat(const AMat32& m);
-				TR_Mat(const TR_Mat& t) = default;
-				TR_Mat(const TR_Mat& t, tagInverse);
-				// ---------- TR functions ----------
-				Vec2 toLocal(const Vec2& v) const;
-				Vec2 toLocalDir(const Vec2& v) const;
-				Vec2 toWorld(const Vec2& v) const;
-				Vec2 toWorldDir(const Vec2& v) const;
-				const AMat32& getToLocal() const;
-				const AMat32& getToWorld() const;
-		};
-		//! モデルハンドルに変換を被せる
-		template <class BASE>
-		using TModelH = TModel<HLMdl, BASE>;
-		//! const参照に変換を被せる(一時的な用途)
-		template <class BASE>
-		using TModelR = TModel<const IModel&, BASE>;
 
 		using CircleM = Model<Circle>;
 
@@ -345,12 +326,12 @@ namespace boom {
 			//! 指定ポイントの内部的な領域IDと内外位置を取得
 			/*! \return first=内外判定
 						second=領域ID */
-			IModel::CPos checkPosition(const Vec2& pos) const;
+			std::pair<ConvexPos, int> checkPosition(const Vec2& pos) const;
 			//! 内部的な通し番号における外郭ライン
 			Segment getOuterSegment(int n) const;
 			Line getOuterLine(int n) const;
-			IModel::PosL getOverlappingPoints(const IModel& mdl, const Vec2& inner) const;
-			static Convex GetOverlappingConvex(const IModel& m0, const IModel& m1, const Vec2& inner);
+			std::pair<bool,PointL> getOverlappingPoints(const Convex& mdl, const Vec2& inner) const;
+			static Convex GetOverlappingConvex(const Convex& m0, const Convex& m1, const Vec2& inner);
 			//! 凸包が直線と交差している箇所を2点計算
 			std::tuple<bool,Vec2,Vec2> checkCrossingLine(const Line& l) const;
 			Convex& operator *= (const AMat32& m);

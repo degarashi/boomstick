@@ -24,21 +24,6 @@ namespace boom {
 	void* IModelNode::getUserData() const { return nullptr; }
 
 	namespace geo2d {
-		// -------------------------- TR_Mat --------------------------
-		TR_Mat::tagInverse TR_Mat::TagInverse;
-		TR_Mat::TR_Mat(const AMat32& m): _mToWorld(m) {
-			auto mt = m.convert33();
-			mt.invert();
-			_mToLocal = mt.convertA32();
-		}
-		TR_Mat::TR_Mat(const TR_Mat& t, tagInverse): _mToLocal(t._mToWorld), _mToWorld(t._mToLocal) {}
-
-		Vec2 TR_Mat::toLocal(const Vec2& v) const { return v.asVec3(1) * _mToLocal; }
-		Vec2 TR_Mat::toLocalDir(const Vec2& v) const { return v.asVec3(0) * _mToLocal; }
-		Vec2 TR_Mat::toWorld(const Vec2& v) const { return v.asVec3(1) * _mToWorld; }
-		Vec2 TR_Mat::toWorldDir(const Vec2& v) const { return v.asVec3(0) * _mToWorld; }
-		const AMat32& TR_Mat::getToLocal() const { return _mToLocal; }
-		const AMat32& TR_Mat::getToWorld() const { return _mToWorld; }
 /*
 		// -------------------------- TModel --------------------------
 		template <class MDL, class BASE>

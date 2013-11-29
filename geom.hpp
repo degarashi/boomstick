@@ -6,6 +6,7 @@
 #include "spinner/plane.hpp"
 #include "spinner/optional.hpp"
 #include "spinner/pose.hpp"
+#include <boost/variant.hpp>
 
 namespace boom {
 	using spn::Vec2; using spn::Vec3; using spn::Vec4;
@@ -106,6 +107,27 @@ namespace boom {
 		}
 	};
 	using MdlIP = std::pair<PtrItr, PtrItr>;
+	//! IModelとHMdlの差異吸収
+	template <class MMGR>
+	class VModel {
+		using HMdl = typename MMGR::SHdl;
+		using HLMdl = typename MMGR::LHdl;
+		using IModel = typename MMGR::data_type::element_type;
+		using VMdl = boost::variant<const IModel&, HLMdl>;
+		VMdl	_vMdl;
+
+		struct Visitor : boost::static_visitor<const IModel&> {
+			const IModel& operator()(const HLMdl& hl) const {
+				return *hl.cref().get(); }
+			const IModel& operator()(const IModel& m) const { return m; }
+		};
+		public:
+			VModel(const IModel& mdl): _vMdl(mdl) {}
+			VModel(HMdl hMdl): _vMdl(hMdl) {}
+			const IModel& get() const {
+				return boost::apply_visitor(Visitor(), _vMdl);
+			}
+	};
 
 	//! 2D/3D共通
 	struct IModelNode {
@@ -388,6 +410,8 @@ namespace boom {
 			VEC im_support(const VEC& v) const override {
 				return source.support(v);
 			}
+			const void* getCore() const override {
+				return static_cast<const T*>(&source); }
 		};
 		//! 当たり判定を行う関数をリストにセットする
 		static void Initialize() {

@@ -126,8 +126,8 @@ namespace boom {
 				point[i] = tmp[i].second;
 		}
 
-		Convex Convex::GetOverlappingConvex(const IModel& m0, const IModel& m1, const Vec2& inner) {
-			Assert(Trap, m0.im_isInner(inner) && m1.im_isInner(inner), "invalid inner point")
+		Convex Convex::GetOverlappingConvex(const Convex& m0, const Convex& m1, const Vec2& inner) {
+			Assert(Trap, m0.isInner(inner) && m1.isInner(inner), "invalid inner point")
 
 			// DualTransformで直線から点に変換
 			int nV0 = m0.getNPoints(),
@@ -158,12 +158,12 @@ namespace boom {
 		Vec2 Convex::getPoint(int n) const { return point[n]; }
 
 		namespace {
-			int BinSearch(const PointL& point, int nV, const IModel& mdl, int a, int b, bool flip) {
+			int BinSearch(const PointL& point, int nV, const Convex& mdl, int a, int b, bool flip) {
 				for(;;) {
 					if(a+1 >= b)
 						break;
 					int c = (a+b)/2;
-					if(mdl.im_isInner(point[spn::CndRange(c, nV)]) ^ flip)
+					if(mdl.isInner(point[spn::CndRange(c, nV)]) ^ flip)
 						b = c;
 					else
 						a = c;
@@ -171,20 +171,20 @@ namespace boom {
 				return spn::CndRange(a, nV);
 			}
 		}
-		IModel::PosL Convex::getOverlappingPoints(const IModel& mdl, const Vec2& inner) const {
+		std::pair<bool,PointL> Convex::getOverlappingPoints(const Convex& mdl, const Vec2& inner) const {
 			auto res = checkPosition(inner);
 			if(res.first != ConvexPos::Outer) {
 				int nV = point.size();
 				int a,b, begI;
 				// 2分探索で衝突が始まる地点を探す
-				if(mdl.im_isInner(point[res.second])) {
+				if(mdl.isInner(point[res.second])) {
 					a = res.second - nV;
 					b = res.second;
 					// 衝突開始インデックス(これ自体は衝突していない)
 					begI = BinSearch(point, nV, mdl, a,b,false);
 				} else {
 					begI = res.second;
-					if(!mdl.im_isInner(point[spn::CndSub(res.second+1, nV)]))
+					if(!mdl.isInner(point[spn::CndSub(res.second+1, nV)]))
 						return std::make_pair(false, PointL());
 				}
 
@@ -211,7 +211,7 @@ namespace boom {
 			return std::make_pair(false, PointL());
 		}
 
-		IModel::CPos Convex::checkPosition(const Vec2& pos) const {
+		std::pair<ConvexPos,int> Convex::checkPosition(const Vec2& pos) const {
 			// 適当に内部点を算出
 			Vec2 inner = (point[0] + point[1] + point[2]) * (1.f/3);
 			Vec2 toP(pos - inner);
@@ -283,7 +283,7 @@ namespace boom {
 				posf = ConvexPos::Outer;
 			else
 				posf = ConvexPos::OnLine;
-			return IModel::CPos(posf, tmpA.index);
+			return std::make_pair(posf, tmpA.index);
 		}
 		bool Convex::isInner(const Vec2& pos) const {
 			return checkPosition(pos).first != ConvexPos::Outer;
