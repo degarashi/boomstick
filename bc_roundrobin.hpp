@@ -27,7 +27,7 @@ namespace boom {
 				spn::SHandle	hCol;
 				BVolume			volume;
 			};
-			using Nodes = spn::noseq_list<Node, uint32_t>;
+			using Nodes = spn::noseq_list<Node, std::allocator, uint32_t>;
 			Nodes			_node[NumType];
 			const FGetBV 	_fGetBV;
 
