@@ -232,7 +232,7 @@ namespace boom {
 			int nV2 = 0;
 			Vec3 v[5] = { Vec3(0,0,0),Vec3(-1,1,1), Vec3(1,1,1), Vec3(1,-1,1), Vec3(-1,-1,1) };
 			Vec3 v2[8];
-			AMat43 m = getToWorld() * mV;
+			AMat43 m = getToWorld().convertA44() * mV;
 			for(int i=0 ; i<countof(v) ; i++)
 				v[i] = v[i].asVec4(1) * m;
 			// ビュー座標へ変換し，Z平面0でクリップ
