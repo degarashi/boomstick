@@ -1,8 +1,7 @@
 cmake_minimum_required(VERSION 2.8)
 project(boomstick)
-# KDevelopの変数設定が機能していないのでターゲットによってコメントアウトを切り替える
-set(SSE_LEVEL 2)
-# set(ARCHITECTURE x86)
+# Android:		set(ARCHITECTURE x86)又はset(ARCHITECTURE arm)とする
+# Win32|Linux:	必要に応じてset(SSE_LEVEL 0..3)
 include(spinner/CMakeCommon.txt require)
 include(spinner/CMakeCompiler.txt require)
 include_directories(${PROJECT_SOURCE_DIR}/spinner)
