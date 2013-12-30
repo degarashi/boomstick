@@ -19,21 +19,21 @@ namespace boom {
 		Frustum::Points::Points(const Points& pts) {
 			std::memcpy(this, &pts, sizeof(*this)); }
 		Frustum::Points::Points(const Vec3& cen, const Vec3& lt, const Vec3& rt, const Vec3& lb, const Vec3& rb):
-			center(cen), leftTop(lt), rightTop(rt), leftBottom(lb), rightBottom(rb) {}
+			point{cen, lt, rt, lb, rb} {}
 		Frustum::Points& Frustum::Points::operator = (const Points& pts) {
 			return *(new(this) Points(pts)); }
 		Frustum::Points Frustum::Points::operator * (const AMat43& m) const {
 			Points pts;
-			for(int i=0 ; i<countof(ar) ; i++)
-				pts.ar[i] = ar[i].asVec4(1) * m;
+			for(int i=0 ; i<countof(point) ; i++)
+				pts.point[i] = point[i].asVec4(1) * m;
 			return pts;
 		}
 		bool Frustum::Points::hit(const Plane& p) const {
 			// centerから四隅への線分が交差しているかを調べる
 			Segment seg;
-			seg.from = center;
-			for(auto& pv : corner) {
-				seg.to = pv;
+			seg.from = point[Center];
+			for(int i=1 ; i<NumPos ; i++) {
+				seg.to = point[i];
 				if(seg.hit(p))
 					return true;
 			}
@@ -43,13 +43,13 @@ namespace boom {
 		Frustum::Planes::Planes(const Planes& ps) {
 			std::memcpy(this, &ps, sizeof(Planes)); }
 		Frustum::Planes::Planes(const Plane& pL, const Plane& pR, const Plane& pB, const Plane& pT, const Plane& pF):
-			left(pL), right(pR), bottom(pB), top(pT), front(pF) {}
+			plane{pL, pR, pB, pT, pF} {}
 		Frustum::Planes& Frustum::Planes::operator = (const Planes& ps) {
 			return *(new(this) Planes(ps)); }
 		Frustum::Planes Frustum::Planes::operator * (const AMat43& m) const {
 			Planes ret;
-			for(int i=0 ; i<countof(ar) ; i++)
-				ret.ar[i] = ar[i] * m;
+			for(int i=0 ; i<countof(plane) ; i++)
+				ret.plane[i] = plane[i] * m;
 			return ret;
 		}
 		Frustum::Frustum(const Vec3& ori, const Vec3& dir, const Vec3& up, float fov, float dist, float aspect) {
@@ -64,9 +64,9 @@ namespace boom {
 		Vec3 Frustum::bs_getGCenter() const {
 			auto pts = getPoints(true);
 			Vec3 c(0,0,0);
-			for(int i=0 ; i<5 ; i++)
-				c += pts.ar[i];
-			return c / 5;
+			for(int i=0 ; i<Points::NumPos ; i++)
+				c += pts.point[i];
+			return c / Points::NumPos;
 		}
 		Vec3 Frustum::bs_getCenter() const {
 			return bs_getGCenter();
@@ -74,9 +74,9 @@ namespace boom {
 		Sphere Frustum::bs_getBVolume() const {
 			auto pts = getPoints(true);
 			Vec3 c = bs_getCenter();
-			float len = c.dist_sq(pts.center);
-			for(int i=0 ; i<4 ; i++)
-				len = std::max(c.dist_sq(pts.corner[i]), len);
+			float len = c.dist_sq(pts.point[Points::Center]);
+			for(int i=1 ; i<Points::NumPos ; i++)
+				len = std::max(c.dist_sq(pts.point[i]), len);
 			return Sphere(c, spn::Sqrt(len));
 		}
 		float Frustum::bs_getArea() const { INVOKE_ERROR }
@@ -117,16 +117,16 @@ namespace boom {
 			Vec3 ldir = dir.asVec4(0) * getToLocal();
 			auto pts = getPoints(false);
 
-			float d = pts.center.dot(ldir);
+			float d = pts.point[Points::Center].dot(ldir);
 			int idx = 0;
-			for(int i=0 ; i<4 ; i++) {
-				float td = ldir.dot(pts.corner[i]);
+			for(int i=1 ; i<Points::NumPos ; i++) {
+				float td = ldir.dot(pts.point[i]);
 				if(d < td) {
 					d = td;
 					idx = i+1;
 				}
 			}
-			return pts.ar[idx].asVec4(1) * getToWorld();
+			return pts.point[idx].asVec4(1) * getToWorld();
 		}
 		Frustum Frustum::operator * (const AMat43& m) const {
 			auto ap = spn::DecompAffine(m);
@@ -158,9 +158,9 @@ namespace boom {
 			plane[3] = Plane(vU,0);
 
 			// 線分の絶対値化は面倒なので5平面と比較
-			for(int i=0 ; i<countof(pts.ar) ; i++) {
-				auto &p0 = pts.ar[i],
-					&p1 = pts.ar[(i+1)%countof(pts.ar)];
+			for(int i=0 ; i<countof(pts.point) ; i++) {
+				auto &p0 = pts.point[i],
+					&p1 = pts.point[(i+1)%countof(pts.point)];
 				// 線分が必ず2つの平面を横切っている前提 (1つ少なくて済む)
 				for(int j=0 ; j<countof(plane)-1 ; j++) {
 					if(auto cp = Segment(p0,p1).crossPoint(plane[j])) {
@@ -188,7 +188,7 @@ namespace boom {
 
 			// check in-hit
 			// 効率化のために絶対値の座標で比較する (上, 右, 奥)
-			for(auto& p : pts.ar) {
+			for(auto& p : pts.point) {
 				if(p.z >= 0) {
 					Vec3 tpt(std::fabs(p.m[0]), std::fabs(p.m[1]), p.m[2]);
 					if(vU.dot(tpt)>=0 && vR.dot(tpt)>=0 && pZ.dot(tpt)>=0)
@@ -221,8 +221,8 @@ namespace boom {
 			// 5点の符号を比べる
 			const auto& pts = getPoints(false);
 			const auto& sc = getScale();
-			for(int i=0 ; i<countof(pts.ar) ; i++) {
-				auto& p = pts.ar[i];
+			for(int i=0 ; i<countof(pts.point) ; i++) {
+				auto& p = pts.point[i];
 				cb(i, tplane.dot(Vec3(p.x*sc.x, p.y*sc.y, p.z*sc.z)));
 			}
 		}
@@ -353,7 +353,7 @@ namespace boom {
 			// 四角錘をローカル空間に変換する
 			auto m = getToLocal();
 			auto pts = fr.getPoints(true);
-			for(auto& p : pts.ar)
+			for(auto& p : pts.point)
 				p = p.asVec4(1) * m;
 
 			if(inHit_LocalB(pts) || crossHit_LocalB(pts))
@@ -361,7 +361,7 @@ namespace boom {
 
 			m = fr.getToLocal();
 			pts = getPoints(true);
-			for(auto& p : pts.ar)
+			for(auto& p : pts.point)
 				p = p.asVec4(1) * m;
 			return fr.inHit_LocalB(pts);
 		}
@@ -372,7 +372,7 @@ namespace boom {
 
 			// 視錐台4隅 + 4辺の線分がConeと交差しているか
 			auto pts = getPoints(true);
-			const Vec3* pPts = pts.ar;
+			const Vec3* pPts = pts.point;
 			const int pIdx[8][2] = {
 				{0,1},{0,2},{0,3},{0,4},
 				{1,2},{1,3},{2,4},{3,4}
@@ -384,7 +384,7 @@ namespace boom {
 
 			auto planes = getPlanes(true);
 			// 視錐台5平面に対しての最深点がFrustumに入っているか
-			for(auto& pl : planes.ar) {
+			for(auto& pl : planes.plane) {
 				if(cone.nearestPoint(pl).second > 0)
 					return false;
 			}

@@ -124,7 +124,7 @@ namespace boom {
 				Sphere im_getBVolume() const override {
 					return _model.get().im_getBVolume() * _mToWorld; }
 				Mat33 im_getInertia() const override {
-					return _model.get().im_getInertia() * _mToWorld; }
+					return _model.get().im_getInertia().convertA44() * _mToWorld; }
 				float im_getArea() const override {
 					return _model.get().im_getArea(); }
 				Vec3 im_getCenter() const override {
@@ -330,16 +330,16 @@ namespace boom {
 		/*! 距離1,幅1,高さ1の四角錐を基本としFovの調整はスケーリングで対応 */
 		struct Frustum : ITagP<Frustum>, public Pose3D {
 			struct Points {
-				union {
-					struct {
-						Vec3 center;
-						union {
-							struct { Vec3 leftTop, rightTop, leftBottom, rightBottom; };
-							Vec3 corner[4];
-						};
-					};
-					Vec3 ar[5];
+				enum Pos {
+					Center,
+					LeftTop,
+					RightTop,
+					LeftBottom,
+					RightBottom,
+					NumPos
 				};
+				Vec3 point[NumPos];
+
 				Points() = default;
 				Points(const Vec3& cen, const Vec3& lt, const Vec3& rt, const Vec3& lb, const Vec3& rb);
 				Points(const Points& pts);
@@ -348,10 +348,16 @@ namespace boom {
 				Points operator * (const AMat43& m) const;
 			};
 			struct Planes {
-				union {
-					struct { Plane left, right, bottom, top, front; };
-					Plane ar[5];
+				enum Pos {
+					Left,
+					Right,
+					Bottom,
+					Top,
+					Front,
+					NumPlane
 				};
+				Plane plane[NumPlane];
+
 				Planes() = default;
 				Planes(const Plane& pL, const Plane& pR, const Plane& pB, const Plane& pT, const Plane& pF);
 				Planes(const Planes& ps);
@@ -719,10 +725,10 @@ namespace boom {
 		#undef DEF_INVALID_BSFUNCS
 
 		struct Types {
-			using CTGeo = CTGeo;
-			using MMgr = ModelMgr;
-			using IModel = IModel;
-			using GJK = GSimplex;
+			using CTGeo = ::boom::geo3d::CTGeo;
+			using MMgr = ::boom::geo3d::ModelMgr;
+			using IModel = ::boom::geo3d::IModel;
+			using GJK = ::boom::geo3d::GSimplex;
 			using Narrow = ::boom::Narrow<Types>;
 		};
 	}

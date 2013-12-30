@@ -477,10 +477,10 @@ namespace boom {
 		#undef DEF_INVALID_BSFUNCS
 
 		struct Types {
-			using CTGeo = CTGeo;
-			using MMgr = ModelMgr;
-			using IModel = IModel;
-			using GJK = GSimplex;
+			using CTGeo = ::boom::geo2d::CTGeo;
+			using MMgr = ::boom::geo2d::ModelMgr;
+			using IModel = ::boom::geo2d::IModel;
+			using GJK = ::boom::geo2d::GSimplex;
 			using Narrow = ::boom::Narrow<Types>;
 		};
 	}
