@@ -461,8 +461,8 @@ namespace boom {
 			return _vNormal;
 		}
 		DEF(Vec3)::getSumNormal() const {
-			Vec3 sub0 = getVtx(1) - getVtx(0),
-				sub1 = getVtx(2) - getVtx(0);
+// 			Vec3 sub0 = getVtx(1) - getVtx(0),
+// 				sub1 = getVtx(2) - getVtx(0);
 			Vec3 sum(0,0,0);
 			int nv = getNVtx();
 			for(int i=2 ; i<nv ; i++)
@@ -526,12 +526,9 @@ namespace boom {
 		DEF_TEMP
 		Vec3x2 Convex<VType,UD>::support(const Vec3& vc) const {
 			const Vec3& center = getCenter();
-			const Vec3& normal = getNormal();
-			const Plane& plane = getPlane();
-			Vec3 opvc = plane.placeOnPlane(vc, 0);
 			Vec3 dir = vc-center;
 			dir.normalize();
-			Vec3 vanother = center+dir*100.0f, cp;
+			Vec3 vanother = center+dir*100.0f;
 			Vec3 dstcpos, dstnml;
 			float dist = 1e8f;
 			int nv = getNVtx();

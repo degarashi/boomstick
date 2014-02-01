@@ -126,7 +126,6 @@ namespace boom {
 		}
 		std::pair<Vec3,float> Cone::nearestPoint(const Plane& plane) const {
 			const auto& nml = plane.getNormal();
-			float d = dir.dot(nml);
 			Vec3 bnml = nml % dir;
 			bnml %= dir;
 

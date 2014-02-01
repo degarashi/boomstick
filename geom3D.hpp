@@ -35,7 +35,7 @@ namespace boom {
 		struct AABB;
 		struct Cone;
 		struct Cylinder;
-		struct ConvexP;
+		class ConvexP;
 		using CTGeo = spn::CType<ConvexP, AABB, Frustum, Cone, Cylinder, Capsule, Sphere, Segment, Ray, Line, Point>;
 		template <class T>
 		using ITagP = ITagP_base<T, CTGeo>;

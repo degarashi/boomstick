@@ -230,7 +230,6 @@ namespace boom {
 			auto& nml = poly.getNormal();
 			if(IsValidValue(nml)) {
 				Vec3 cp = poly.nearest(ori).first;
-				float d = cp.len_sq();
 
 				Vec3 nml = poly.getNormal();
 				Vec3 toV1 = poly.getVtx(1)-poly.getVtx(0),
@@ -281,7 +280,6 @@ namespace boom {
 			// 4面体は最寄りの3角ポリゴンと同義
 			if(_nearIDX >= 0) {
 				// (nearPはポリゴン上にある)
-				const int c_defaultID[3] = {0,1,2};
 				const int* use = cs_index[(_nVtx==3) ? 0 : _nearIDX];
 				Vec3 v0 = CalcPolyRatio(_vtx[use[0]], _vtx[use[1]], _vtx[use[2]], _nearP,
 										_posB[use[0]], _posB[use[1]], _posB[use[2]]),

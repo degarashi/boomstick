@@ -316,7 +316,7 @@ namespace boom {
 		public:
 			template <class T>
 			const T_OP<T>& _getInfo() const {
-				constexpr int idx = CTTAG::template Find<T>::result;
+// 				constexpr int idx = CTTAG::template Find<T>::result;
 				return _getInfo<T>(std::is_reference<decltype(T::get(std::declval<CORE>()))>());
 			}
 			const CORE& getCoreRef() const { return _core; }

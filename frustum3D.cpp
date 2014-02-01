@@ -308,14 +308,14 @@ namespace boom {
 			spc.y = std::fabs(spc.y);
 
 			const auto& sc = getScale();
-			float w = sc.x / sc.z,
-				h = sc.y / sc.z;
-			float angW = std::atan(w),
-				cW = std::cos(angW),
-				sW = std::sin(angW);
-			float angH = std::atan(h),
-				cH = std::cos(angH),
-				sH = std::sin(angH);
+// 			float w = sc.x / sc.z,
+// 				h = sc.y / sc.z;
+// 			float angW = std::atan(w),
+// 				cW = std::cos(angW),
+// 				sW = std::sin(angW);
+// 			float angH = std::atan(h),
+// 				cH = std::cos(angH),
+// 				sH = std::sin(angH);
 			Vec3 nml[4] = {
 				Vec3(),
 				Vec3(),

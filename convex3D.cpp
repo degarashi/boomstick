@@ -54,7 +54,7 @@ namespace boom {
 			return -1;
 		}
 		// ------------------------- CnvP -------------------------
-		CnvP::CnvP(const int (&initial)[4], const Vec3List& vtx): _vtx(vtx), _poly(0x100), _pcCur(0), _pfCur(0) {
+		CnvP::CnvP(const int (&initial)[4], const Vec3List& vtx): _poly(0x100), _pcCur(0), _pfCur(0), _vtx(vtx) {
 			int nV = vtx.size();
 			_vcCur = nV-4;
 			for(int i=0 ; i<nV ; i++)
@@ -94,7 +94,6 @@ namespace boom {
 		}
 		CnvP::PolyF::Ptr& CnvP::_addPoly(int i0, int i1, int i2) {
 			auto ptr = _poly.get(i0,i1,i2,_vtx);
-			Idx3* p = ptr.get();
 			// 頂点番号登録
 			_addRefVID(i0);
 			_addRefVID(i1);
