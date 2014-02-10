@@ -1,5 +1,3 @@
-Sorry, japanese text only (for now :)
-
 ・これは何？
 	>当たり判定・剛体シミュレーションライブラリ
 
@@ -8,3 +6,33 @@ Sorry, japanese text only (for now :)
 	>というか、書いてみたかった
 
 <spinnerと同じく開発途中なので実用性はありません>
+依存ライブラリ:
+Spinner
+Boost-1.55.0(boost_regex, boost_serialization, boost_system)
+
+Sphere
+SphereM(末尾のM付きは汎用モデルインタフェース継承)
+SphereC(末尾のC付きは汎用キャッシュインタフェース継承)
+
+実装した形状クラス
+	[2D]
+		Point:
+		Segment:
+		AABB:
+		Poly:
+		Circle:
+		Convex:
+	[3D]
+		Point:
+		Sphere:
+		Line:
+		Ray:
+		Segment:
+		Capsule:
+		Frustum:
+		AABB:
+		Cone:
+		Cylinder:
+		ConvecP:
+単純な当たり判定
+	
