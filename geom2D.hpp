@@ -76,7 +76,7 @@ namespace boom {
 		using UPModel = std::unique_ptr<IModel>;
 		#define mgr_model2d (::boom::geo2d::ModelMgr::_ref())
 		class ModelMgr : public spn::ResMgrA<UPModel, ModelMgr> {};
-		DEF_HANDLE(ModelMgr, Mdl, UPModel)
+		DEF_AHANDLE(ModelMgr, Mdl, UPModel, UPModel)
 
 		template <class T>
 		struct Model : IModelP_base<T, IModel> {
