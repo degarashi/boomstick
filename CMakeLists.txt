@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 2.8)
 project(boomstick)
 include("spinner/${BUILD_TYPE}.cmake" require)
-include(spinner/Common.cmake require)
 include_directories(${PROJECT_SOURCE_DIR}/spinner)
 link_directories(${CMAKE_INSTALL_PREFIX}/lib_${TOOL_PREFIX})
 
