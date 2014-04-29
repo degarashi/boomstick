@@ -13,6 +13,6 @@ install(FILES ${HEADERS} DESTINATION include/boomstick)
 
 if(NOT DEFINED ARCHITECTURE)
 	add_executable(bs_test main.cpp)
-	target_link_libraries(bs_test boomstick spinner boost_system)
+	target_link_libraries(bs_test boomstick spinner boost_system boost_regex)
 	install(TARGETS bs_test RUNTIME DESTINATION bin_${TOOL_PREFIX})
 endif()
