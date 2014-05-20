@@ -194,7 +194,7 @@ namespace boom {
 			const Sphere& bs_getBVolume() const { INVOKE_ERROR } \
 			const float& bs_getArea() const { INVOKE_ERROR } \
 			const Mat33& bs_getInertia() const { INVOKE_ERROR } \
-			const Vec3& support(const Vec3& dir) const { INVOKE_ERROR }
+			const Vec3& support(const Vec3& /*dir*/) const { INVOKE_ERROR }
 		//! 点
 		struct Point : Vec3, ITagP<Point> {
 			constexpr static float NEAR_THRESHOLD = 1e-5f;

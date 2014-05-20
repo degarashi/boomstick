@@ -248,7 +248,7 @@ namespace boom {
 	template <>
 	struct Setter<0> {
 		template <class CACHE, class... Ts>
-		static void set(CACHE& c, const std::tuple<Ts...>& tup) {}
+		static void set(CACHE& /*c*/, const std::tuple<Ts...>& /*tup*/) {}
 	};
 
 	#define DEF_GETMETHOD(clazz, name, tag)	decltype(std::declval<clazz>().template _getInfo<tag>()) name() const { return clazz::template _getInfo<tag>(); }
@@ -361,7 +361,7 @@ namespace boom {
 		template <int N0, int N1, class B0, class B1,
 					class = int,
 					class = typename std::enable_if<spn::TType<B0,B1>::t_nand::value>::type>
-		static bool CFRaw(const void* m0, const void* m1) {
+		static bool CFRaw(const void* /*m0*/, const void* /*m1*/) {
 			return false;
 		}
 	};
@@ -376,7 +376,7 @@ namespace boom {
 	};
 	template <class Types, int M>
 	struct Narrow_InitB<Types, M, -1> {
-		static void Init(ColFunc*& dst) {}
+		static void Init(ColFunc*& /*dst*/) {}
 	};
 
 	template <class Types, int WIDE_M, int M>
@@ -388,7 +388,7 @@ namespace boom {
 	};
 	template <class Types, int WIDE_M>
 	struct Narrow_InitA<Types, WIDE_M, -1> {
-		static void Init(ColFunc*& dst) {}
+		static void Init(ColFunc*& /*dst*/) {}
 	};
 
 	template <class T, class IM>
