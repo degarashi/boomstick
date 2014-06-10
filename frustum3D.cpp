@@ -53,10 +53,10 @@ namespace boom {
 			return ret;
 		}
 		Frustum::Frustum(const Vec3& ori, const Vec3& dir, const Vec3& up, float fov, float dist, float aspect) {
-			setOfsVec(ori);
+			setOffset(ori);
 			setRot(AQuat::FromAxis(up % dir, up, dir));
 			float h = std::tan(fov/2);
-			setScale(h*aspect, h, dist);
+			setScale({h*aspect, h, dist});
 		}
 		Frustum::Frustum(const Vec3& ori, const Vec3& at, const Vec3& up, float fov, float aspect):
 			Frustum(ori, (at-ori).normalization(), up, fov, (at-ori).length(), aspect)
