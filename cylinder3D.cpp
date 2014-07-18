@@ -1,5 +1,6 @@
 #include "geom3D.hpp"
 #include "convex.hpp"
+#include "spinner/ulps.hpp"
 
 namespace boom {
 	namespace geo3d {
@@ -84,11 +85,11 @@ namespace boom {
 
 			// X軸の計算
 			zaxis = spn::GetVerticalVec(yaxis);
-			AssertP(Trap, spn::IsNear(zaxis.length(), 1.f, 1e-3f))
+			AssertP(Trap, spn::EqAbs(zaxis.length(), 1.f, 1e-3f))
 
 			// Z軸の計算
 			xaxis = yaxis % zaxis;
-			AssertP(Trap, spn::IsNear(xaxis.length(), 1.f, 1e-3f))
+			AssertP(Trap, spn::EqAbs(xaxis.length(), 1.f, 1e-3f))
 
 			// X軸セット
 			m.setColumn(0, xaxis.asVec4(from.dot(-xaxis)));

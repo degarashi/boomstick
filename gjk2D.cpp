@@ -216,7 +216,7 @@ namespace boom {
 							&v0 = *fr.vtx[0],
 							&v2 = *fr.vtx[1];
 				float d1 = fr.dir.dot(v1.first);
-				if(spn::IsNear(d1, fr.dist, 5e-4f)) {
+				if(spn::EqAbs(d1, fr.dist, 5e-4f)) {
 					if(minLen > fr.dist) {
 						minLen = fr.dist;
 						_pvec = fr.dir * fr.dist;
@@ -249,7 +249,7 @@ namespace boom {
 							&v0 = *fr.vtx[0],
 							&v2 = *fr.vtx[1];
 				float d1 = fr.dir.dot(v1.first);
-				if(spn::IsNear(std::fabs(d1), fr.dist, 5e-4f)) {
+				if(spn::EqAbs(std::fabs(d1), fr.dist, 5e-4f)) {
 					_nvec.second = v1.second;
 					_nvec.first = v1.second + fr.dir * fr.dist;
 					return;

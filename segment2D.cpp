@@ -51,7 +51,7 @@ namespace boom {
 			Vec2 toV1(to-from),
 				toP(p-from);
 			toV1.normalize();
-			return spn::IsNear(toV1.dot(toP), toP.length(), 1e-5f);
+			return spn::EqAbs(toV1.dot(toP), toP.length(), 1e-5f);
 		}
 		LNear Segment::crossPoint(const Segment& ls) const {
 			auto fn = [](float f){ return f; };
