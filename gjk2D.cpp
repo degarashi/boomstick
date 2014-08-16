@@ -174,16 +174,16 @@ namespace boom {
 				PrintV(v.second);
 			}
 		}
-		void GEpa::_printASV() {
+		void GEpa::_printASV() const {
 			int nV = _szVl;
 			for(int i=0 ; i<nV ; i++) {
 				PrintV(*_vl[i]);
 				std::cout << std::endl;
 			}
-			for(auto& p : _asv) {
-				std::cout << p.dist << ':';
-				PrintV(p.dir);
-				std::cout << std::hex << p.vtx[0] << ',' << p.vtx[1] << std::endl;
+			for(auto itr=_asv.cbegin() ; itr!=_asv.cend() ; itr++) {
+				std::cout << itr->dist << ':';
+				PrintV(itr->dir);
+				std::cout << std::hex << itr->vtx[0] << ',' << itr->vtx[1] << std::endl;
 			}
 		}
 

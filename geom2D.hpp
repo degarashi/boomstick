@@ -402,7 +402,7 @@ namespace boom {
 			};
 			//! 最短距離リスト
 			spn::AssocVec<LmLen>	_asv;
-			void _printASV();
+			void _printASV() const;
 
 			union {
 				Vec2	_pvec;

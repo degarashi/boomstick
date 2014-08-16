@@ -6,6 +6,8 @@
 #include "spinner/plane.hpp"
 #include "spinner/optional.hpp"
 #include "spinner/pose.hpp"
+#include "spinner/interpolatation.hpp"
+#include "spinner/check_macro.hpp"
 #include <boost/variant.hpp>
 
 namespace boom {

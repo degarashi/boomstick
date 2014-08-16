@@ -4,6 +4,7 @@
 #include "spinner/resmgr.hpp"
 #include "spinner/size.hpp"
 #include "spinner/layerbit.hpp"
+#include "spinner/structure/freeobj.hpp"
 #include <memory>
 #include <unordered_set>
 #include <map>
