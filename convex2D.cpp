@@ -119,7 +119,7 @@ namespace boom {
 			using AngPair = std::pair<float, Vec2>;
 			std::vector<AngPair> tmp(nV);
 			for(int i=0 ; i<nV ; i++)
-				tmp[i] = AngPair{spn::Angle(point[i]-c), point[i]};
+				tmp[i] = AngPair{spn::AngleValue(point[i]-c), point[i]};
 			std::sort(tmp.begin(), tmp.end(), [](const AngPair& a0, const AngPair& a1) { return a0.first < a1.first; });
 
 			for(int i=0 ; i<nV ; i++)

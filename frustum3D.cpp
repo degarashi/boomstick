@@ -2,12 +2,12 @@
 
 namespace boom {
 	namespace geo3d {
-		void VFrusFloat::init(float nearZ, float farZ, float aspect, float fov) {
+		void VFrusFloat::init(float nearZ, float farZ, float aspect, spn::RadF fov) {
 			nearDistance = nearZ;
 			farDistance = farZ;
 
 			float a = aspect,
-				e = 1.0f / tan(fov/2),
+				e = 1.0f / tan(fov.get()/2),
 				f = sqrt(e*e + 1),
 				f2 = sqrt(e*e + a*a);
 			leftRightX = e / f2;
@@ -52,13 +52,13 @@ namespace boom {
 				ret.plane[i] = plane[i] * m;
 			return ret;
 		}
-		Frustum::Frustum(const Vec3& ori, const Vec3& dir, const Vec3& up, float fov, float dist, float aspect) {
+		Frustum::Frustum(const Vec3& ori, const Vec3& dir, const Vec3& up, spn::RadF fov, float dist, float aspect) {
 			setOffset(ori);
 			setRot(AQuat::FromAxis(up % dir, up, dir));
-			float h = std::tan(fov/2);
+			float h = std::tan(fov.get()/2);
 			setScale({h*aspect, h, dist});
 		}
-		Frustum::Frustum(const Vec3& ori, const Vec3& at, const Vec3& up, float fov, float aspect):
+		Frustum::Frustum(const Vec3& ori, const Vec3& at, const Vec3& up, spn::RadF fov, float aspect):
 			Frustum(ori, (at-ori).normalization(), up, fov, (at-ori).length(), aspect)
 		{}
 		Vec3 Frustum::bs_getGCenter() const {
@@ -129,7 +129,7 @@ namespace boom {
 			return pts.point[idx].asVec4(1) * getToWorld();
 		}
 		Frustum Frustum::operator * (const AMat43& m) const {
-			auto ap = spn::DecompAffine(m);
+			auto ap = spn::AffineParts::Decomp(m);
 			return Frustum(Pose3D(getOffset() + ap.offset,
 							getRot() >> ap.rotation,
 							getScale() * ap.scale));

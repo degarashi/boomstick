@@ -325,7 +325,7 @@ namespace boom {
 			float		topBottomY;
 			float		topBottomZ;
 
-			void init(float nearZ, float farZ, float aspect, float fov);
+			void init(float nearZ, float farZ, float aspect, spn::RadF fov);
 		};
 		//! 四角錐
 		/*! 距離1,幅1,高さ1の四角錐を基本としFovの調整はスケーリングで対応 */
@@ -370,8 +370,8 @@ namespace boom {
 
 			Frustum() = default;
 			using Pose3D::Pose3D;
-			Frustum(const Vec3& ori, const Vec3& dir, const Vec3& up, float fov, float dist, float aspect);
-			Frustum(const Vec3& ori, const Vec3& at, const Vec3& up, float fov, float aspect);
+			Frustum(const Vec3& ori, const Vec3& dir, const Vec3& up, spn::RadF fov, float dist, float aspect);
+			Frustum(const Vec3& ori, const Vec3& at, const Vec3& up, spn::RadF fov, float aspect);
 
 			// ---- cacheable functions ----
 			Vec3 bs_getGCenter() const;
