@@ -1,3 +1,6 @@
 [submodule "spinner"]
 	path = spinner
 	url = ../spinner
+[submodule "crosscompile"]
+	path = crosscompile
+	url = ../crosscompile/
