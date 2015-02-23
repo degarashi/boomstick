@@ -116,7 +116,7 @@ namespace boom {
 			// point全部が凸包に使用される頂点と仮定
 			Vec2 c = (point[0] + point[1] + point[2]) * (1.f/3);
 			int nV = point.size();
-			using AngPair = std::pair<float, Vec2>;
+			using AngPair = std::pair<spn::RadF, Vec2>;
 			std::vector<AngPair> tmp(nV);
 			for(int i=0 ; i<nV ; i++)
 				tmp[i] = AngPair{spn::AngleValue(point[i]-c), point[i]};
