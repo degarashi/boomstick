@@ -48,13 +48,6 @@ namespace boom {
 			for(int i=0 ; i<3 ; i++)
 				point[i] += ofs;
 		}
-		bool Poly::isInTriangle(const Vec2& p) const {
-			Vec2 vt(p-point[0]),
-				v1(point[1]-point[0]),
-				v2(point[2]-point[0]);
-			return v1.cw(vt) >= 0 &&
-					vt.cw(v2) >= 0;
-		}
 		int Poly::getObtuseCorner() const {
 			AVec2 v01(point[1]-point[0]),
 				v02(point[2]-point[0]),
@@ -71,6 +64,17 @@ namespace boom {
 			if(v02.dot(v12) < 0)
 				return 2;
 			return -1;
+		}
+		bool Poly::_isInTriangle(const Vec2& p, float threshold) const {
+			return (point[1] - point[0]).cw(p - point[0]) >= -threshold &&
+					(point[2] - point[1]).cw(p - point[1]) >= -threshold &&
+					(point[0] - point[2]).cw(p - point[2]) >= -threshold;
+		}
+		bool Poly::isInTriangle(const Vec2& p) const {
+			return _isInTriangle(p, 0.f);
+		}
+		bool Poly::hit(const Vec2& p) const {
+			return _isInTriangle(p, 1e-3f);
 		}
 	}
 }

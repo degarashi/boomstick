@@ -790,7 +790,7 @@ namespace boom {
 				tv0.normalize();
 				tv1 = tmp2 - tmp0;
 				tv1.normalize();
-				if(spn::IsInTriangle(tmp0, tmp1, tmp2, cp))
+				if(IsInTriangle(tmp0, tmp1, tmp2, cp))
 					return cp;
 			}
 			return spn::none;

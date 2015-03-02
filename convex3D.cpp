@@ -2,6 +2,37 @@
 
 namespace boom {
 	namespace geo3d {
+		bool IsInTriangle(const Vec3& vtx0, const Vec3& vtx1, const Vec3& vtx2, const Vec3& pos) {
+			Vec3 normal = *NormalFromPoints(vtx0, vtx1, vtx2);
+
+			// 1st Triangle
+			Vec3 tv = Vec3(vtx1-vtx0) % (pos-vtx0);
+			float lensq = tv.len_sq();
+			if(lensq > 1e-5f) {
+				tv /= lensq;
+				if(normal.dot(tv) < -1e-4f)
+					return false;
+			}
+
+			// 2nd Triangle
+			tv = Vec3(vtx2-vtx1) % (pos-vtx1);
+			lensq = tv.len_sq();
+			if(lensq > 1e-5f) {
+				tv /= lensq;
+				if(normal.dot(tv) < -1e-4f)
+					return false;
+			}
+
+			// 3rd Triangle
+			tv = Vec3(vtx0-vtx2) % (pos-vtx2);
+			lensq = tv.len_sq();
+			if(lensq > 1e-5f) {
+				tv /= lensq;
+				if(normal.dot(tv) < -1e-4f)
+					return false;
+			}
+			return true;
+		}
 		// ------------------------- Idx3 -------------------------
 		Idx3::Idx3() {}
 		Idx3::Idx3(int i0, int i1, int i2, int pid): _pid(pid) {

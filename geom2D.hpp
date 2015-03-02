@@ -248,6 +248,7 @@ namespace boom {
 		};
 		struct Poly : ITagP<Poly> {
 			Vec2		point[3];
+			bool _isInTriangle(const Vec2& p, float threshold) const;
 
 			Poly() = default;
 			Poly(const Vec2& p0, const Vec2& p1, const Vec2& p2);
@@ -257,6 +258,9 @@ namespace boom {
 			Vec2 bs_getCenter() const;
 			Circle bs_getBVolume() const;
 			// -----------------------------
+			//! 座標が三角形の内部に含まれるかを判定
+			/*! ポリゴンは時計回りを想定
+				辺上は含まない */
 			bool isInTriangle(const Vec2& p) const;
 			std::pair<Vec2,int> nearest(const Vec2& p) const;
 
@@ -269,6 +273,9 @@ namespace boom {
 			int getObtuseCorner() const;
 
 			spn::none_t hit(...) const;
+			//! 座標が三角形と衝突するか判定
+			/*! isInTriangleとは異なり辺上もHitとみなす */
+			bool hit(const Vec2& p) const;
 		};
 		//! 多角形基本クラス
 		struct Convex : ITagP<Convex> {

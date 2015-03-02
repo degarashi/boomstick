@@ -453,6 +453,14 @@ namespace boom {
 			bool hit(const AABB& ab) const;
 			bool hit(const Plane& p) const;
 		};
+		//! 平面上の一点が三角形の内部に含まれるかどうかを判定
+		/*! 引数は時計回りを想定
+			\param vtx0 三角形の頂点0
+			\param vtx1 三角形の頂点1
+			\param vtx2 三角形の頂点2
+			\param pos 判定する平面上の点
+			\return 三角形に含まれているならtrue, 含まれていないならfalse */
+		bool IsInTriangle(const Vec3& vtx0, const Vec3& vtx1, const Vec3& vtx2, const Vec3& pos);
 		//! 各座標を格納するまでもないけどポリゴンを管理したい時のクラス
 		/*! CnvPとセットで使用する */
 		struct Idx3 {
