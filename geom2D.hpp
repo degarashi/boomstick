@@ -271,6 +271,10 @@ namespace boom {
 			//! 鈍角を探す
 			/*! \return 鈍角の番号 (負数は該当なし) */
 			int getObtuseCorner() const;
+			//! 頂点の並びが時計回りかを判定
+			bool isCW() const;
+			//! 頂点の並びを反転
+			void invert();
 
 			spn::none_t hit(...) const;
 			//! 座標が三角形と衝突するか判定

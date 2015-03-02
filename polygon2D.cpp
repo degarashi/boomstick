@@ -76,5 +76,11 @@ namespace boom {
 		bool Poly::hit(const Vec2& p) const {
 			return _isInTriangle(p, 1e-3f);
 		}
+		bool Poly::isCW() const {
+			return (point[1]-point[0]).cw(point[2]-point[0]) >= 0;
+		}
+		void Poly::invert() {
+			std::swap(point[1], point[2]);
+		}
 	}
 }

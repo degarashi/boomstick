@@ -14,7 +14,15 @@ install(FILES ${HEADERS} DESTINATION include/boomstick)
 if(NOT DEFINED ARCHITECTURE)
 	# テストルーチンについては幾つかの警告を抑制する
 	set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wno-unused-variable -Wno-unused-function")
-	add_executable(bs_test main.cpp)
-	target_link_libraries(bs_test boomstick spinner boost_system boost_regex)
+	aux_source_directory(tests TEST_SRC)
+	add_executable(bs_test spinner/main.cpp ${TEST_SRC})
+	set(LINK_LIBS
+		boomstick
+		spinner
+		boost_system
+		boost_regex
+		gtest
+		pthread)
+	target_link_libraries(bs_test ${LINK_LIBS})
 	install(TARGETS bs_test RUNTIME DESTINATION bin_${TOOL_PREFIX})
 endif()
