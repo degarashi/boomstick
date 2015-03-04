@@ -4,10 +4,8 @@ namespace boom {
 	namespace geo2d {
 		AABB::AABB(const Vec2& min_v, const Vec2& max_v): minV(min_v), maxV(max_v) {}
 		Vec2 AABB::support(const Vec2& dir) const {
-			constexpr uint32_t one = 0x3f800000;
-			Vec2 v(spn::ReinterpretValue<float>((spn::ReinterpretValue<int>(dir.x) & 0x80000000) | one),
-					spn::ReinterpretValue<float>((spn::ReinterpretValue<int>(dir.y) & 0x80000000) | one));
-			return v *= (maxV - minV) * 0.5f;
+			return {dir.x > 0 ? maxV.x : minV.x;
+					dir.y > 0 ? maxV.y : minV.y};
 		}
 
 		bool AABB::hit(const Segment& l) const {
