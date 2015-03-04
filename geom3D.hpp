@@ -91,10 +91,8 @@ namespace boom {
 			const AMat43& getToLocalI() const;
 			const AMat43& getToWorldI() const;
 		};
-		using UPModel = std::unique_ptr<IModel>;
 		#define mgr_model3d (::boom::geo3d::ModelMgr::_ref())
 		class ModelMgr : public spn::ResMgrA<UPModel, ModelMgr> {};
-		DEF_AHANDLE(ModelMgr, Mdl, UPModel, UPModel)
 
 		template <class T>
 		struct Model : IModelP_base<T, IModel> {
@@ -217,6 +215,7 @@ namespace boom {
 			bool hit(const Vec3& p) const;
 			friend std::ostream& operator << (std::ostream& os, const Point& p);
 		};
+		using PointM = Model<Point>;
 		//! 直線
 		struct Line : ITagP<Line> {
 			Vec3	pos, dir;
@@ -254,6 +253,7 @@ namespace boom {
 			spn::none_t hit(...) const;
 			friend std::ostream& operator << (std::ostream& os, const Ray& r);
 		};
+		using RayM = Model<Ray>;
 		//! 線分
 		struct Segment : ITagP<Segment> {
 			Vec3	from, to;
@@ -415,6 +415,8 @@ namespace boom {
 			spn::Rect get2DRect(const AMat43& mV, const AMat44& mP) const;
 			friend std::ostream& operator << (std::ostream& os, const Frustum& f);
 		};
+		using FrustumM = Model<Frustum>;
+
 		//! 円錐
 		struct Cone : ITagP<Cone> {
 			Vec3	center, dir;
@@ -441,6 +443,8 @@ namespace boom {
 			Cone operator * (const AMat43& m) const;
 			friend std::ostream& operator << (std::ostream& os, const Cone& c);
 		};
+		using ConeM = Model<Cone>;
+
 		//! AxisAligned Box
 		struct AABB : ITagP<AABB> {
 			Vec3	vmin, vmax;
@@ -471,6 +475,8 @@ namespace boom {
 			\param pos 判定する平面上の点
 			\return 三角形に含まれているならtrue, 含まれていないならfalse */
 		bool IsInTriangle(const Vec3& vtx0, const Vec3& vtx1, const Vec3& vtx2, const Vec3& pos);
+		using AABBM = Model<AABB>;
+
 		//! 各座標を格納するまでもないけどポリゴンを管理したい時のクラス
 		/*! CnvPとセットで使用する */
 		struct Idx3 {
@@ -615,6 +621,8 @@ namespace boom {
 				spn::none_t hit(...) const;
 				friend std::ostream& operator << (std::ostream& os, const ConvexP& c);
 		};
+		using ConvexPM = Model<ConvexP>;
+
 		//! 円柱
 		struct Cylinder : ITagP<Cylinder>, Capsule {
 			// ---- cacheable functions ----
@@ -641,6 +649,7 @@ namespace boom {
 			using ITagP<Cylinder>::GetCID;
 			friend std::ostream& operator << (std::ostream& os, const Cylinder& c);
 		};
+		using CylinderM = Model<Cylinder>;
 
 		//! GJK法による衝突判定(3D)
 		/*! ヒットチェックのみ。衝突時は内部点を出力可 */

@@ -5,48 +5,61 @@ namespace boom {
 	//! 当たり判定属性マスク
 	using CMask = uint32_t;
 	using CTime = uint32_t;
+	using Int_OP = spn::Optional<int>;
 
-	template <class CMGR, class HLMDL, class NSID, class UD>
+	/*! コリジョン情報を纏めた構造体
+		\tparam CMGR	コリジョンマネージャ
+		\tparam HLMDL	モデルハンドル(Locked)
+		\tparam BCID	BroadCollisionクラスのオブジェクトを特定できるようなデータ型
+		\tparam UD		任意のユーザーデータ型
+	*/
+	template <class CMGR, class HLMDL, class BCID, class UD>
 	class ColMem {
-		CMask	_mask;	//!< 当たり判定対象フラグ
-		struct Index {
-			CMask 	time;	//!< indexが指している累積時間
-			int		front,	//!< 線形リスト先頭インデックス
-					last;	//!< 線形リスト末尾インデックス
+		private:
+			CMask	_mask;	//!< 当たり判定対象フラグ
+			struct Index {
+				CTime	time;	//!< indexが指している累積時間
+				Int_OP	front,	//!< 線形リスト先頭インデックス
+						last;	//!< 線形リスト末尾インデックス
 
-			//! リストに何もつないでない状態に初期化
-			void init(CTime tm) {
-				time = tm;
-				front = last = -1;
-			}
-			//! リスト末尾に新しくインデックスを加える
-			/*!	\param[in] idx 新しく加えるインデックス値
-				\return 直前の先頭インデックス値 */
-			int add(int idx) {
-				int ret = last;
-				if(front < 0)
-					front = last = idx;
-				else
-					last = idx;
-				return ret;
-			}
-		};
-		Index		_cur,
-					_prev;
-		HLMDL		_hlMdl;
-		NSID		_nsid;
-		UD			_udata;
+				//! リストに何もつないでない状態に初期化
+				void init(CTime tm) {
+					time = tm;
+					front = last = spn::none;
+				}
+				//! リスト末尾に新しくインデックスを加える
+				/*!	\param[in] idx 新しく加えるインデックス値
+					\return 直前の先頭インデックス値 */
+				Int_OP setLastIndex(int idx) {
+					Int_OP ret = last;
+					if(!front)
+						front = last = idx;
+					else
+						last = idx;
+					return ret;
+				}
+			};
+			Index		_cur,
+						_prev;
+			HLMDL		_hlMdl;
+			BCID		_bcid;
+			UD			_udata;
 
 		public:
-			ColMem(CMask ms, HLMDL hm, const UD& ud): _mask(ms), _hlMdl(hm), _udata(ud) {
+			template <class UD2>
+			ColMem(CMask ms, HLMDL hm, UD2&& ud):
+				_mask(ms),
+				_hlMdl(hm),
+				_udata(std::forward<UD2>(ud))
+			{
 				_cur.init(0);
 				_prev.init(0);
 			}
-			void setNSID(const NSID& ns) {
-				_nsid = ns;
+			void setBCID(const BCID& ns) {
+				_bcid = ns;
 			}
-			const NSID& getNSID() const {
-				return _nsid;
+			const BCID& getBCID() const {
+				return _bcid;
 			}
 			auto getBVolume() const -> decltype(_hlMdl.cref()->im_getBVolume()) {
 				return _hlMdl.cref()->im_getBVolume();
@@ -54,101 +67,116 @@ namespace boom {
 			auto getModel() const -> decltype(_hlMdl.cref().get()) {
 				return _hlMdl.cref().get();
 			}
-			//! 衝突判定結果を参照 (コリジョン開始 / 継続中の判定)
+			CMask getMask() const {
+				return _mask;
+			}
+			UD& refUserData() {
+				return _udata;
+			}
+			//! 衝突判定履歴を巡回 (コリジョン開始 / 継続中の判定)
 			/*! \param cb[in,out] コールバック(CMgr::Hist) */
 			template <class CB>
-			void getCollision(CB cb) const {
+			void getCollision(CB&& cb) const {
 				auto& m = CMGR::_ref();
 				CTime tm = m.getAccum();
-				if(_cur.time >= tm && _cur.front>=0)
-					m.iterateHistCur(_cur.front, cb);
+				// 現在の時刻より新しい時に巡回
+				if(_cur.time >= tm && _cur.front)
+					m.iterateHistCur(*_cur.front, std::forward<CB>(cb));
 			}
 			//! 衝突判定結果を参照 (コリジョン終了判定)
 			/*! \param cb[in,out] コールバック(CMgr::Hist) */
 			template <class CB>
-			void getEndCollision(CB cb) const {
+			void getEndCollision(CB&& cb) const {
 				auto& m = CMGR::_ref();
 				CTime tm = m.getAccum();
 				if(_cur.time == tm) {
-					// 今回何かと衝突した場合
-					if(_prev.time == tm-1 && _prev.front >= 0) {
+					// 今回何かと衝突していて前回も判定済の場合
+					if(_prev.time == tm-1 && _prev.front) {
 						// _prevにあって_curに無い物が対象
-						m.iterateHistPrev(_prev.front, [&cb](const typename CMGR::Hist& h) {
+						m.iterateHistPrev(*_prev.front, [&cb](const auto& h) {
 							// _prevで一度参照されたエントリにはフラグが立ててある -> (nFrame==0)
 							if(h.nFrame > 0)
-								cb(h);
+								std::forward<CB>(cb)(h);
 						});
 					}
-				} else if(_cur.time == tm-1 && _cur.front >= 0) {
+				} else if(_cur.time == tm-1 && _cur.front) {
 					// 今回何とも衝突しなかった場合
 					// _cur のリスト全部対象。ただし履歴はColMgr上では過去のものになってるのでPrevを参照
-					m.iterateHistPrev(_cur.front, cb);
+					m.iterateHistPrev(*_cur.front, std::forward<CB>(cb));
 				}
 			}
-			CMask getMask() const { return _mask; }
-			spn::Optional<int> getPrevIndex(CTime tm) const {
-				if(_cur.time == tm-1 &&
-					_cur.front >= 0)
+			//! 引数の時刻-1と合致する方のリストインデックス先頭を取得
+			/*! \return どちらも無効ならspn::none */
+			Int_OP getPrevIndex(CTime tm) const {
+				if(_cur.time == tm-1)
 					return _cur.front;
-				if(_prev.time == tm-1 &&
-					_prev.front >= 0)
+				if(_prev.time == tm-1)
 					return _prev.front;
 				return spn::none;
 			}
 			//! カレントリスト末尾に新しくインデックスを加える
 			/*! \return 直前の先頭インデックス値 */
-			int addQueue(CTime tm, int idx) {
+			Int_OP setLastIndex(CTime tm, int idx) {
+				// もし新しい時刻の設定だったらカーソルの新旧入れ替え
 				if(tm > _cur.time) {
 					_prev = _cur;
 					_cur.init(tm);
 				}
-				return _cur.add(idx);
-			}
-			UD& refUserData() {
-				return _udata;
+				return _cur.setLastIndex(idx);
 			}
 	};
+	/*!	\tparam	BC		BroadCollision class template<BVolume, IModel>
+		\tparam	Types	geom2d::Types or geom3d::Types
+		\tparam UD		userdata type
+	*/
 	template <template <class,class> class BC,
 				class Types,
 				class UD>
 	class ColMgr : public spn::ResMgrA<ColMem<ColMgr<BC,Types,UD>,
 											typename Types::MMgr::LHdl,
-											typename BC<decltype(std::declval<typename Types::IModel>().im_getBVolume()), typename Types::IModel>::IDType,
+											typename BC<decltype(std::declval<typename Types::IModel>().im_getBVolume()),
+														typename Types::IModel>
+													  ::IDType,
 											UD>,
 										ColMgr<BC,Types,UD>>,
 					public Types::Narrow
 	{
 		public:
-			using IModel = typename Types::IModel;
-			using MMgr = typename Types::MMgr;
-			using user_t = UD;
-			using BVolume = decltype(std::declval<IModel>().im_getBVolume());
+			using IModel = typename Types::IModel;									//!< IModel interface
+			using MMgr = typename Types::MMgr;										//!< ModelManager
+			using user_t = UD;														//!< Userdata
+			using BVolume = decltype(std::declval<IModel>().im_getBVolume());		//!< Bounding-volume
 			using this_t = ColMgr<BC, Types, user_t>;
-			using BroadC = BC<BVolume, IModel>;
-			using NSID = typename BroadC::IDType;
+			using BroadC = BC<BVolume, IModel>;										//!< BroadCollision class
+			using BCID = typename BroadC::IDType;									//!< BroadCollision dependant Id
+			// ---- model handle type ----
 			using HMdl = typename MMgr::SHdl;
 			using HLMdl = typename MMgr::LHdl;
-			using CMem = ColMem<this_t, HLMdl, NSID, user_t>;
+			using CMem = ColMem<this_t, HLMdl, BCID, user_t>;						//!< Collision information structure
+
 			using base = spn::ResMgrA<CMem, this_t>;
+			// --- collision handle type ----
 			using HCol = typename base::SHdl;
 			using HLCol = typename base::LHdl;
 			// 単方向リスト
 			struct Hist {
 				HCol	hCol;
-				int		nFrame;
-				int		nextOffset;
-				Hist(HCol hc, int nf): hCol(hc), nFrame(nf), nextOffset(0) {}
+				int		nFrame;				//!< 衝突継続したフレーム数
+				int		nextOffset;			//!< 次のエントリへのバイトオフセット
+
+				Hist(HCol hc, int nf):
+					hCol(hc),
+					nFrame(nf),
+					nextOffset(0)
+				{}
 			};
 		private:
 			using Narrow = typename Types::Narrow;
-			using FrameCount = std::vector<std::pair<HCol, int>>;
 			using HistVec = std::vector<Hist>;
 			using RemList = std::vector<HLCol>;
 
 			BroadC		_broadC;
 			CTime		_accum = 0;
-			//! 継続フレーム数を一本の配列に保存
-			FrameCount	_fcount;
 			//! history, removelistの現在のインデックス
 			int			_swHist = 0;
 			HistVec		_hist[2];
@@ -161,30 +189,29 @@ namespace boom {
 			const HistVec& _getPrevHist() const { return _hist[_swHist^1]; }
 			RemList& _getCurRM() { return _rmList[_swHist]; }
 			RemList& _getPrevRM() { return _rmList[_swHist^1]; }
+			using Hist_OP = spn::Optional<Hist&>;
 
 			//! hc0のリストにhc1のエントリが存在するかチェック
 			/*!	\return hc1が見つかればその参照を返す */
-			spn::Optional<Hist&> _hasPrevCollision(HCol hc0, HCol hc1) {
+			Hist_OP _hasPrevCollision(HCol hc0, HCol hc1) {
 				auto& c0 = hc0.cref();
-				auto pidx = c0.getPrevIndex(_accum);
-				if(!pidx)
-					return spn::none;
-				int prevIdx = *pidx;
-				Hist* res = nullptr;
-				iterateHistPrev(prevIdx, [hc1,&res](Hist& h){
-					if(h.hCol == hc1)
-						res = &h;
-				});
-				if(res)
-					return res;
-				return spn::none;
+				Hist_OP ret;
+				if(auto pidx = c0.getPrevIndex(_accum)) {
+					iterateHistPrev(*pidx, [hc1,&ret](Hist& h){
+						if(h.hCol == hc1)
+							ret = h;
+					});
+				}
+				return ret;
 			}
+			/*! \param hv	_hist[0] or _hist[1]
+				\param idx	巡回を開始するインデックス */
 			template <class HVec, class CB>
-			static void _IterateHist(HVec& hv, int idx, CB cb) {
+			static void _IterateHist(HVec& hv, int idx, CB&& cb) {
 				AssertP(Trap, idx>=0)
 				auto* hst = &hv[idx];
 				for(;;) {
-					cb(*hst);
+					std::forward<CB>(cb)(*hst);
 					int np = hst->nextOffset;
 					if(np != 0)
 						hst = reinterpret_cast<decltype(hst)>(reinterpret_cast<uintptr_t>(hst) + np);
@@ -218,28 +245,29 @@ namespace boom {
 				return _accum;
 			}
 			template <class CB>
-			void iterateHistCur(int idx, CB cb) const { _IterateHist(_getCurHist(), idx, cb); }
+			void iterateHistCur(int idx, CB&& cb) const { _IterateHist(_getCurHist(), idx, std::forward<CB>(cb)); }
 			template <class CB>
-			void iterateHistPrev(int idx, CB cb) const { _IterateHist(_getPrevHist(), idx, cb); }
+			void iterateHistPrev(int idx, CB&& cb) const { _IterateHist(_getPrevHist(), idx, std::forward<CB>(cb)); }
 			template <class CB>
-			void iterateHistCur(int idx, CB cb) { _IterateHist(_getCurHist(), idx, cb); }
+			void iterateHistCur(int idx, CB&& cb) { _IterateHist(_getCurHist(), idx, std::forward<CB>(cb)); }
 			template <class CB>
-			void iterateHistPrev(int idx, CB cb) { _IterateHist(_getPrevHist(), idx, cb); }
+			void iterateHistPrev(int idx, CB&& cb) { _IterateHist(_getPrevHist(), idx, std::forward<CB>(cb)); }
 
 			//! 当たり判定対象を追加
 			/*! \param ms[in] マスク */
-			HLCol addCol(CMask ms, HMdl hm, const UD& ud=UD()) {
-				HLCol hlC = base::emplace(ms, hm, ud);
-				hlC.ref().setNSID(_broadC.add(hlC, ms));
+			template <class UD2>
+			HLCol addCol(CMask ms, HMdl hm, UD2&& ud=UD()) {
+				HLCol hlC = base::emplace(ms, hm, std::forward<UD2>(ud));
+				hlC.ref().setBCID(_broadC.add(hlC, ms));
 				return std::move(hlC);
 			}
 			//! ハンドル解放処理を一時的に遅延させる (デストラクタ時以外)
 			void release(HCol hCol) {
 				if(!_bDelete && hCol.count() == 1) {
-					// 次のupdateまでハンドル解放を遅延
+					// OnCollisionEndの処理がある為、次のupdateまでハンドル解放を遅延
 					_getCurRM().push_back(hCol);
 					// しかしBroadCからは即刻外す
-					_broadC.rem(hCol.cref().getNSID());
+					_broadC.rem(hCol.cref().getBCID());
 				}
 				base::release(hCol);
 			}
@@ -254,6 +282,7 @@ namespace boom {
 
 					HCol hc0(sh0), hc1(sh1);
 					// 詳細判定
+					// 毎フレームヒットリストを再構築
 					if(Narrow::Hit(hc0.ref().getModel(), hc1.ref().getModel())) {
 						auto fn = [this, &hist](HCol hc0, HCol hc1){
 							auto &c0 = hc0.ref(),
@@ -266,9 +295,9 @@ namespace boom {
 								hist->nFrame = 0;
 							}
 							int nextID = hist.size();
-							int lastID = c0.addQueue(_accum, nextID);
-							if(lastID >= 0)
-								hist[lastID].nextOffset = (nextID - lastID) * sizeof(Hist);
+							Int_OP lastID = c0.setLastIndex(_accum, nextID);
+							if(lastID)
+								hist[*lastID].nextOffset = (nextID - *lastID) * sizeof(Hist);
 							hist.push_back(Hist(hc1, nf+1));
 						};
 						fn(hc0, hc1);

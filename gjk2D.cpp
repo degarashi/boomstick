@@ -5,6 +5,7 @@ namespace boom {
 		Vec2 MinkowskiSub(const IModel& m0, const IModel& m1, const Vec2& dir) {
 			return m0.im_support(dir) - m1.im_support(-dir);
 		}
+		// ------------------ GSimplex ------------------
 		namespace {
 			constexpr float DOT_THRESHOLD = 1e-3f,
 							DIST_THRESHOLD = 1e-6f;
@@ -14,9 +15,38 @@ namespace boom {
 				{1,2,0}
 			};
 		}
+
+		void BarycentricCoord(float ret[3], const Vec2& p0, const Vec2& p1, const Vec2& p2, const Vec2& pos) {
+			Vec2 pt0 = p0 - p2,
+				pt1 = p1 - p2,
+				ptp = pos - p2;
+
+			spn::Mat22 m;
+			m.setColumn(0, pt0);
+			m.setColumn(1, pt1);
+			float det = m.calcDeterminant();
+
+			m.setColumn(0, ptp);
+			ret[0] = m.calcDeterminant();
+
+			m.setColumn(0, pt0);
+			m.setColumn(1, ptp);
+			ret[1] = m.calcDeterminant();
+			if(det != 0) {
+				ret[0] /= det;
+				ret[1] /= det;
+			}
+			ret[2] = 1.f - ret[0] - ret[1];
+		}
+		Vec2 MixVector(const float (&cf)[3], const Vec2& p0, const Vec2& p1, const Vec2& p2) {
+			return p0 * cf[0] +
+					p1 * cf[1] +
+					p2 * cf[2];
+		}
+
 		void GSimplex::_minkowskiSub(const Vec2& dir, int n) {
 			_posB[n] = _m1.im_support(-dir);
-			_vtx[n] = (_m0.im_support(dir) - _posB[n]);
+			_poly.point[n] = (_m0.im_support(dir) - _posB[n]);
 		}
 		bool GSimplex::_gjkMethod() {
 			Vec2 dir(_m1.im_getCenter() - _m0.im_getCenter());
@@ -27,28 +57,28 @@ namespace boom {
 				dir *= spn::RSqrt(lens);
 
 			_minkowskiSub(dir, 0);
-			if(dir.dot(_vtx[0]) < -DOT_THRESHOLD) {
+			if(dir.dot(_poly.point[0]) < -DOT_THRESHOLD) {
 				_nVtx = 1;
 				return false;
 			}
 			// 原点と重なっていたら終了 = 内部点
-			lens = _vtx[0].len_sq();
+			lens = _poly.point[0].len_sq();
 			if(lens < DIST_THRESHOLD) {
 				_nVtx = 1;
 				_inner = _posB[0];
 				return true;
 			}
-			dir = _vtx[0] * spn::RSqrt(lens) * -1.f;
+			dir = _poly.point[0] * spn::RSqrt(lens) * -1.f;
 			_minkowskiSub(dir, 1);
 
 			const Vec2 ori(0);
-			Vec2 tmp = _vtx[1] - _vtx[0];
+			Vec2 tmp = _poly.point[1] - _poly.point[0];
 			float tmpLen = tmp.length();
 			tmp *= spn::Rcp22Bit(tmpLen);
-			float r = tmp.dot(-_vtx[0]);
+			float r = tmp.dot(-_poly.point[0]);
 			if(r > tmpLen)
 				return false;
-			tmp = _vtx[0] + tmp*r;
+			tmp = _poly.point[0] + tmp*r;
 
 			lens = tmp.len_sq();
 			if(lens < DIST_THRESHOLD) {
@@ -62,7 +92,7 @@ namespace boom {
 			LNear res(tmp, LinePos::OnLine);
 			int idx = 2;
 			for(;;) {
-				auto& rV = _vtx[idx];
+				auto& rV = _poly.point[idx];
 				// 新たな頂点を追加
 				dir = res.first.normalization() * -1.f;
 				_minkowskiSub(dir, idx);
@@ -70,8 +100,8 @@ namespace boom {
 					return false;
 
 				auto& ts = ToSearch[idx];
-				if(rV.distance(_vtx[ts[0]]) < 1e-7f ||
-					rV.distance(_vtx[ts[2]]) < 1e-7f)
+				if(rV.distance(_poly.point[ts[0]]) < 1e-7f ||
+					rV.distance(_poly.point[ts[2]]) < 1e-7f)
 				{
 					std::cout << _m0 << std::endl << _m1 << std::endl;
 					return false;
@@ -79,27 +109,28 @@ namespace boom {
 
 				// 現時点で三角形が原点を含んでいるか
 				bool bIn;
-				if((_vtx[1]-_vtx[0]).cw(_vtx[2]-_vtx[0]) > 0) {
-					bIn = (_vtx[1]-_vtx[0]).cw(-_vtx[0]) >= 0 &&
-					(_vtx[2]-_vtx[1]).cw(-_vtx[1]) >= 0 &&
-					(_vtx[0]-_vtx[2]).cw(-_vtx[2]) >= 0;
-				} else {
-					bIn = (_vtx[1]-_vtx[0]).ccw(-_vtx[0]) >= 0 &&
-					(_vtx[2]-_vtx[1]).ccw(-_vtx[1]) >= 0 &&
-					(_vtx[0]-_vtx[2]).ccw(-_vtx[2]) >= 0;
+				if((_poly.point[1]-_poly.point[0]).cw(_poly.point[2]-_poly.point[0]) > 0)
+					bIn = _poly.hit({0,0});
+				else {
+					_poly.invert();
+					bIn = _poly.hit({0,0});
+					_poly.invert();
 				}
-// 				float cm = (_vtx[ts[1]] - _vtx[ts[0]]).cw(-_vtx[ts[0]]) *
-// 							(_vtx[ts[2]] - _vtx[ts[1]]).cw(-_vtx[ts[1]]);
+// 				float cm = (_poly.point[ts[1]] - _poly.point[ts[0]]).cw(-_poly.point[ts[0]]) *
+// 							(_poly.point[ts[2]] - _poly.point[ts[1]]).cw(-_poly.point[ts[1]]);
 // 				if(cm >= -1e-5f) {
 				if(bIn) {
-					_inner = TriangleLerp(_vtx[0], _vtx[1], _vtx[2], ori,
+					float cf[3];
+					spn::BarycentricCoord(cf, _poly.point[0], _poly.point[1], _poly.point[2], ori);
+					_inner = spn::MixVector(cf, _posB[0], _posB[1], _posB[2]);
+					_inner = TriangleLerp(_poly.point[0], _poly.point[1], _poly.point[2], ori,
 										_posB[0], _posB[1], _posB[2]);
-					Assert(Trap, _m0.im_isInner(_inner) && _m1.im_isInner(_inner));
+					Assert(Trap, _m0.im_hitPoint(_inner) && _m1.im_hitPoint(_inner));
 					return true;
 				}
 				float dist = std::numeric_limits<float>::max();
 				idx = -1;
-				res = Segment(_vtx[ts[0]], _vtx[ts[1]]).nearest(ori);
+				res = Segment(_poly.point[ts[0]], _poly.point[ts[1]]).nearest(ori);
 				if(res.second == LinePos::OnLine) {
 					float td = res.first.len_sq();
 					if(dist > td) {
@@ -108,7 +139,7 @@ namespace boom {
 						idx = ts[2];
 					}
 				}
-				res = Segment(_vtx[ts[1]], _vtx[ts[2]]).nearest(ori);
+				res = Segment(_poly.point[ts[1]], _poly.point[ts[2]]).nearest(ori);
 				if(res.second == LinePos::OnLine) {
 					float td = res.first.len_sq();
 					if(dist > td) {
@@ -118,7 +149,7 @@ namespace boom {
 					}
 				}
 				if(dist < 1e-7f) {
-					_inner = TriangleLerp(_vtx[0], _vtx[1], _vtx[2], ori,
+					_inner = TriangleLerp(_poly.point[0], _poly.point[1], _poly.point[2], ori,
 										  _posB[0], _posB[1], _posB[2]);
 					return true;
 				}
@@ -301,7 +332,7 @@ namespace boom {
 			}
 		}
 		void GEpa::_recover2NoHit() {
-			auto res = Segment(_vtx[0], _vtx[1]).nearest(Vec2(0));
+			auto res = Segment(_poly.point[0], _poly.point[1]).nearest(Vec2(0));
 			float len = res.first.length();
 			LmLen lmlen;
 			lmlen.dist = len;
@@ -317,7 +348,7 @@ namespace boom {
 		void GEpa::_recover2OnHit() {
 			LmLen lm;
 			lm.dist = 0;
-			lm.dir = _vtx[0]-_vtx[1];
+			lm.dir = _poly.point[0]-_poly.point[1];
 			lm.dir.normalize();
 			lm.dir *= cs_mRot90[0];
 			lm.vtx[0] = _vl[0];
@@ -334,7 +365,7 @@ namespace boom {
 			_szVl = nV;
 			for(int i=0 ; i<nV ; i++) {
 				auto res = _vl[i] = tls_vPool.malloc();
-				res->first = _vtx[i];
+				res->first = _poly.point[i];
 				res->second = _posB[i];
 			}
 
@@ -352,8 +383,8 @@ namespace boom {
 					_epaMethodOnHit();
 				} else {
 					if(nV == 1) {
-						const Vec2& v = _minkowskiSub(-_vtx[0].normalization()).first;
-						auto res = Segment(_vtx[0], v).nearest(Vec2(0));
+						const Vec2& v = _minkowskiSub(-_poly.point[0].normalization()).first;
+						auto res = Segment(_poly.point[0], v).nearest(Vec2(0));
 						if(res.second == LinePos::OnLine) {
 							float len = res.first.length();
 							_asv.insert(LmLen{len, res.first*spn::Rcp22Bit(len), {_vl[0],_vl[1]}});
@@ -385,7 +416,6 @@ namespace boom {
 			AssertP(Trap, !IsNaN(_pvec))
 			return _pvec;
 		}
-
 		/*! 算出不能なケースは考えない */
 		Float2 TriangleRatio2(const Vec2& v0, const Vec2& v1, const Vec2& v2, const Vec2& vt) {
 			Vec2 toV1(v1-v0),

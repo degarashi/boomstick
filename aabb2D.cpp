@@ -4,10 +4,14 @@ namespace boom {
 	namespace geo2d {
 		AABB::AABB(const Vec2& min_v, const Vec2& max_v): minV(min_v), maxV(max_v) {}
 		Vec2 AABB::support(const Vec2& dir) const {
-			return {dir.x > 0 ? maxV.x : minV.x;
-					dir.y > 0 ? maxV.y : minV.y};
+			return {(dir.x > 0 ? maxV.x : minV.x),
+					(dir.y > 0 ? maxV.y : minV.y)};
 		}
 
+		bool AABB::hit(const Vec2& pos) const {
+			return spn::IsInRange(pos.x, minV.x, maxV.x) &&
+					spn::IsInRange(pos.y, minV.y, maxV.y);
+		}
 		bool AABB::hit(const Segment& l) const {
 			Vec2 dir(minV.x, maxV.y - minV.y);
 			if(Segment(minV, Vec2(minV.x,maxV.y)).crossPoint(l).second == LinePos::OnLine)

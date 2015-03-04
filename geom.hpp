@@ -9,6 +9,7 @@
 #include "spinner/interpolatation.hpp"
 #include "spinner/check_macro.hpp"
 #include <boost/variant.hpp>
+#include "handle.hpp"
 
 namespace boom {
 	using spn::Vec2; using spn::Vec3; using spn::Vec4;

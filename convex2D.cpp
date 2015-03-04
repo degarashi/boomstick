@@ -122,7 +122,7 @@ namespace boom {
 		}
 
 		Convex Convex::GetOverlappingConvex(const Convex& m0, const Convex& m1, const Vec2& inner) {
-			Assert(Trap, m0.isInner(inner) && m1.isInner(inner), "invalid inner point")
+			Assert(Trap, m0.hit(inner) && m1.hit(inner), "invalid inner point")
 
 			// DualTransformで直線から点に変換
 			int nV0 = m0.getNPoints(),
@@ -158,7 +158,7 @@ namespace boom {
 					if(a+1 >= b)
 						break;
 					int c = (a+b)/2;
-					if(mdl.isInner(point[spn::CndRange(c, nV)]) ^ flip)
+					if(mdl.hit(point[spn::CndRange(c, nV)]) ^ flip)
 						b = c;
 					else
 						a = c;
@@ -172,14 +172,14 @@ namespace boom {
 				int nV = point.size();
 				int a,b, begI;
 				// 2分探索で衝突が始まる地点を探す
-				if(mdl.isInner(point[res.second])) {
+				if(mdl.hit(point[res.second])) {
 					a = res.second - nV;
 					b = res.second;
 					// 衝突開始インデックス(これ自体は衝突していない)
 					begI = BinSearch(point, nV, mdl, a,b,false);
 				} else {
 					begI = res.second;
-					if(!mdl.isInner(point[spn::CndSub(res.second+1, nV)]))
+					if(!mdl.hit(point[spn::CndSub(res.second+1, nV)]))
 						return std::make_pair(false, PointL());
 				}
 
@@ -280,8 +280,8 @@ namespace boom {
 				posf = ConvexPos::OnLine;
 			return std::make_pair(posf, tmpA.index);
 		}
-		bool Convex::isInner(const Vec2& pos) const {
-			return checkPosition(pos).first != ConvexPos::Outer;
+		bool Convex::hit(const Vec2& p) const {
+			return checkPosition(p).first != ConvexPos::Outer;
 		}
 		std::tuple<float,float,Vec2> Convex::area_inertia_center() const {
 			int nL = point.size();

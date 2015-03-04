@@ -5,6 +5,8 @@
 #include "spinner/assoc.hpp"
 #include <boost/pool/object_pool.hpp>
 #include <memory>
+#include "spinner/structure/treenode.hpp"
+#include "spinner/rflag.hpp"
 
 namespace boom {
 	namespace geo2d {
@@ -37,10 +39,9 @@ namespace boom {
 			const Circle& bs_getBVolume() const;
 			// -----------------------------
 			Vec2 support(const Vec2& dir) const;
-			bool isInner(const Vec2& pos) const;
 
 			spn::none_t hit(...) const;
-			bool hit(const Vec2& pt) const;
+			bool hit(const Vec2& p) const;
 			bool hit(const Circle& c) const;
 
 			void getArcPoints(PointL& dst, float ang0, float ang1, float deep) const;
@@ -61,8 +62,8 @@ namespace boom {
 			/*! 均等でないスケーリングは対応しない、移動は後でオフセット、回転はdirを逆にすれば代用可
 				・・との理由で行列変換後の物体に対する射像は無し */
 			virtual Vec2 im_support(const Vec2& dir) const = 0;
-			//! ある座標が図形の内部に入っているか
-			virtual bool im_isInner(const Vec2& pos) const = 0;
+			//! 図形と点の判定
+			virtual bool im_hitPoint(const Vec2& p) const = 0;
 			virtual uint32_t getCID() const = 0;
 
 			virtual Vec2 toLocal(const Vec2& v) const { return v; }
@@ -75,11 +76,10 @@ namespace boom {
 			const AMat32& getToLocalI() const;
 			const AMat32& getToWorldI() const;
 		};
-		using UPModel = std::unique_ptr<IModel>;
 		#define mgr_model2d (::boom::geo2d::ModelMgr::_ref())
 		class ModelMgr : public spn::ResMgrA<UPModel, ModelMgr> {};
-		DEF_AHANDLE(ModelMgr, Mdl, UPModel, UPModel)
 
+		//! TにIModelインタフェースを付加
 		template <class T>
 		struct Model : IModelP_base<T, IModel> {
 			using IModelP_base<T, IModel>::IModelP_base;
@@ -89,57 +89,62 @@ namespace boom {
 			float im_getArea() const override { return T::bs_getArea(); }
 			Vec2 im_getCenter() const override { return T::bs_getCenter(); }
 			Vec2 im_support(const Vec2& dir) const override { return T::support(dir); }
-			bool im_isInner(const Vec2& pos) const override { return T::isInner(pos); }
+			bool im_hitPoint(const Vec2& pos) const override { return T::hit(pos); }
 			std::ostream& print(std::ostream& os) const override { return os << static_cast<const T&>(*this); }
 		};
-		//! 座標変換ありのモデル基底
-		/*! Modelに被せる形で使う */
-		template <class T>
-		class TModel : public ITagP<T>, public IModel {
-			using VMdl = VModel<ModelMgr>;
-			VMdl	_model;
-			AMat32	_mToWorld,
-					_mToLocal;
-			void _calcInv() {
-				_mToWorld.convertA33().inversion(reinterpret_cast<AMat33&>(_mToLocal));
-			}
-			public:
-				TModel(const TModel&) = default;
-				TModel(const IModel& mdl, const AMat32& mw): _model(mdl), _mToWorld(mw) { _calcInv(); }
-				TModel(HMdl hMdl, const AMat32& mw): _model(hMdl), _mToWorld(mw) { _calcInv(); }
-
-				Circle im_getBVolume() const override {
-					return toWorld(_model.get().im_getBVolume()); }
-				float im_getInertia() const override {
-					return _model.get().im_getInertia() * _mToWorld; }
-				float im_getArea() const override {
-					return _model.get().im_getArea(); }
-				Vec2 im_getCenter() const override {
-					return toWorld(_model.get().im_getCenter()); }
-				Vec2 im_support(const Vec2& dir) const override {
-					return toWorldDir(_model.get().im_support(toLocalDir(dir))); }
-				bool im_isInner(const Vec2& pos) const override {
-					return _model.get().im_isInner(toLocal(pos)); }
-
-				Vec2 toLocal(const Vec2& v) const override {
-					return v.asVec3(1) * _mToLocal; }
-				Vec2 toLocalDir(const Vec2& v) const override {
-					return v.asVec3(0) * _mToLocal; }
-				Vec2 toWorld(const Vec2& v) const override {
-					return v.asVec3(1) * _mToWorld; }
-				Vec2 toWorldDir(const Vec2& v) const override {
-					return v.asVec3(0) * _mToWorld; }
-				spn::Optional<const AMat32&> getToLocal() const override { return _mToLocal; }
-				spn::Optional<const AMat32&> getToWorld() const override { return _mToWorld; }
-				uint32_t getCID() const override { return ITagP<T>::GetCID(); }
-				const void* getCore() const override { return _model.get().getCore(); }
-		};
-
 		using CircleM = Model<Circle>;
 
+		class TfNode : public spn::CheckAlign<16,TfNode>, public spn::TreeNode<TfNode> {
+			private:
+				#define SEQ_TFNODE \
+					((Pose)(spn::Pose2D)) \
+					((NodeAccum)(uint32_t)) \
+					((Global)(spn::AMat33)(Pose)(NodeAccum))
+				RFLAG_S(TfNode, SEQ_TFNODE)
+				void onParentChange(const SP&, const SP&);
+			public:
+				RFLAG_SETMETHOD_S(SEQ_TFNODE)
+				RFLAG_GETMETHOD_S(SEQ_TFNODE)
+				RFLAG_REFMETHOD_S(SEQ_TFNODE)
+				#undef SEQ_TFNODE
+				friend std::ostream& operator << (std::ostream&, const TfNode&);
+		};
+		#define mgr_tf2d (::boom::geo2d::TfMgr::_ref())
+		class TfMgr : public spn::ResMgrA<spn::Pose2D, TfMgr> {};
+
+		//! 座標変換ありのモデル基底
+		class TModel : public IModel {
+			private:
+				HLMdl					_hlMdl;
+				HLTf					_hlTf;
+				mutable spn::AMat32		_mToLocal,
+										_mToWorld;
+			public:
+				TModel(HMdl hMdl, HTf hTf);
+
+				Circle im_getBVolume() const override;
+				float im_getInertia() const override;
+				float im_getArea() const override;
+				Vec2 im_getCenter() const override;
+				Vec2 im_support(const Vec2& dir) const override;
+				bool im_hitPoint(const Vec2& p) const override;
+
+				Vec2 toLocal(const Vec2& v) const override;
+				Vec2 toLocalDir(const Vec2& v) const override;
+				Vec2 toWorld(const Vec2& v) const override;
+				Vec2 toWorldDir(const Vec2& v) const override;
+
+				const AMat32& tm_getToLocal() const;
+				const AMat32& tm_getToWorld() const;
+				spn::Optional<const AMat32&> getToLocal() const override;
+				spn::Optional<const AMat32&> getToWorld() const override;
+				uint32_t getCID() const override;
+				const void* getCore() const override;
+		};
 		using LNear = std::pair<Vec2, LinePos>;
 		struct Point : Vec2, ITagP<Point> {
-			constexpr static float NEAR_THRESHOLD = 1e-5f;
+			constexpr static float DOT_THRESHOLD = 1e-4f,		//!< 一直線上にあると判断する基準
+									NEAR_THRESHOLD = 1e-5f;		//!< 同じ位置と判断する基準
 
 			// ---- cacheable functions ----
 			const float& bs_getArea() const;
@@ -182,8 +187,10 @@ namespace boom {
 			Line operator * (const AMat32& m) const;
 
 			spn::none_t hit(...) const;
+			bool hit(const Vec2& p) const;
 			friend std::ostream& operator << (std::ostream& os, const Line& l);
 		};
+		using LineM = Model<Line>;
 		//! 半直線
 		struct Ray : ITagP<Ray> {
 			Vec2	pos, dir;
@@ -198,8 +205,10 @@ namespace boom {
 			Ray operator * (const AMat32& m) const;
 
 			spn::none_t hit(...) const;
+			bool hit(const Vec2& p) const;
 			friend std::ostream& operator << (std::ostream& os, const Ray& r);
 		};
+		using RayM = Model<Ray>;
 		//! 線分
 		struct Segment : ITagP<Segment> {
 			Vec2	from, to;
@@ -218,6 +227,7 @@ namespace boom {
 			float length() const;
 			float len_sq() const;
 			spn::none_t hit(...) const;
+			bool hit(const Vec2& p) const;
 			bool hit(const Segment& l) const;
 
 			/*! \return Vec2(最寄り座標),LINEPOS(最寄り線分位置) */
@@ -235,6 +245,7 @@ namespace boom {
 			Segment operator * (const AMat32& m) const;
 			friend std::ostream& operator << (std::ostream& os, const Segment& s);
 		};
+		using SegmentM = Model<Segment>;
 		//! AxisAlignedBox
 		struct AABB : ITagP<AABB> {
 			Vec2	minV, maxV;
@@ -251,9 +262,11 @@ namespace boom {
 			Vec2 nearest(const Vec2& pos) const;
 
 			spn::none_t hit(...) const;
+			bool hit(const Vec2& p) const;
 			bool hit(const Segment& l) const;
 			friend std::ostream& operator << (std::ostream& os, const AABB& a);
 		};
+		using AABBM = Model<AABB>;
 		struct Poly : ITagP<Poly> {
 			Vec2		point[3];
 			bool _isInTriangle(const Vec2& p, float threshold) const;
@@ -290,6 +303,7 @@ namespace boom {
 			bool hit(const Vec2& p) const;
 			friend std::ostream& operator << (std::ostream& os, const Poly& p);
 		};
+		using PolyM = Model<Poly>;
 		//! 多角形基本クラス
 		struct Convex : ITagP<Convex> {
 			using AreaL = std::vector<float>;
@@ -332,7 +346,6 @@ namespace boom {
 			/*! 同時に求めると少し効率が良い為 */
 			std::tuple<float,float,Vec2> area_inertia_center() const;
 			Vec2 support(const Vec2& dir) const;
-			bool isInner(const Vec2& pos) const;
 			//! 2つに分割
 			/*! \param[out] c0 線分の進行方向左側
 				\param[out] c1 線分の進行方向右側 */
@@ -375,15 +388,17 @@ namespace boom {
 			Vec2 getPoint(int n) const;
 
 			spn::none_t hit(...) const;
+			bool hit(const Vec2& p) const;
 			friend std::ostream& operator << (std::ostream& os, const Convex& c);
 		};
+		using ConvexM = Model<Convex>;
 		//! GJK法による衝突判定(2D)
 		/*! ヒットチェックのみ。衝突時は内部点を出力可 */
 		class GSimplex {
 			protected:
 				const IModel	&_m0, &_m1;
-				Vec2	_vtx[3],		//!< 凸包を構成する頂点
-						_posB[3],		//!< vtxを求める時に使ったB側のインデックス
+				Poly	_poly;			//!< 凸包を構成するポリゴン
+				Vec2	_posB[3],		//!< vtxを求める時に使ったB側のインデックス
 						_inner;			//!< 内部点
 				bool	_bHit;
 				int		_nVtx;

@@ -27,5 +27,11 @@ namespace boom {
 			return os << "Line [ pos: " << l.pos << std::endl
 						<< "dir: " << l.dir << ']';
 		}
+		bool Line::hit(const Vec2& p) const {
+			Vec2 v = p - pos;
+			float d = std::abs(v.dot(dir));
+			constexpr float NS = Point::NEAR_THRESHOLD;
+			return (pos + dir*d).dist_sq(p) <= spn::Square(NS);
+		}
 	}
 }

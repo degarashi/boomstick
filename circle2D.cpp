@@ -18,9 +18,6 @@ namespace boom {
 		Vec2 Circle::support(const Vec2& dir) const {
 			return dir * fRadius + vCenter;
 		}
-		bool Circle::isInner(const Vec2& pos) const {
-			return pos.distance(vCenter) <= fRadius;
-		}
 		bool Circle::hit(const Vec2& pt) const {
 			return vCenter.dist_sq(pt) <= spn::Square(fRadius);
 		}

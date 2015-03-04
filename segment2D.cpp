@@ -14,6 +14,19 @@ namespace boom {
 		float Segment::len_sq() const {
 			return from.dist_sq(to);
 		}
+		bool Segment::hit(const Vec2& p) const {
+			Vec2 v = p - from,
+				 dir = to-from;
+			float len = dir.length();
+			dir /= len;
+			float d = v.dot(dir);
+			if(d < 0)
+				return false;
+			if(d > len)
+				return false;
+			v -= dir*len;
+			return v.len_sq() <= spn::Square(Point::NEAR_THRESHOLD);
+		}
 		bool Segment::hit(const Segment& l) const {
 			return distance(l) < Point::NEAR_THRESHOLD;
 		}
