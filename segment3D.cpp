@@ -102,5 +102,9 @@ namespace boom {
 		bool Segment::hit(const Plane& p) const {
 			return crossPointFit(p, 1e-5f);
 		}
+		std::ostream& operator << (std::ostream& os, const Segment& s) {
+			return os << "Segment(3d) [ from: " << s.from << std::endl
+						<< "to: " << s.to << ']';
+		}
 	}
 }

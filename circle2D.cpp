@@ -42,5 +42,9 @@ namespace boom {
 		Circle Circle::operator * (float s) const {
 			return Circle(vCenter, fRadius*s);
 		}
+		std::ostream& operator << (std::ostream& os, const Circle& c) {
+			return os << "Circle(2d) [ center: " << c.vCenter << std::endl
+						<< "radius: " << c.fRadius << ']';
+		}
 	}
 }

@@ -113,5 +113,10 @@ namespace boom {
 			// 頂点を円柱ローカルに変換
 			return vec.asVec4(1) * MatrixYLocal(from, to);
 		}
+		std::ostream& operator << (std::ostream& os, const Cylinder& c) {
+			return os << "Cylinder(3d) [ from: " << c.from << std::endl
+						<< "to: " << c.to << std::endl
+						<< "radius: " << c.radius << ']';
+		}
 	}
 }

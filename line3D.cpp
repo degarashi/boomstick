@@ -32,5 +32,9 @@ namespace boom {
 			Vec3x2 res = NearestPoint(*this, ls, fn, fn);
 			return res.first.distance(res.second) <= Point::NEAR_THRESHOLD;
 		}
+		std::ostream& operator << (std::ostream& os, const Line& l) {
+			return os << "Line(3d) [ pos: " << l.pos << std::endl
+						<< "dir: " << l.dir << ']';
+		}
 	}
 }

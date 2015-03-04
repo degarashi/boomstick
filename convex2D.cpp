@@ -89,11 +89,6 @@ namespace boom {
 		Line Convex::getOuterLine(int n) const {
 			return Line(point[n], (point[spn::CndSub(n+1, point.size())] - point[n]).normalization());
 		}
-		std::ostream& Convex::dbgPrint(std::ostream& os) const {
-			for(auto& p : point)
-				os << '[' << p.x << ',' << p.y << ']' << std::endl;
-			return os;
-		}
 
 		Convex& Convex::operator *= (const AMat32& m) {
 			for(auto& p : point)
@@ -480,6 +475,14 @@ namespace boom {
 			Vec2 t1 = ls.dir + t0;
 			return Vec2((t0.y-t1.y) / (t0.x-t1.x),
 						-t0.ccw(t1) / (t1.x-t0.x));
+		}
+
+		std::ostream& operator << (std::ostream& os, const Convex& c) {
+			os << "Convex(2d) [";
+			int idx=0;
+			for(auto& p : c.point)
+				os << idx << ": " << p << std::endl;
+			return os << ']';
 		}
 	}
 }

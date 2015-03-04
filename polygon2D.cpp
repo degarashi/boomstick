@@ -82,5 +82,10 @@ namespace boom {
 		void Poly::invert() {
 			std::swap(point[1], point[2]);
 		}
+		std::ostream& operator << (std::ostream& os, const Poly& p) {
+			return os << "Polygon(2d) [ 0: " << p.point[0] << std::endl
+						<< "1: " << p.point[1] << std::endl
+						<< "2: " << p.point[2] << ']';
+		}
 	}
 }

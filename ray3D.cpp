@@ -23,5 +23,9 @@ namespace boom {
 		const Line& Ray::asLine() const{
 			return *reinterpret_cast<const Line*>(this);
 		}
+		std::ostream& operator << (std::ostream& os, const Ray& r) {
+			return os << "Ray(3d) [ pos: " << r.pos << std::endl
+						<< "dir: " << r.dir << ']';
+		}
 	}
 }

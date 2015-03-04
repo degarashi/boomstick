@@ -142,5 +142,9 @@ namespace boom {
 			c.length = length;
 			return c;
 		}
+		std::ostream& operator << (std::ostream& os, const Cone& c) {
+			return os << "Cone(3d) [ center: " << c.center << std::endl
+						<< "dir: " << c.dir << ']';
+		}
 	}
 }

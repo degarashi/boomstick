@@ -19,5 +19,8 @@ namespace boom {
 			return Circle(*this, NEAR_THRESHOLD);
 		}
 		const float& Point::bs_getInertia() const { INVOKE_ERROR }
+		std::ostream& operator << (std::ostream& os, const Point& c) {
+			return os << "Point(2d) [ pos: " << static_cast<const Vec2&>(c) << ']';
+		}
 	}
 }

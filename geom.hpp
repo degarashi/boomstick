@@ -147,6 +147,7 @@ namespace boom {
 		//! 最寄りのユーザーデータを取得
 		/*! このノードが持っていればそれを返し、無ければ親を遡って探す */
 		virtual void* getUserData() const;
+		virtual std::ostream& print(std::ostream& os) const = 0;
 
 		friend std::ostream& operator << (std::ostream& os, const IModelNode& mdl);
 	};

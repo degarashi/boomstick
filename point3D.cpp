@@ -22,5 +22,8 @@ namespace boom {
 		bool Point::hit(const Vec3& p) const {
 			return distance(p) <= NEAR_THRESHOLD;
 		}
+		std::ostream& operator << (std::ostream& os, const Point& p) {
+			return os << "Point(3d) [ pos: " << static_cast<const Vec3&>(p) << ']';
+		}
 	}
 }

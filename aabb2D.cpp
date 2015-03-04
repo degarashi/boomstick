@@ -36,5 +36,9 @@ namespace boom {
 			return Circle((minV + maxV) * 0.5f,
 								minV.distance(maxV));
 		}
+		std::ostream& operator << (std::ostream& os, const AABB& a) {
+			return os << "AABB(2d) [ min: " << a.minV << std::endl
+						<< "max: " << a.maxV << ']';
+		}
 	}
 }

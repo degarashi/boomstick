@@ -67,6 +67,7 @@ namespace boom {
 			bool hit(const Segment& s) const;
 
 			static Sphere Cover(PtrItr mI, PtrItr mE);
+			friend std::ostream& operator << (std::ostream& os, const Sphere& s);
 		};
 		struct IModel : ::boom::IModelNode {
 			//! 形状の通し番号
@@ -106,6 +107,7 @@ namespace boom {
 			Vec3 im_getCenter() const override { return T::bs_getCenter(); }
 			Vec3 im_getGCenter() const override { return T::bs_getGCenter(); }
 			Vec3 im_support(const Vec3& dir) const override { return T::support(dir); }
+			std::ostream& print(std::ostream& os) const override { return os << static_cast<const T&>(*this); }
 		};
 		//! IModelに行列変換をプラス
 		template <class T>
@@ -213,6 +215,7 @@ namespace boom {
 
 			spn::none_t hit(...) const;
 			bool hit(const Vec3& p) const;
+			friend std::ostream& operator << (std::ostream& os, const Point& p);
 		};
 		//! 直線
 		struct Line : ITagP<Line> {
@@ -231,6 +234,7 @@ namespace boom {
 			spn::none_t hit(...) const;
 			bool hit(const Vec3& p) const;
 			bool hit(const Line& ls) const;
+			friend std::ostream& operator << (std::ostream& os, const Line& l);
 		};
 		//! 半直線
 		struct Ray : ITagP<Ray> {
@@ -248,6 +252,7 @@ namespace boom {
 			const Line& asLine() const;
 
 			spn::none_t hit(...) const;
+			friend std::ostream& operator << (std::ostream& os, const Ray& r);
 		};
 		//! 線分
 		struct Segment : ITagP<Segment> {
@@ -284,6 +289,7 @@ namespace boom {
 
 			spn::none_t hit(...) const;
 			bool hit(const Plane& p) const;
+			friend std::ostream& operator << (std::ostream& os, const Segment& s);
 		};
 		using SegmentM = Model<Segment>;
 
@@ -307,6 +313,7 @@ namespace boom {
 			bool hit(const Capsule& c) const;
 
 			using ITagP<Capsule>::GetCID;
+			friend std::ostream& operator << (std::ostream& os, const Capsule& c);
 		};
 		using CapsuleM = Model<Capsule>;
 		using CapsuleC = Cache<CacheBase<Capsule>>;
@@ -406,6 +413,7 @@ namespace boom {
 			Planes getPlanes(bool bWorld) const;
 			//! 指定された行列で変換した時の透視平面上での大きさ
 			spn::Rect get2DRect(const AMat43& mV, const AMat44& mP) const;
+			friend std::ostream& operator << (std::ostream& os, const Frustum& f);
 		};
 		//! 円錐
 		struct Cone : ITagP<Cone> {
@@ -431,6 +439,7 @@ namespace boom {
 
 			Vec3 support(const Vec3& dir) const;
 			Cone operator * (const AMat43& m) const;
+			friend std::ostream& operator << (std::ostream& os, const Cone& c);
 		};
 		//! AxisAligned Box
 		struct AABB : ITagP<AABB> {
@@ -452,6 +461,7 @@ namespace boom {
 			spn::none_t hit(...) const;
 			bool hit(const AABB& ab) const;
 			bool hit(const Plane& p) const;
+			friend std::ostream& operator << (std::ostream& os, const AABB& a);
 		};
 		//! 平面上の一点が三角形の内部に含まれるかどうかを判定
 		/*! 引数は時計回りを想定
@@ -603,6 +613,7 @@ namespace boom {
 
 				// すべてGJK法で衝突判定するのでここには判定関数を記述しない
 				spn::none_t hit(...) const;
+				friend std::ostream& operator << (std::ostream& os, const ConvexP& c);
 		};
 		//! 円柱
 		struct Cylinder : ITagP<Cylinder>, Capsule {
@@ -628,6 +639,7 @@ namespace boom {
 
 			spn::none_t hit(...) const;
 			using ITagP<Cylinder>::GetCID;
+			friend std::ostream& operator << (std::ostream& os, const Cylinder& c);
 		};
 
 		//! GJK法による衝突判定(3D)

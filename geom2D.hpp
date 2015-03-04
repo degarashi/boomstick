@@ -46,6 +46,8 @@ namespace boom {
 			void getArcPoints(PointL& dst, float ang0, float ang1, float deep) const;
 			Circle operator * (const AMat32& m) const;
 			Circle operator * (float s) const;
+
+			friend std::ostream& operator << (std::ostream& os, const Circle& c);
 		};
 
 		struct IModel : ::boom::IModelNode {
@@ -88,6 +90,7 @@ namespace boom {
 			Vec2 im_getCenter() const override { return T::bs_getCenter(); }
 			Vec2 im_support(const Vec2& dir) const override { return T::support(dir); }
 			bool im_isInner(const Vec2& pos) const override { return T::isInner(pos); }
+			std::ostream& print(std::ostream& os) const override { return os << static_cast<const T&>(*this); }
 		};
 		//! 座標変換ありのモデル基底
 		/*! Modelに被せる形で使う */
@@ -152,6 +155,7 @@ namespace boom {
 
 			spn::none_t hit(...) const;
 			bool hit(const Point& p) const;
+			friend std::ostream& operator << (std::ostream& os, const Point& p);
 		};
 		using PointM = Model<Point>;
 
@@ -178,6 +182,7 @@ namespace boom {
 			Line operator * (const AMat32& m) const;
 
 			spn::none_t hit(...) const;
+			friend std::ostream& operator << (std::ostream& os, const Line& l);
 		};
 		//! 半直線
 		struct Ray : ITagP<Ray> {
@@ -193,6 +198,7 @@ namespace boom {
 			Ray operator * (const AMat32& m) const;
 
 			spn::none_t hit(...) const;
+			friend std::ostream& operator << (std::ostream& os, const Ray& r);
 		};
 		//! 線分
 		struct Segment : ITagP<Segment> {
@@ -227,6 +233,7 @@ namespace boom {
 			bool online(const Vec2& p) const;
 
 			Segment operator * (const AMat32& m) const;
+			friend std::ostream& operator << (std::ostream& os, const Segment& s);
 		};
 		//! AxisAlignedBox
 		struct AABB : ITagP<AABB> {
@@ -245,6 +252,7 @@ namespace boom {
 
 			spn::none_t hit(...) const;
 			bool hit(const Segment& l) const;
+			friend std::ostream& operator << (std::ostream& os, const AABB& a);
 		};
 		struct Poly : ITagP<Poly> {
 			Vec2		point[3];
@@ -280,6 +288,7 @@ namespace boom {
 			//! 座標が三角形と衝突するか判定
 			/*! isInTriangleとは異なり辺上もHitとみなす */
 			bool hit(const Vec2& p) const;
+			friend std::ostream& operator << (std::ostream& os, const Poly& p);
 		};
 		//! 多角形基本クラス
 		struct Convex : ITagP<Convex> {
@@ -366,7 +375,7 @@ namespace boom {
 			Vec2 getPoint(int n) const;
 
 			spn::none_t hit(...) const;
-			std::ostream& dbgPrint(std::ostream& os) const;
+			friend std::ostream& operator << (std::ostream& os, const Convex& c);
 		};
 		//! GJK法による衝突判定(2D)
 		/*! ヒットチェックのみ。衝突時は内部点を出力可 */

@@ -23,6 +23,9 @@ namespace boom {
 	MdlIP IModelNode::getInner() const { return MdlIP(); }
 	bool IModelNode::hasInner() const { return false; }
 	void* IModelNode::getUserData() const { return nullptr; }
+	std::ostream& operator << (std::ostream& os, const IModelNode& mdl) {
+		return mdl.print(os);
+	}
 
 	namespace geo3d {
 		const AMat43 IModel::cs_idMat(AMat43::TagIdentity);

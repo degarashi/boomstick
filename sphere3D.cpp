@@ -50,5 +50,9 @@ namespace boom {
 			Vec3 cp = NearestPoint(s.asLine(), center, [](float f){return f;});
 			return cp.dist_sq(center) <= spn::Square(radius);
 		}
+		std::ostream& operator << (std::ostream& os, const Sphere& s) {
+			return os << "Sphere(3d) [ center: " << s.center << std::endl
+					<< "radius: " << s.radius << ']';
+		}
 	}
 }

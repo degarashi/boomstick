@@ -393,5 +393,8 @@ namespace boom {
 		bool Frustum::hit(const Plane& p) const {
 			return getPoints(true).hit(p);
 		}
+		std::ostream& operator << (std::ostream& os, const Frustum& f) {
+			return os << "Frustum(3d) [ pose: " << static_cast<const Pose3D&>(f) << ']';
+		}
 	}
 }

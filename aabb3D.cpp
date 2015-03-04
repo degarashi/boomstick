@@ -63,5 +63,9 @@ namespace boom {
 			Vec3 v = support(-plane.getNormal());
 			return plane.dot(v) <= 0;
 		}
+		std::ostream& operator << (std::ostream& os, const AABB& a) {
+			return os << "AABB(3d) [ min: " << a.vmin << std::endl
+						<< "max: " << a.vmax << ']';
+		}
 	}
 }

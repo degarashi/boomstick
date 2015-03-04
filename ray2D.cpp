@@ -14,5 +14,9 @@ namespace boom {
 		Ray Ray::operator * (const AMat32& m) const {
 			return Ray{pos.asVec3(1)*m, dir.asVec3(0)*m};
 		}
+		std::ostream& operator << (std::ostream& os, const Ray& r) {
+			return os << "Ray [ pos: " << r.pos << std::endl
+						<< "dir: " << r.dir << ']';
+		}
 	}
 }

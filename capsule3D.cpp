@@ -47,5 +47,10 @@ namespace boom {
 			Vec3x2 res = NearestPoint(asLine(), c.asLine(), fnSat, fnSat);
 			return res.first.dist_sq(res.second) <= spn::Square(radius + c.radius);
 		}
+		std::ostream& operator << (std::ostream& os, const Capsule& c) {
+			return os << "Capsule(3d) [ from: " << c.from << std::endl
+						<< "to: " << c.to << std::endl
+						<< "radius: " << c.radius << ']';
+		}
 	}
 }

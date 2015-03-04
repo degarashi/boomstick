@@ -23,5 +23,9 @@ namespace boom {
 		Line Line::operator * (const AMat32& m) const {
 			return Line{pos.asVec3(1)*m, dir.asVec3(0)*m};
 		}
+		std::ostream& operator << (std::ostream& os, const Line& l) {
+			return os << "Line [ pos: " << l.pos << std::endl
+						<< "dir: " << l.dir << ']';
+		}
 	}
 }

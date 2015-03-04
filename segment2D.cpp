@@ -82,5 +82,9 @@ namespace boom {
 		Vec2 Segment::getDir() const {
 			return (to-from).normalization();
 		}
+		std::ostream& operator << (std::ostream& os, const Segment& s) {
+			return os << "Segment(2d) [ from: " << s.from << std::endl
+						<< "to: " << s.to << ']';
+		}
 	}
 }
