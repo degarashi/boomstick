@@ -18,11 +18,11 @@ namespace boom {
 		Vec2 Circle::support(const Vec2& dir) const {
 			return dir * fRadius + vCenter;
 		}
-		bool Circle::hit(const Vec2& pt) const {
-			return vCenter.dist_sq(pt) <= spn::Square(fRadius);
+		bool Circle::hit(const Vec2& pt, float t) const {
+			return vCenter.dist_sq(pt) <= spn::Square(fRadius + t);
 		}
-		bool Circle::hit(const Circle& c) const {
-			return vCenter.dist_sq(c.vCenter) <= spn::Square(fRadius + c.fRadius);
+		bool Circle::hit(const Circle& c, float t) const {
+			return vCenter.dist_sq(c.vCenter) <= spn::Square(fRadius + c.fRadius + t);
 		}
 		Circle Circle::operator * (const AMat32& m) const {
 			auto& m2 = reinterpret_cast<const AMat22&>(m);

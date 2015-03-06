@@ -73,8 +73,8 @@ namespace boom {
 		bool Poly::isInTriangle(const Vec2& p) const {
 			return _isInTriangle(p, 0.f);
 		}
-		bool Poly::hit(const Vec2& p) const {
-			return _isInTriangle(p, 1e-3f);
+		bool Poly::hit(const Vec2& p, float t) const {
+			return _isInTriangle(p, t);
 		}
 		bool Poly::isCW() const {
 			return (point[1]-point[0]).cw(point[2]-point[0]) >= 0;

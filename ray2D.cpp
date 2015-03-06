@@ -18,12 +18,12 @@ namespace boom {
 			return os << "Ray [ pos: " << r.pos << std::endl
 						<< "dir: " << r.dir << ']';
 		}
-		bool Ray::hit(const Vec2& p) const {
+		bool Ray::hit(const Vec2& p, float t) const {
 			Vec2 v = p - pos;
 			float d = v.dot(dir);
 			if(d < 0)
 				return false;
-			return (pos + dir*d).dist_sq(p) <= spn::Square(Point::NEAR_THRESHOLD);
+			return (pos + dir*d).dist_sq(p) <= t*SQUARE_RATIO;
 		}
 	}
 }

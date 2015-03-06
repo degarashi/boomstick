@@ -7,8 +7,6 @@ namespace boom {
 		}
 		// ------------------ GSimplex ------------------
 		namespace {
-			constexpr float DOT_THRESHOLD = 1e-3f,
-							DIST_THRESHOLD = 1e-6f;
 			constexpr int ToSearch[3][3] = {
 				{2,0,1},
 				{0,1,2},
@@ -20,9 +18,10 @@ namespace boom {
 			_poly.point[n] = (_m0.im_support(dir) - _posB[n]);
 		}
 		bool GSimplex::_gjkMethod() {
+			// とりあえず物体の中心位置でサポートベクトルを決める
 			Vec2 dir(_m1.im_getCenter() - _m0.im_getCenter());
 			float lens = dir.len_sq();
-			if(lens < DIST_THRESHOLD)
+			if(lens < NEAR_THRESHOLD_SQ)
 				dir = Vec2(1,0);
 			else
 				dir *= spn::RSqrt(lens);
@@ -34,7 +33,7 @@ namespace boom {
 			}
 			// 原点と重なっていたら終了 = 内部点
 			lens = _poly.point[0].len_sq();
-			if(lens < DIST_THRESHOLD) {
+			if(lens < NEAR_THRESHOLD) {
 				_nVtx = 1;
 				_inner = _posB[0];
 				return true;
@@ -52,7 +51,7 @@ namespace boom {
 			tmp = _poly.point[0] + tmp*r;
 
 			lens = tmp.len_sq();
-			if(lens < DIST_THRESHOLD) {
+			if(lens < NEAR_THRESHOLD) {
 				// ライン上に原点がある
 				_inner =_posB[0].l_intp(_posB[1], r * spn::Rcp22Bit(tmpLen));
 				_nVtx = 2;
@@ -119,7 +118,7 @@ namespace boom {
 						idx = ts[0];
 					}
 				}
-				if(dist < 1e-7f) {
+				if(dist < NEAR_THRESHOLD_SQ) {
 					_inner = TriangleLerp(_poly.point[0], _poly.point[1], _poly.point[2], ori,
 										  _posB[0], _posB[1], _posB[2]);
 					return true;

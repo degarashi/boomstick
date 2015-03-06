@@ -8,8 +8,8 @@ namespace boom {
 		LNear Point::nearest(const Segment& s) const {
 			return s.nearest(*this);
 		}
-		bool Point::hit(const Point& p) const {
-			return distance(p) <= NEAR_THRESHOLD;
+		bool Point::hit(const Vec2& p, float t) const {
+			return distance(p) <= t;
 		}
 		const Vec2& Point::support(const Vec2& dir) const { return *this; }
 		const float& Point::bs_getArea() const { INVOKE_ERROR }

@@ -280,7 +280,7 @@ namespace boom {
 				posf = ConvexPos::OnLine;
 			return std::make_pair(posf, tmpA.index);
 		}
-		bool Convex::hit(const Vec2& p) const {
+		bool Convex::hit(const Vec2& p, float t) const {
 			return checkPosition(p).first != ConvexPos::Outer;
 		}
 		std::tuple<float,float,Vec2> Convex::area_inertia_center() const {

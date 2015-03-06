@@ -18,27 +18,29 @@ namespace boom {
 		float Segment::len_sq() const {
 			return from.dist_sq(to);
 		}
-		bool Segment::hit(const Vec2& p) const {
+		bool Segment::hit(const Vec2& p, float t) const {
 			Vec2 v = p - from,
 				 dir = to-from;
-			float len = dir.length();
-			dir /= len;
+			float len = dir.normalize();
+			if(len < ZEROVEC_LENGTH)
+				return Point(from).hit(p);
+
 			float d = v.dot(dir);
-			if(d < 0)
+			if(d < -DOT_THRESHOLD)
 				return false;
-			if(d > len)
+			if(d > len+DOT_THRESHOLD)
 				return false;
-			v -= dir*len;
-			return v.len_sq() <= spn::Square(Point::NEAR_THRESHOLD);
+			v -= dir*d;
+			return v.len_sq() <= t*SQUARE_RATIO;
 		}
-		bool Segment::hit(const Segment& l) const {
-			return distance(l) < Point::NEAR_THRESHOLD;
+		bool Segment::hit(const Segment& l, float t) const {
+			return IsCrossing(asLine(), l.asLine(), length(), l.length(), t);
 		}
 		LNear Segment::nearest(const Vec2& p) const {
 			Vec2 toP(p-from),
 				toV1(to-from);
-			if(toV1.len_sq() <1e-6f)
-				return LNear(Vec2(), LinePos::NotHit);
+			if(toV1.len_sq() < ZEROVEC_LENGTH_SQ)
+				return LNear(from, LinePos::Begin);
 			float lenV1 = toV1.length();
 			toV1 *= spn::Rcp22Bit(lenV1);
 			float d = toV1.dot(toP);

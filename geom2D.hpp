@@ -26,6 +26,14 @@ namespace boom {
 		struct Line;
 		struct Ray;
 
+		constexpr static float DOT_THRESHOLD = 1e-4f,		//!< 内積による表裏判定基準
+								NEAR_THRESHOLD = 1e-4f,		//!< 同じ座標と判断する基準
+								ZEROVEC_LENGTH = 1e-5f,
+								SQUARE_RATIO = 1e-1f,
+								DOT_THRESHOLD_SQ = DOT_THRESHOLD * SQUARE_RATIO,
+								NEAR_THRESHOLD_SQ = NEAR_THRESHOLD * SQUARE_RATIO,
+								ZEROVEC_LENGTH_SQ = ZEROVEC_LENGTH * SQUARE_RATIO;
+
 		struct Circle : ITagP<Circle> {
 			Vec2	vCenter;
 			float	fRadius;
@@ -41,8 +49,8 @@ namespace boom {
 			Vec2 support(const Vec2& dir) const;
 
 			spn::none_t hit(...) const;
-			bool hit(const Vec2& p) const;
-			bool hit(const Circle& c) const;
+			bool hit(const Vec2& p, float t=NEAR_THRESHOLD) const;
+			bool hit(const Circle& c, float t=NEAR_THRESHOLD) const;
 
 			void getArcPoints(PointL& dst, float ang0, float ang1, float deep) const;
 			Circle operator * (const AMat32& m) const;
@@ -63,7 +71,7 @@ namespace boom {
 				・・との理由で行列変換後の物体に対する射像は無し */
 			virtual Vec2 im_support(const Vec2& dir) const = 0;
 			//! 図形と点の判定
-			virtual bool im_hitPoint(const Vec2& p) const = 0;
+			virtual bool im_hitPoint(const Vec2& p, float t=NEAR_THRESHOLD) const = 0;
 			virtual uint32_t getCID() const = 0;
 
 			virtual Vec2 toLocal(const Vec2& v) const { return v; }
@@ -89,7 +97,7 @@ namespace boom {
 			float im_getArea() const override { return T::bs_getArea(); }
 			Vec2 im_getCenter() const override { return T::bs_getCenter(); }
 			Vec2 im_support(const Vec2& dir) const override { return T::support(dir); }
-			bool im_hitPoint(const Vec2& pos) const override { return T::hit(pos); }
+			bool im_hitPoint(const Vec2& pos, float t=NEAR_THRESHOLD) const override { return T::hit(pos, t); }
 			std::ostream& print(std::ostream& os) const override { return os << static_cast<const T&>(*this); }
 		};
 		template <class T>
@@ -131,7 +139,7 @@ namespace boom {
 				float im_getArea() const override;
 				Vec2 im_getCenter() const override;
 				Vec2 im_support(const Vec2& dir) const override;
-				bool im_hitPoint(const Vec2& p) const override;
+				bool im_hitPoint(const Vec2& p, float t=NEAR_THRESHOLD) const override;
 
 				Vec2 toLocal(const Vec2& v) const override;
 				Vec2 toLocalDir(const Vec2& v) const override;
@@ -147,8 +155,6 @@ namespace boom {
 		};
 		using LNear = std::pair<Vec2, LinePos>;
 		struct Point : Vec2, ITagP<Point> {
-			constexpr static float DOT_THRESHOLD = 1e-4f,		//!< 一直線上にあると判断する基準
-									NEAR_THRESHOLD = 1e-5f;		//!< 同じ位置と判断する基準
 
 			// ---- cacheable functions ----
 			const float& bs_getArea() const;
@@ -163,7 +169,7 @@ namespace boom {
 			const Vec2& support(const Vec2& dir) const;
 
 			spn::none_t hit(...) const;
-			bool hit(const Point& p) const;
+			bool hit(const Vec2& p, float t=NEAR_THRESHOLD) const;
 			friend std::ostream& operator << (std::ostream& os, const Point& p);
 		};
 		using PointM = Model<Point>;
@@ -191,7 +197,7 @@ namespace boom {
 			Line operator * (const AMat32& m) const;
 
 			spn::none_t hit(...) const;
-			bool hit(const Vec2& p) const;
+			bool hit(const Vec2& p, float t=NEAR_THRESHOLD) const;
 			friend std::ostream& operator << (std::ostream& os, const Line& l);
 		};
 		using LineM = Model<Line>;
@@ -209,7 +215,7 @@ namespace boom {
 			Ray operator * (const AMat32& m) const;
 
 			spn::none_t hit(...) const;
-			bool hit(const Vec2& p) const;
+			bool hit(const Vec2& p, float t=NEAR_THRESHOLD) const;
 			friend std::ostream& operator << (std::ostream& os, const Ray& r);
 		};
 		using RayM = Model<Ray>;
@@ -231,8 +237,8 @@ namespace boom {
 			float length() const;
 			float len_sq() const;
 			spn::none_t hit(...) const;
-			bool hit(const Vec2& p) const;
-			bool hit(const Segment& l) const;
+			bool hit(const Vec2& p, float t=NEAR_THRESHOLD) const;
+			bool hit(const Segment& s, float t=NEAR_THRESHOLD) const;
 
 			/*! \return Vec2(最寄り座標),LINEPOS(最寄り線分位置) */
 			LNear nearest(const Vec2& p) const;
@@ -254,6 +260,14 @@ namespace boom {
 		struct AABB : ITagP<AABB> {
 			Vec2	minV, maxV;
 
+			int _getAreaNumX(float p) const;
+			int _getAreaNumY(float p) const;
+			void _makeSegmentX(Segment& s, int num) const;
+			void _makeSegmentY(Segment& s, int num) const;
+			bool _checkHitX(const Segment& s0, int from, int to) const;
+			bool _checkHitY(const Segment& s0, int from, int to) const;
+			std::pair<int,int> _getAreaNum(const Vec2& p) const;
+
 			AABB() = default;
 			AABB(const Vec2& min_v, const Vec2& max_v);
 			// ---- cacheable functions ----
@@ -266,8 +280,9 @@ namespace boom {
 			Vec2 nearest(const Vec2& pos) const;
 
 			spn::none_t hit(...) const;
-			bool hit(const Vec2& p) const;
-			bool hit(const Segment& l) const;
+			bool hit(const Vec2& p, float t=NEAR_THRESHOLD) const;
+			bool hit(const Segment& l, float t=NEAR_THRESHOLD) const;
+			bool hit(const AABB& ab, float t=NEAR_THRESHOLD) const;
 			friend std::ostream& operator << (std::ostream& os, const AABB& a);
 		};
 		using AABBM = Model<AABB>;
@@ -304,7 +319,7 @@ namespace boom {
 			spn::none_t hit(...) const;
 			//! 座標が三角形と衝突するか判定
 			/*! isInTriangleとは異なり辺上もHitとみなす */
-			bool hit(const Vec2& p) const;
+			bool hit(const Vec2& p, float t=NEAR_THRESHOLD) const;
 			friend std::ostream& operator << (std::ostream& os, const Poly& p);
 		};
 		using PolyM = Model<Poly>;
@@ -392,7 +407,7 @@ namespace boom {
 			Vec2 getPoint(int n) const;
 
 			spn::none_t hit(...) const;
-			bool hit(const Vec2& p) const;
+			bool hit(const Vec2& p, float t=NEAR_THRESHOLD) const;
 			friend std::ostream& operator << (std::ostream& os, const Convex& c);
 		};
 		using ConvexM = Model<Convex>;
@@ -494,8 +509,9 @@ namespace boom {
 			float d = ls.dir.dot(toP);
 			return ls.pos + ls.dir * clip(d);
 		}
-		template <class CLIP>
-		inline Vec2x2 NearestPoint(const Line& ls0, const Line& ls1, CLIP clip0, CLIP clip1) {
+		bool IsCrossing(const Line& ls0, const Line& ls1, float len0, float len1, float t=NEAR_THRESHOLD);
+		template <class CLIP0, class CLIP1>
+		inline Vec2x2 NearestPoint(const Line& ls0, const Line& ls1, CLIP0 clip0, CLIP1 clip1) {
 			float st0d = ls0.dir.len_sq(),
 					st1d = ls1.dir.len_sq(),
 					st01d = ls0.dir.dot(ls1.dir);

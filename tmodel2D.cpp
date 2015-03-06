@@ -26,8 +26,8 @@ namespace boom {
 		Vec2 TModel::im_support(const Vec2& dir) const {
 			return toWorldDir(_hlMdl->get()->im_support(toLocalDir(dir)));
 		}
-		bool TModel::im_hitPoint(const Vec2& p) const {
-			return _hlMdl->get()->im_hitPoint(toLocal(p));
+		bool TModel::im_hitPoint(const Vec2& p, float t) const {
+			return _hlMdl->get()->im_hitPoint(toLocal(p), t);
 		}
 		Vec2 TModel::toLocal(const Vec2& v) const {
 			return v.asVec3(1) * *getToLocal();
