@@ -92,6 +92,10 @@ namespace boom {
 			bool im_hitPoint(const Vec2& pos) const override { return T::hit(pos); }
 			std::ostream& print(std::ostream& os) const override { return os << static_cast<const T&>(*this); }
 		};
+		template <class T>
+		std::ostream& operator << (std::ostream& os, const Model<T>& m) {
+			return m.print(os);
+		}
 		using CircleM = Model<Circle>;
 
 		class TfNode : public spn::CheckAlign<16,TfNode>, public spn::TreeNode<TfNode> {
