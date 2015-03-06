@@ -4,8 +4,12 @@ namespace boom {
 	namespace geo2d {
 		Segment::Segment(const Vec2& v0, const Vec2& v1): from(v0), to(v1) {}
 		float Segment::distance(const Segment& ls) const {
-			auto fn = [](float f) { return spn::Saturate(f, 0.f, 1.f); };
-			Vec2x2 vp = NearestPoint(asLine(), ls.asLine(), fn,fn);
+			float len0 = length(),
+				  len1 = ls.length();
+			auto fn0 = [len0](float f) { return spn::Saturate(f, 0.f, len0); };
+			auto fn1 = [len1](float f) { return spn::Saturate(f, 0.f, len1); };
+			// 係数が範囲を超えたら交差していないとみなす
+			Vec2x2 vp = NearestPoint(asLine(), ls.asLine(), fn0, fn1);
 			return vp.first.distance(vp.second);
 		}
 		float Segment::length() const {
