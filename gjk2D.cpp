@@ -15,35 +15,6 @@ namespace boom {
 				{1,2,0}
 			};
 		}
-
-		void BarycentricCoord(float ret[3], const Vec2& p0, const Vec2& p1, const Vec2& p2, const Vec2& pos) {
-			Vec2 pt0 = p0 - p2,
-				pt1 = p1 - p2,
-				ptp = pos - p2;
-
-			spn::Mat22 m;
-			m.setColumn(0, pt0);
-			m.setColumn(1, pt1);
-			float det = m.calcDeterminant();
-
-			m.setColumn(0, ptp);
-			ret[0] = m.calcDeterminant();
-
-			m.setColumn(0, pt0);
-			m.setColumn(1, ptp);
-			ret[1] = m.calcDeterminant();
-			if(det != 0) {
-				ret[0] /= det;
-				ret[1] /= det;
-			}
-			ret[2] = 1.f - ret[0] - ret[1];
-		}
-		Vec2 MixVector(const float (&cf)[3], const Vec2& p0, const Vec2& p1, const Vec2& p2) {
-			return p0 * cf[0] +
-					p1 * cf[1] +
-					p2 * cf[2];
-		}
-
 		void GSimplex::_minkowskiSub(const Vec2& dir, int n) {
 			_posB[n] = _m1.im_support(-dir);
 			_poly.point[n] = (_m0.im_support(dir) - _posB[n]);
