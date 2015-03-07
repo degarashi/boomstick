@@ -8,7 +8,7 @@ namespace boom {
 			return NearestPoint(*this, st, fn, fn);
 		}
 		Vec2 Line::nearest(const Vec2& p) const {
-			return pos + (p-pos).dot(dir);
+			return pos + dir * (p-pos).dot(dir);
 		}
 		float Line::distance(const Vec2& p) const {
 			return std::fabs(dir.ccw(p - pos));
