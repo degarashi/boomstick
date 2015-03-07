@@ -33,7 +33,7 @@ namespace boom {
 			}
 			// 原点と重なっていたら終了 = 内部点
 			lens = _poly.point[0].len_sq();
-			if(lens < NEAR_THRESHOLD) {
+			if(lens < NEAR_THRESHOLD_SQ) {
 				_nVtx = 1;
 				_inner = _posB[0];
 				return true;
@@ -51,7 +51,7 @@ namespace boom {
 			tmp = _poly.point[0] + tmp*r;
 
 			lens = tmp.len_sq();
-			if(lens < NEAR_THRESHOLD) {
+			if(lens < NEAR_THRESHOLD_SQ) {
 				// ライン上に原点がある
 				_inner =_posB[0].l_intp(_posB[1], r * spn::Rcp22Bit(tmpLen));
 				_nVtx = 2;
@@ -62,40 +62,35 @@ namespace boom {
 			LNear res(tmp, LinePos::OnLine);
 			int idx = 2;
 			for(;;) {
-				auto& rV = _poly.point[idx];
 				// 新たな頂点を追加
 				dir = res.first.normalization() * -1.f;
 				_minkowskiSub(dir, idx);
+				auto& rV = _poly.point[idx];
 				if(dir.dot(rV) < -DOT_THRESHOLD)
 					return false;
 
+				// 既存の頂点と同じ座標だったらこれ以上進展はないということで、終了
 				auto& ts = ToSearch[idx];
-				if(rV.distance(_poly.point[ts[0]]) < 1e-7f ||
-					rV.distance(_poly.point[ts[2]]) < 1e-7f)
+				if(rV.dist_sq(_poly.point[ts[0]]) < NEAR_THRESHOLD_SQ ||
+					rV.dist_sq(_poly.point[ts[2]]) < NEAR_THRESHOLD_SQ)
 				{
-					std::cout << _m0 << std::endl << _m1 << std::endl;
 					return false;
 				}
 
 				// 現時点で三角形が原点を含んでいるか
 				bool bIn;
-				if((_poly.point[1]-_poly.point[0]).cw(_poly.point[2]-_poly.point[0]) > 0)
-					bIn = _poly.hit({0,0});
+				if(_poly.isCW())
+					bIn = _poly.hit({0,0}, 0.f);
 				else {
 					_poly.invert();
-					bIn = _poly.hit({0,0});
+					bIn = _poly.hit({0,0}, 0.f);
 					_poly.invert();
 				}
-// 				float cm = (_poly.point[ts[1]] - _poly.point[ts[0]]).cw(-_poly.point[ts[0]]) *
-// 							(_poly.point[ts[2]] - _poly.point[ts[1]]).cw(-_poly.point[ts[1]]);
-// 				if(cm >= -1e-5f) {
 				if(bIn) {
+					// 交差領域の1点を算出
 					float cf[3];
 					spn::BarycentricCoord(cf, _poly.point[0], _poly.point[1], _poly.point[2], ori);
 					_inner = spn::MixVector(cf, _posB[0], _posB[1], _posB[2]);
-					_inner = TriangleLerp(_poly.point[0], _poly.point[1], _poly.point[2], ori,
-										_posB[0], _posB[1], _posB[2]);
-					Assert(Trap, _m0.im_hitPoint(_inner) && _m1.im_hitPoint(_inner));
 					return true;
 				}
 				float dist = std::numeric_limits<float>::max();
@@ -109,25 +104,26 @@ namespace boom {
 						idx = ts[2];
 					}
 				}
-				res = Segment(_poly.point[ts[1]], _poly.point[ts[2]]).nearest(ori);
-				if(res.second == LinePos::OnLine) {
-					float td = res.first.len_sq();
-					if(dist > td) {
-						dist = td;
-						// この辺について調べる
-						idx = ts[0];
+				{
+					auto res2 = Segment(_poly.point[ts[1]], _poly.point[ts[2]]).nearest(ori);
+					if(res2.second == LinePos::OnLine) {
+						float td = res2.first.len_sq();
+						if(dist > td) {
+							dist = td;
+							// この辺について調べる
+							idx = ts[0];
+							res = res2;
+						}
 					}
-				}
-				if(dist < NEAR_THRESHOLD_SQ) {
-					_inner = TriangleLerp(_poly.point[0], _poly.point[1], _poly.point[2], ori,
-										  _posB[0], _posB[1], _posB[2]);
-					return true;
 				}
 				if(idx < 0)
 					return false;
 			}
 		}
-		GSimplex::GSimplex(const IModel& m0, const IModel& m1): _m0(m0), _m1(m1), _bHit(_gjkMethod()) {}
+		GSimplex::GSimplex(const IModel& m0, const IModel& m1):
+			_m0(m0),
+			_m1(m1),
+			_bHit(_gjkMethod()) {}
 		bool GSimplex::getResult() const {
 			return _bHit;
 		}
