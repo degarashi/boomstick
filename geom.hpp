@@ -209,6 +209,13 @@ namespace boom {
 		OnLine,
 		Outer
 	};
+	//! 凸包の直線との位置関係
+	enum LineDivision {
+		OnLine = 0x00,
+		Cw = 0x01,
+		Ccw = 0x02,
+		Bridge = 0x03
+	};
 
 	template <class... Ts>
 	struct CCType : spn::CType<Ts...> {

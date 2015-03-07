@@ -76,6 +76,12 @@ namespace boom {
 		bool Poly::hit(const Vec2& p, float t) const {
 			return _isInTriangle(p, t);
 		}
+		LineDivision Poly::checkSide(const Line& l, float t) const {
+			uint32_t res = 0;
+			for(int i=0 ; i<3 ; i++)
+				res |= l.checkSide(point[i], t);
+			return static_cast<LineDivision>(res);
+		}
 		bool Poly::isCW() const {
 			return (point[1]-point[0]).cw(point[2]-point[0]) >= 0;
 		}

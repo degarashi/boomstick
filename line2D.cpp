@@ -20,6 +20,15 @@ namespace boom {
 			Vec2 tv(p-pos);
 			return dir.dot(tv);
 		}
+		LineDivision Line::checkSide(const Vec2& p, float t) const {
+			auto p2 = p - pos;
+			float d = dir.cw(p2);
+			if(d < -t)
+				return LineDivision::Ccw;
+			if(d > t)
+				return LineDivision::Cw;
+			return LineDivision::OnLine;
+		}
 		Line Line::operator * (const AMat32& m) const {
 			return Line{pos.asVec3(1)*m, dir.asVec3(0)*m};
 		}

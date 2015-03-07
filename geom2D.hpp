@@ -199,6 +199,7 @@ namespace boom {
 			//! 基準位置に対する方向ベクトルとの内積
 			float posDot(const Vec2& p) const;
 			Line operator * (const AMat32& m) const;
+			LineDivision checkSide(const Vec2& p, float t=DOT_THRESHOLD) const;
 
 			spn::none_t hit(...) const;
 			bool hit(const Vec2& p, float t=NEAR_THRESHOLD) const;
@@ -319,6 +320,7 @@ namespace boom {
 			bool isCW() const;
 			//! 頂点の並びを反転
 			void invert();
+			LineDivision checkSide(const Line& l, float t=DOT_THRESHOLD) const;
 
 			spn::none_t hit(...) const;
 			//! 座標が三角形と衝突するか判定
