@@ -212,11 +212,11 @@ namespace boom {
 			return std::make_pair(false, PointL());
 		}
 
-		std::pair<ConvexPos,int> Convex::checkPosition(const Vec2& pos) const {
+		std::pair<ConvexPos,int> Convex::checkPosition(const Vec2& pos, float threshold) const {
 			// 適当に内部点を算出
 			Vec2 inner = (point[0] + point[1] + point[2]) * (1.f/3);
 			Vec2 toP(pos - inner);
-			if(toP.len_sq() < 1e-6f) {
+			if(toP.len_sq() < NEAR_THRESHOLD_SQ) {
 				// 重心がちょうどposと重なってしまったら少しずらす
 				inner.lerp(point[0], 0.5f);
 			}
@@ -278,16 +278,16 @@ namespace boom {
 			tmpB.index = spn::CndSub(tmpB.index, nV);
 			float d = (point[tmpB.index] - point[tmpA.index]).cw(pos - point[tmpA.index]);
 			ConvexPos posf;
-			if(d > 1e-6f)
+			if(d > threshold)
 				posf = ConvexPos::Inner;
-			else if(d < -1e-6f)
+			else if(d < -threshold)
 				posf = ConvexPos::Outer;
 			else
 				posf = ConvexPos::OnLine;
 			return std::make_pair(posf, tmpA.index);
 		}
 		bool Convex::hit(const Vec2& p, float t) const {
-			return checkPosition(p).first != ConvexPos::Outer;
+			return checkPosition(p, t).first != ConvexPos::Outer;
 		}
 		std::tuple<float,float,Vec2> Convex::area_inertia_center() const {
 			int nL = point.size();

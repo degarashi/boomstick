@@ -29,7 +29,7 @@ namespace boom {
 		constexpr static float DOT_THRESHOLD = 1e-4f,		//!< 内積による表裏判定基準
 								NEAR_THRESHOLD = 1e-4f,		//!< 同じ座標と判断する基準
 								ZEROVEC_LENGTH = 1e-5f,
-								SQUARE_RATIO = 1e-1f,
+								SQUARE_RATIO = 1e-4f,
 								DOT_THRESHOLD_SQ = DOT_THRESHOLD * SQUARE_RATIO,
 								NEAR_THRESHOLD_SQ = NEAR_THRESHOLD * SQUARE_RATIO,
 								ZEROVEC_LENGTH_SQ = ZEROVEC_LENGTH * SQUARE_RATIO;
@@ -399,7 +399,7 @@ namespace boom {
 			//! 指定ポイントの内部的な領域IDと内外位置を取得
 			/*! \return first=内外判定
 						second=領域ID */
-			std::pair<ConvexPos, int> checkPosition(const Vec2& pos) const;
+			std::pair<ConvexPos, int> checkPosition(const Vec2& pos, float threshold=DOT_THRESHOLD) const;
 			//! 内部的な通し番号における外郭ライン
 			Segment getOuterSegment(int n) const;
 			Line getOuterLine(int n) const;
