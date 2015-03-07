@@ -15,6 +15,12 @@ namespace boom {
 			point = std::move(c.point);
 			return *this;
 		}
+		Vec2 Convex::bs_getCenter() const {
+			return std::get<2>(area_inertia_center());
+		}
+		float Convex::bs_getInertia() const {
+			return std::get<1>(area_inertia_center());
+		}
 
 		namespace {
 			bool Back(const Vec2& v0, const Vec2& v1, const Vec2& v2) {

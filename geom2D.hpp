@@ -361,6 +361,8 @@ namespace boom {
 			// ---- cacheable functions ----
 			float bs_getArea() const;
 			Circle bs_getBVolume() const;
+			Vec2 bs_getCenter() const;
+			float bs_getInertia() const;
 			// -----------------------------
 			/*! 同時に求めると少し効率が良い為 */
 			std::tuple<float,float,Vec2> area_inertia_center() const;
