@@ -90,7 +90,11 @@ namespace boom {
 		//! TにIModelインタフェースを付加
 		template <class T>
 		struct Model : IModelP_base<T, IModel> {
-			using IModelP_base<T, IModel>::IModelP_base;
+			using base_t = IModelP_base<T, IModel>;
+			using base_t::base_t;
+
+			Model(const T& t): base_t(t) {}
+			Model(T&& t): base_t(std::move(t)) {}
 			// 各種ルーチンの中継
 			Circle im_getBVolume() const override { return T::bs_getBVolume(); }
 			float im_getInertia() const override { return T::bs_getInertia(); }

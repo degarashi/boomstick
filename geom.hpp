@@ -82,6 +82,8 @@ namespace boom {
 	template <class T, class MDL>
 	struct IModelP_base : MDL, T {
 		using T::T;
+		IModelP_base(T&& t): T(std::move(t)) {}
+		IModelP_base(const T& t): T(t) {}
 		const void* getCore() const override { return static_cast<const T*>(this); }
 		uint32_t getCID() const override { return T::GetCID(); }
 	};
