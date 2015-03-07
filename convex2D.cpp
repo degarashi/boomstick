@@ -62,7 +62,7 @@ namespace boom {
 			// 末尾がダブる為、削る
 			--pDst;
 
-			Assert(Trap, pDst < &pts[0]+nV)
+			Assert(Trap, pDst <= &pts[0]+nV)
 			pts.resize(pDst - &pts[0]);
 			return Convex(std::move(pts));
 		}
