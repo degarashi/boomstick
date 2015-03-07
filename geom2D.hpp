@@ -326,6 +326,7 @@ namespace boom {
 			//! 座標が三角形と衝突するか判定
 			/*! isInTriangleとは異なり辺上もHitとみなす */
 			bool hit(const Vec2& p, float t=NEAR_THRESHOLD) const;
+			bool hit(const Poly& p, float t=NEAR_THRESHOLD) const;
 			friend std::ostream& operator << (std::ostream& os, const Poly& p);
 		};
 		using PolyM = Model<Poly>;

@@ -42,7 +42,16 @@ namespace boom {
 			return p0.cw(p1) * 0.5f;
 		}
 		Vec2 Poly::support(const Vec2& dir) const {
-			AssertT(Trap, false, (std::domain_error)(const char*), "not implemented yet") throw 0;
+			int index = -1;
+			float d = std::numeric_limits<float>::lowest();
+			for(int i=0 ; i<3 ; i++) {
+				float td = point[i].dot(dir);
+				if(td > d) {
+					d = td;
+					index = i;
+				}
+			}
+			return point[index];
 		}
 		void Poly::addOffset(const Vec2& ofs) {
 			for(int i=0 ; i<3 ; i++)
@@ -75,6 +84,22 @@ namespace boom {
 		}
 		bool Poly::hit(const Vec2& p, float t) const {
 			return _isInTriangle(p, t);
+		}
+		bool Poly::hit(const Poly& p, float t) const {
+			for(int i=0 ; i<3 ; i++) {
+				const auto& p0 = point[i];
+				for(int j=0 ; j<3 ; j++) {
+					const auto& p1 = p.point[j];
+					Line line(p0, (p1-p0).normalization());
+					auto res0 = checkSide(line, t),
+						res1 = p.checkSide(line, t);
+					if(res0 != res1 &&
+						res0 != LineDivision::Bridge &&
+						res1 != LineDivision::Bridge)
+						return false;
+				}
+			}
+			return true;
 		}
 		LineDivision Poly::checkSide(const Line& l, float t) const {
 			uint32_t res = 0;
