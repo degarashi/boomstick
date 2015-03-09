@@ -1,24 +1,23 @@
 #ifdef WIN32
 	#include <intrin.h>
 #endif
-#include "spinner/tests/test.hpp"
-#include "geom2D.hpp"
+#include "test.hpp"
 
 namespace boom {
 	namespace test {
 		using namespace spn::test;
 		using spn::Vec2;
-		using geo2d::Poly;
+		using geo2d::PolyM;
 		class Poly2D : public spn::test::RandomTestInitializer {};
 		TEST_F(Poly2D, Triangle) {
 			auto rd = getRand();
-			auto rc = [&](){ return rd.template getUniform<float>({0,1}); };
-			auto rv = [&](){ return GenRVec<2,false>(rc); };
+			spn::RangeF rV{0,1};
 
-			Poly p{rv(), rv(), rv()};
+			PolyM p(GenRPoly(rd, rV));
 			if(!p.isCW())
 				p.invert();
 
+			auto rc = [&](){ return rd.template getUniform<float>(rV); };
 			// 3頂点を合計1になるような係数で合成した座標は必ず三角形の中に入る
 			float c[3];
 			c[0] = rc();

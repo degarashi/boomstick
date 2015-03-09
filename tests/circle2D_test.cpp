@@ -1,8 +1,7 @@
 #ifdef WIN32
 	#include <intrin.h>
 #endif
-#include "spinner/tests/test.hpp"
-#include "geom2D.hpp"
+#include "test.hpp"
 
 namespace boom {
 	namespace test {
@@ -15,11 +14,9 @@ namespace boom {
 		class Circle2D : public spn::test::RandomTestInitializer {};
 		TEST_F(Circle2D, Hit_Point) {
 			auto rd = getRand();
-			auto rc = [&](){ return rd.template getUniform<float>({-1e4f,1e4f}); };
-			auto rv = [&](){ return GenRVec<2,false>(rc); };
 
-			CircleM c(rv(), rd.template getUniform<float>({0, 1e3f}));
-			PointM p(rv());
+			CircleM c(GenRCircle(rd));
+			PointM p(GenRPoint(rd));
 
 			bool b0 = c.hit(p);
 			bool b1 = GSimplex(c, p).getResult();
@@ -27,11 +24,9 @@ namespace boom {
 		}
 		TEST_F(Circle2D, Hit_Circle) {
 			auto rd = getRand();
-			auto rc = [&](){ return rd.template getUniform<float>({-1e4f,1e4f}); };
-			auto rv = [&](){ return GenRVec<2,false>(rc); };
 
-			CircleM c0(rv(), rd.template getUniform<float>({0, 1e3f})),
-					c1(rv(), rd.template getUniform<float>({0, 1e3f}));
+			CircleM c0(GenRCircle(rd)),
+					c1(GenRCircle(rd));
 
 			bool b0 = c0.hit(c1);
 			bool b1 = GSimplex(c0,c1).getResult();
@@ -39,12 +34,9 @@ namespace boom {
 		}
 		TEST_F(Circle2D, Support) {
 			auto rd = getRand();
-			auto rc = [&](){ return rd.template getUniform<float>({-1e3f,1e3f}); };
-			auto rc11 = [&](){ return rd.template getUniform<float>({-1,1}); };
-			auto rv = [&](){ return GenRVec<2,false>(rc); };
 
-			CircleM c(rv(), rd.template getUniform<float>({0, 1e3f}));
-			Vec2 dir(GenRDir<2,false>(rc11));
+			CircleM c(GenRCircle(rd, {-1e3f,1e3f}));
+			Vec2 dir(GenR2Dir(rd));
 			Vec2 sv = c.support(dir);
 
 			// 中心座標からの距離は全てradiusと等しい筈
