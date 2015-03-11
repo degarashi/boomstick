@@ -35,6 +35,36 @@ namespace boom {
 			return Circle(ori,
 						spn::Sqrt(std::max(tx.len_sq(), ty.len_sq())));
 		}
+		void Circle::setBoundary(const IModel* p) {
+			*this = p->im_getBVolume();
+		}
+		void Circle::appendBoundary(const IModel* p) {
+			Circle c2 = p->im_getBVolume();
+			Vec2 toC2 = c2.vCenter - vCenter;
+			float len = toC2.normalize(),
+				  rd = fRadius - c2.fRadius;
+			if(len > rd) {
+				// サポート写像で新たな円を算出
+				Vec2 tv0 = c2.vCenter + toC2 * c2.fRadius,
+					 tv1 = vCenter - toC2 * fRadius;
+				vCenter = (tv0 + tv1) * .5f;
+				fRadius = tv0.distance(tv1) * .5;
+			}
+		}
+		Circle Circle::Boundary(const IModel* p, size_t n, size_t stride) {
+			AssertT(Trap, n>0, (std::invalid_argument)(const char*), "size must not 0")
+
+			Circle c;
+			c.setBoundary(p);
+			auto pv = reinterpret_cast<uintptr_t>(p);
+			pv += stride;
+			while(n-- > 1) {
+				p = reinterpret_cast<const IModel*>(pv);
+				c.appendBoundary(p);
+				pv += stride;
+			}
+			return c;
+		}
 		// 半径のみ倍率をかける
 		Circle Circle::operator * (float s) const {
 			return Circle(vCenter, fRadius*s);

@@ -1,4 +1,4 @@
-//! 3D形状の定義
+//! 2D形状の定義
 #pragma once
 #include "geom.hpp"
 #include "spinner/resmgr.hpp"
@@ -33,7 +33,7 @@ namespace boom {
 								DOT_THRESHOLD_SQ = DOT_THRESHOLD * SQUARE_RATIO,
 								NEAR_THRESHOLD_SQ = NEAR_THRESHOLD * SQUARE_RATIO,
 								ZEROVEC_LENGTH_SQ = ZEROVEC_LENGTH * SQUARE_RATIO;
-
+		struct IModel;
 		struct Circle : ITagP<Circle> {
 			Vec2	vCenter;
 			float	fRadius;
@@ -55,6 +55,9 @@ namespace boom {
 			void getArcPoints(PointL& dst, float ang0, float ang1, float deep) const;
 			Circle operator * (const AMat32& m) const;
 			Circle operator * (float s) const;
+			void setBoundary(const IModel* p);
+			void appendBoundary(const IModel* p);
+			static Circle Boundary(const IModel* p, size_t n, size_t stride);
 
 			friend std::ostream& operator << (std::ostream& os, const Circle& c);
 		};
