@@ -291,6 +291,11 @@ namespace boom {
 			bool hit(const Vec2& p, float t=NEAR_THRESHOLD) const;
 			bool hit(const Segment& l, float t=NEAR_THRESHOLD) const;
 			bool hit(const AABB& ab, float t=NEAR_THRESHOLD) const;
+
+			void setBoundary(const IModel* p);
+			void appendBoundary(const IModel* p);
+			static AABB Boundary(const IModel* p, size_t n, size_t stride);
+
 			friend std::ostream& operator << (std::ostream& os, const AABB& a);
 		};
 		using AABBM = Model<AABB>;

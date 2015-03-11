@@ -113,6 +113,33 @@ namespace boom {
 			return Circle((minV + maxV) * 0.5f,
 								minV.distance(maxV));
 		}
+
+		void AABB::setBoundary(const IModel* p) {
+			minV.x = p->im_support(Vec2(-1,0)).x;
+			maxV.x = p->im_support(Vec2(1,0)).x;
+			minV.y = p->im_support(Vec2(0,-1)).y;
+			maxV.y = p->im_support(Vec2(0,1)).y;
+		}
+		void AABB::appendBoundary(const IModel* p) {
+			minV.x = std::min(minV.x, p->im_support(Vec2(-1,0)).x);
+			maxV.x = std::max(maxV.x, p->im_support(Vec2(1,0)).x);
+			minV.y = std::min(minV.y, p->im_support(Vec2(0,-1)).y);
+			maxV.y = std::max(maxV.y, p->im_support(Vec2(0,1)).y);
+		}
+		AABB AABB::Boundary(const IModel* p, size_t n, size_t stride) {
+			AssertT(Trap, n>0, (std::invalid_argument)(const char*), "size must not 0")
+
+			AABB a;
+			a.setBoundary(p);
+			auto pv = reinterpret_cast<uintptr_t>(p);
+			pv += stride;
+			while(n-- > 1) {
+				p = reinterpret_cast<const IModel*>(pv);
+				a.appendBoundary(p);
+				pv += stride;
+			}
+			return a;
+		}
 		std::ostream& operator << (std::ostream& os, const AABB& a) {
 			return os << "AABB(2d) [ min: " << a.minV << std::endl
 						<< "max: " << a.maxV << ']';
