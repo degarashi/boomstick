@@ -41,9 +41,10 @@ namespace boom {
 		void Circle::appendBoundary(const IModel* p) {
 			Circle c2 = p->im_getBVolume();
 			Vec2 toC2 = c2.vCenter - vCenter;
-			float len = toC2.normalize(),
-				  rd = fRadius - c2.fRadius;
-			if(len > rd) {
+			float lensq = toC2.len_sq(),
+				  rdsq = spn::Square(fRadius - c2.fRadius);
+			if(lensq > rdsq) {
+				toC2 *= spn::RSqrt(lensq);
 				// サポート写像で新たな円を算出
 				Vec2 tv0 = c2.vCenter + toC2 * c2.fRadius,
 					 tv1 = vCenter - toC2 * fRadius;
