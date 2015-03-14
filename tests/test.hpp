@@ -6,33 +6,28 @@ namespace boom {
 	namespace test {
 		template <class RD>
 		geo2d::PointM GenRPoint(RD& rd, const spn::RangeF& r={-1e4f, 1e4f}) {
-			auto rc = [&](){ return rd.template getUniform<float>(r); };
-			return geo2d::PointM(spn::test::GenRVec<2,false>(rc));
+			return geo2d::PointM(spn::test::GenR2Vec(rd, r));
 		}
 		template <class RD>
 		geo2d::CircleM GenRCircle(RD& rd, const spn::RangeF& rC={-1e4f, 1e4f},
 											const spn::RangeF& rR={0, 1e3f})
 		{
-			auto rc = [&](){ return rd.template getUniform<float>(rC); };
-			return geo2d::CircleM(spn::test::GenRVec<2,false>(rc),
+			return geo2d::CircleM(spn::test::GenR2Vec(rd, rC),
 							rd.template getUniform<float>(rR));
 		}
 		template <class RD>
 		geo2d::SegmentM GenRSegment(RD& rd, const spn::RangeF& rV={-1e3f, 1e3f}) {
-			auto rc = [&](){ return rd.template getUniform<float>(rV); };
-			auto rv = [&](){ return spn::test::GenRVec<2,false>(rc); };
+			auto rv = [&](){ return spn::test::GenR2Vec(rd, rV); };
 			return geo2d::SegmentM(rv(), rv());
 		}
 		template <class RD>
 		geo2d::PolyM GenRPoly(RD& rd, const spn::RangeF& rV={-1e3f, 1e3f}) {
-			auto rc = [&](){ return rd.template getUniform<float>(rV); };
-			auto rv = [&](){ return spn::test::GenRVec<2,false>(rc); };
+			auto rv = [&](){ return spn::test::GenR2Vec(rd, rV); };
 			return geo2d::PolyM(rv(), rv(), rv());
 		}
 		template <class RD>
 		geo2d::ConvexM GenRConvex(RD& rd, int n, const spn::RangeF& rV={-1e3f, 1e3f}) {
-			auto rc = [&](){ return rd.template getUniform<float>(rV); };
-			auto rv = [&](){ return spn::test::GenRVec<2,false>(rc); };
+			auto rv = [&](){ return spn::test::GenR2Vec(rd, rV); };
 			geo2d::PointL pl(n);
 			for(int i=0 ; i<n ; i++) {
 				Vec2 p;
@@ -53,24 +48,13 @@ namespace boom {
 		}
 		template <class RD>
 		geo2d::AABBM GenRAABB(RD& rd, const spn::RangeF& rV={-1e3f, 1e3f}) {
-			auto rc = [&](){ return rd.template getUniform<float>(rV); };
-			auto rv = [&](){ return spn::test::GenRVec<2,false>(rc); };
+			auto rv = [&](){ return spn::test::GenR2Vec(rd, rV); };
 			Vec2 v0 = rv(),
 				 v1 = rv(),
 				 tmp = v0;
 			v0.selectMin(v1);
 			v1.selectMax(tmp);
 			return geo2d::AABBM(v0, v1);
-		}
-		template <class RD>
-		spn::Vec2 GenR2Vec(RD& rd, const spn::RangeF& rV={-1e4f, 1e4f}) {
-			auto rc = [&](){ return rd.template getUniform<float>(rV); };
-			return spn::test::GenRVec<2,false>(rc);
-		}
-		template <class RD>
-		spn::Vec2 GenR2Dir(RD& rd) {
-			auto rc = [&](){ return rd.template getUniform<float>({-1.f, 1.f}); };
-			return spn::test::GenRDir<2,false>(rc);
 		}
 	}
 }
