@@ -1,7 +1,7 @@
 #ifdef WIN32
 	#include <intrin.h>
 #endif
-#include "test.hpp"
+#include "test2D.hpp"
 
 namespace boom {
 	namespace test {
