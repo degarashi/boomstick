@@ -3,7 +3,7 @@
 #include "geom2D.hpp"
 
 namespace boom {
-	namespace test {
+	namespace test2d {
 		template <class RD>
 		geo2d::PointM GenRPoint(RD& rd, const spn::RangeF& r={-1e4f, 1e4f}) {
 			return geo2d::PointM(spn::test::GenR2Vec(rd, r));

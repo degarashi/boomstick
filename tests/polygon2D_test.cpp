@@ -4,7 +4,7 @@
 #include "test2D.hpp"
 
 namespace boom {
-	namespace test {
+	namespace test2d {
 		using namespace spn::test;
 		using spn::Vec2;
 		using geo2d::PolyM;
