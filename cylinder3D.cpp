@@ -4,6 +4,8 @@
 
 namespace boom {
 	namespace geo3d {
+		Cylinder::Cylinder(const Capsule& c): Capsule(c) {}
+		Cylinder::Cylinder(const Vec3& p0, const Vec3& p1, float r): Capsule(p0, p1, r) {}
 		Sphere Cylinder::bs_getBVolume() const{
 			Sphere sp;
 			// 中心座標計算

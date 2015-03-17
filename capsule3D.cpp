@@ -3,6 +3,10 @@
 namespace boom {
 	namespace geo3d {
 		// --------------------- Capsule ---------------------
+		Capsule::Capsule(const Vec3& p0, const Vec3& p1, float r):
+			Segment(p0, p1), radius(r) {}
+		Capsule::Capsule(const Segment& s, float r):
+			Segment(s), radius(r) {}
 		Vec3 Capsule::bs_getCenter() const {
 			return bs_getCenter();
 		}

@@ -19,6 +19,16 @@ namespace boom {
 			return ab;
 		}
 
+		Mat33 AABB::bs_getInertia() const {
+			auto dv = vmax - vmin;
+			const float r12 = 1.f/12.f,
+						x2 = spn::Square(dv.x),
+						y2 = spn::Square(dv.y),
+						z2 = spn::Square(dv.z);
+			return Mat33(r12*(y2+z2), 0, 0,
+						0, r12*(z2+x2), 0,
+						0, 0, r12*(x2+y2));
+		}
 		Vec3 AABB::bs_getGCenter() const {
 			return (vmin + vmax) /2;
 		}

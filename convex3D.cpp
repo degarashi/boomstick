@@ -322,21 +322,13 @@ namespace boom {
 		// ------------------------- ConvexP -------------------------
 		ConvexP::ConvexP(): _rflg(~0) {}
 		ConvexP::ConvexP(const Vec3* src, int n): ConvexP() {
-			_vtx.resize(n);
-			for(int i=0 ; i<n ; i++)
-				_vtx[i] = src[i];
+			_vtx.assign(src, src+n);
+		}
+		ConvexP::ConvexP(const Vec3List& src): ConvexP() {
+			_vtx = src;
 		}
 		ConvexP::ConvexP(Vec3List&& src): ConvexP() {
-			_vtx.swap(src);
-		}
-		ConvexP::ConvexP(ConvexP&& c) {
-			swap(c);
-		}
-		void ConvexP::swap(ConvexP& c) noexcept {
-			std::swap(_rflg, c._rflg);
-			std::swap(_vGCenter, c._vGCenter);
-			std::swap(_vtx, c._vtx);
-			std::swap(_pface, c._pface);
+			_vtx = std::move(src);
 		}
 		int ConvexP::getNVtx() const { return _vtx.size(); }
 		void ConvexP::popVtx() {
@@ -570,6 +562,13 @@ namespace boom {
 			if(spn::Bit::ChClear(_rflg, RFL_POLYFACE))
 				quickHull();
 			return _pface;
+		}
+		std::ostream& operator << (std::ostream& os, const ConvexP& c) {
+			os << "Convex(3d) [";
+			int idx=0;
+			for(auto& p : c._vtx)
+				os << idx++ << ": " << p << std::endl;
+			return os << ']';
 		}
 	}
 }

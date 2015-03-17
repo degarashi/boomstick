@@ -487,7 +487,7 @@ namespace boom {
 			os << "Convex(2d) [";
 			int idx=0;
 			for(auto& p : c.point)
-				os << idx << ": " << p << std::endl;
+				os << idx++ << ": " << p << std::endl;
 			return os << ']';
 		}
 	}

@@ -297,6 +297,9 @@ namespace boom {
 		struct Capsule : ITagP<Capsule>, Segment {
 			float	radius;
 
+			Capsule() = default;
+			Capsule(const Vec3& p0, const Vec3& p1, float r);
+			Capsule(const Segment& s, float r);
 			// ---- cacheable functions ----
 			Vec3 bs_getCenter() const;
 			Vec3 bs_getGCenter() const;
@@ -422,6 +425,8 @@ namespace boom {
 			Vec3	center, dir;
 			float	radius, length;
 
+			Cone() = default;
+			Cone(const Vec3& c, const Vec3& d, float rad, float len);
 			// ---- cacheable functions ----
 			Vec3 bs_getGCenter() const;
 			Vec3 bs_getCenter() const;
@@ -578,8 +583,9 @@ namespace boom {
 			public:
 				ConvexP();
 				ConvexP(const Vec3* src, int n);
-				ConvexP(ConvexP&& c);
+				ConvexP(const Vec3List& src);
 				ConvexP(Vec3List&& src);
+				ConvexP(ConvexP&&) = default;
 
 				template <class... Args>
 				ConvexP(const Vec3& v, Args&&... args): _vtx(sizeof...(args)+1) {
@@ -594,7 +600,6 @@ namespace boom {
 				/*! ついでにポリゴンインデックスをキャッシュ */
 				bool quickHull();
 				bool hasPoint(const Vec3& p);
-				void swap(ConvexP& c) noexcept;
 
 				static Vec3 DualTransform(const Plane& plane);
 				static Plane DualTransform(const Vec3& p);
@@ -625,6 +630,9 @@ namespace boom {
 
 		//! 円柱
 		struct Cylinder : ITagP<Cylinder>, Capsule {
+			Cylinder() = default;
+			Cylinder(const Vec3& p0, const Vec3& p1, float r);
+			Cylinder(const Capsule& c);
 			// ---- cacheable functions ----
 			Vec3 bs_getGCenter() const;
 			Vec3 bs_getCenter() const;

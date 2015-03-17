@@ -72,6 +72,25 @@ namespace boom {
 			}
 		}
 
+		Cone::Cone(const Vec3& c, const Vec3& d, float rad, float len):
+			center(c), dir(d),
+			radius(rad), length(len)
+		{}
+		Sphere Cone::bs_getBVolume() const {
+			return Sphere{};
+		}
+		Mat33 Cone::bs_getInertia() const {
+			throw std::runtime_error("not implemented yet");
+		}
+		float Cone::bs_getArea() const {
+			return spn::Square(radius) * length * (1.f/3);
+		}
+		Vec3 Cone::bs_getCenter() const {
+			return center + dir * length * .5f;
+		}
+		Vec3 Cone::bs_getGCenter() const {
+			return center + dir * length * (1.f/4);
+		}
 		float Cone::getAngle() const {
 			float r = radius / length;
 			return std::atan(r);
