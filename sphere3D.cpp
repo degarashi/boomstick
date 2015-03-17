@@ -34,6 +34,9 @@ namespace boom {
 						radius);
 		}
 
+		bool Sphere::hit(const Vec3& p) const {
+			return center.dist_sq(p) <= spn::Square(radius);
+		}
 		bool Sphere::hit(const Sphere& s) const {
 			return center.dist_sq(s.center) <= spn::Square(radius + s.radius);
 		}

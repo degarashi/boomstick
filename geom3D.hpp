@@ -60,6 +60,7 @@ namespace boom {
 			Sphere operator * (const AMat43& m) const;
 
 			spn::none_t hit(...) const;
+			bool hit(const Vec3& p) const;
 			bool hit(const Ray& r) const;
 			bool hit(const Sphere& s) const;
 			bool hit(const Capsule& c) const;
@@ -235,6 +236,7 @@ namespace boom {
 			bool hit(const Line& ls) const;
 			friend std::ostream& operator << (std::ostream& os, const Line& l);
 		};
+		using LineM = Model<Line>;
 		//! 半直線
 		struct Ray : ITagP<Ray> {
 			Vec3	pos, dir;
