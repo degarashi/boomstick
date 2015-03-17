@@ -12,6 +12,14 @@
 #include "handle.hpp"
 
 namespace boom {
+	constexpr static float DOT_THRESHOLD = 1e-4f,		//!< 内積による表裏判定基準
+							NEAR_THRESHOLD = 1e-4f,		//!< 同じ座標と判断する基準
+							ZEROVEC_LENGTH = 1e-5f,
+							SQUARE_RATIO = 1e-2f,
+							DOT_THRESHOLD_SQ = DOT_THRESHOLD * SQUARE_RATIO,
+							NEAR_THRESHOLD_SQ = NEAR_THRESHOLD * SQUARE_RATIO,
+							ZEROVEC_LENGTH_SQ = ZEROVEC_LENGTH * SQUARE_RATIO;
+
 	using spn::Vec2; using spn::Vec3; using spn::Vec4;
 	using spn::AVec2; using spn::AVec3; using spn::AVec4;
 	using spn::Mat22; using spn::Mat32; using spn::Mat33; using spn::Mat43; using spn::Mat44;

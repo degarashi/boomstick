@@ -35,7 +35,7 @@ namespace boom {
 			float c[2];
 			c[0] = rc();
 			c[1] = 1.f-c[0];
-			if(s.from.dist_sq(s.to) < geo2d::NEAR_THRESHOLD_SQ)
+			if(s.from.dist_sq(s.to) < NEAR_THRESHOLD_SQ)
 				static_cast<Vec2&>(v) = s.from;
 			else
 				static_cast<Vec2&>(v) = s.from*c[0] + s.to*c[1];
@@ -46,7 +46,7 @@ namespace boom {
 			spn::RangeF rV{-1e3f, 1e3f};
 			SegmentM s(GenRSegment(rd, rV));
 			PointM p(GenRPoint(rd, rV));
-			constexpr auto NS = geo2d::NEAR_THRESHOLD_SQ;
+			constexpr auto NS = NEAR_THRESHOLD_SQ;
 			// 最近傍点がきちんと線分上に乗っているかのテスト
 			auto res = s.nearest(p);
 			switch(res.second) {
@@ -92,10 +92,10 @@ namespace boom {
 				  dot1 = dir.dot(s.to);
 
 			// サポート座標は線分の両端のどちらかと一致している筈
-			if(dist0 < geo2d::NEAR_THRESHOLD_SQ) {
+			if(dist0 < NEAR_THRESHOLD_SQ) {
 				// 更に両端の内、内積が大きい方と一致しているか
 				ASSERT_GE(dot0, dot1);
-			} else if(dist1 < geo2d::NEAR_THRESHOLD_SQ) {
+			} else if(dist1 < NEAR_THRESHOLD_SQ) {
 				ASSERT_GE(dot1, dot0);
 			} else {
 				ASSERT_TRUE(false);

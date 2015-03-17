@@ -1,5 +1,5 @@
 #pragma once
-#include "spinner/tests/test.hpp"
+#include "test.hpp"
 #include "geom2D.hpp"
 
 namespace boom {
@@ -27,24 +27,11 @@ namespace boom {
 		}
 		template <class RD>
 		geo2d::ConvexM GenRConvex(RD& rd, int n, const spn::RangeF& rV={-1e3f, 1e3f}) {
-			auto rv = [&](){ return spn::test::GenR2Vec(rd, rV); };
-			geo2d::PointL pl(n);
-			for(int i=0 ; i<n ; i++) {
-				Vec2 p;
-				bool bLoop;
-				do {
-					bLoop = false;
-					p = rv();
-					for(int j=0 ; j<i ; j++) {
-						if(pl[j].dist_sq(p) <= geo2d::NEAR_THRESHOLD_SQ) {
-							bLoop = true;
-							break;
-						}
-					}
-				} while(bLoop);
-				pl[i] = p;
-			}
-			return geo2d::ConvexM(geo2d::Convex::FromConcave(std::move(pl)));
+			return geo2d::ConvexM(
+					geo2d::Convex::FromConcave(
+						test::GenRVectors<2>(rd, n, rV, NEAR_THRESHOLD_SQ)
+					)
+			);
 		}
 		template <class RD>
 		geo2d::AABBM GenRAABB(RD& rd, const spn::RangeF& rV={-1e3f, 1e3f}) {
