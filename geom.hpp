@@ -83,43 +83,39 @@ namespace boom {
 	#define DEF_CASTFUNC(typ) virtual spn::Optional<typ&> castAs##typ() { return spn::none; } \
 			virtual spn::Optional<const typ&> castAs##typ() const { auto ref = const_cast<IModel*>(this)->castAs##typ(); \
 			if(ref) return *ref; return spn::none; }
+	//! コリジョンID取得関数を付加
+	/*! \tparam T	コリジョン構造体
+		\tparam CT	コリジョン型リスト(CType) */
 	template <class T, class CT>
 	struct ITagP_base {
 		static constexpr uint32_t GetCID() { return CT::template Find<T>::result; }
 	};
+	/*! \tparam T	コリジョン構造体 (ITagP_base)
+		\tparam MDL	Modelインタフェース */
 	template <class T, class MDL>
-	struct IModelP_base : MDL, T {
+	struct IModelP_base : virtual MDL, T {
 		using T::T;
+		IModelP_base() = default;
 		IModelP_base(T&& t): T(std::move(t)) {}
 		IModelP_base(const T& t): T(t) {}
 		const void* getCore() const override { return static_cast<const T*>(this); }
 		uint32_t getCID() const override { return T::GetCID(); }
 	};
-	//! IModelインタフェースの子ノードイテレータ
-	struct PtrItr {
-		const uint8_t*	ptr;
-		const size_t	stride;
+	struct IModelNode {
+		using Time_t = uint32_t;
 
-		PtrItr(): ptr(nullptr), stride(0) {}
-		PtrItr(const void* p, size_t st):
-			ptr(reinterpret_cast<const uint8_t*>(p)), stride(st) {}
-		PtrItr& operator ++ () {
-			ptr += stride;
-			return *this;
-		}
-		bool operator == (const PtrItr& pi) const {
-			return ptr == pi.ptr; }
-		bool operator != (const PtrItr& pi) const {
-			return !(operator == (pi)); }
-		template <class T>
-		const T* get() const {
-			return reinterpret_cast<const T*>(ptr); }
-		int operator - (const PtrItr& p) const {
-			auto diff = ptr - p.ptr;
-			return diff / stride;
-		}
+		virtual ~IModelNode() {}
+		virtual void imn_refresh(Time_t t);
+		virtual bool hasInner() const;
+		//! モデルの実体へのポインタ
+		virtual const void* getCore() const;
+		//! 最寄りのユーザーデータを取得
+		/*! このノードが持っていればそれを返し、無ければ親を遡って探す */
+		virtual void* getUserData();
+		virtual std::ostream& print(std::ostream& os) const = 0;
+		friend std::ostream& operator << (std::ostream& os, const IModelNode& mdl);
 	};
-	using MdlIP = std::pair<PtrItr, PtrItr>;
+
 	//! IModelとHMdlの差異吸収
 	template <class MMGR>
 	class VModel {
@@ -142,68 +138,6 @@ namespace boom {
 			}
 	};
 
-	//! 2D/3D共通
-	struct IModelNode {
-		IModelNode* pParent = nullptr;
-		virtual ~IModelNode() {}
-
-		//! 子に変更があった事を親ノードに(あれば)伝える
-		virtual void notifyChange();
-		virtual void applyChange();
-		//! 子ノードの取得
-		virtual MdlIP getInner() const;
-		virtual bool hasInner() const;
-		//! モデルの実体
-		virtual const void* getCore() const = 0;
-		//! 最寄りのユーザーデータを取得
-		/*! このノードが持っていればそれを返し、無ければ親を遡って探す */
-		virtual void* getUserData() const;
-		virtual std::ostream& print(std::ostream& os) const = 0;
-
-		friend std::ostream& operator << (std::ostream& os, const IModelNode& mdl);
-	};
-	//! 子ノードを含むIModelインタフェース
-	template <class IM, class CHILD, class COVER, class UD=spn::none_t>
-	struct ModelCh : IModelP_base<CHILD, IM> {
-		using ChL = std::vector<CHILD>;
-		COVER	_cover;
-		ChL		_chL;
-		bool	_bChange = false;
-		UD		_udata;
-
-		template <class MC>
-		void addChild(MC&& mc) {
-			_chL.push_back(std::forward<MC>(mc));
-			_bChange = true;
-		}
-		CHILD& operator [](int n) { return _chL[n]; }
-		const CHILD& operator [](int n) const { return _chL[n]; }
-
-		MdlIP getInner() const override {
-			if(_chL.empty())
-				return MdlIP();
-			int nC = _chL.size();
-			return MdlIP(MdlItr(&_chL[0], sizeof(CHILD)), MdlItr(&_chL[nC-1], sizeof(CHILD)));
-		}
-		void applyChange() override {
-			if(_bChange) {
-				_bChange = false;
-				for(auto& c : _chL)
-					c.applyChange();
-				auto mip = getInner();
-				COVER::Cover(mip.first, mip.second);
-			}
-		}
-		virtual void* getUserData() {
-			return _getUserData(std::is_same<spn::none_t, UD>());
-		}
-		void* _getUserData(std::true_type) {
-			return (IM::pParent) ? IM::pParent->getUserData() : nullptr;
-		}
-		void* _getUserData(std::false_type) {
-			return &_udata;
-		}
-	};
 	//! ラインの位置を示す
 	enum class LinePos {
 		Begin,		//!< 始点
@@ -469,17 +403,16 @@ namespace boom {
 			\param[in] bSwap 左右を入れ替えて判定している場合はtrue */
 		static bool HitL(const IModel* mdl0, const IModel* mdl1, bool bSwap) {
 			auto in = mdl0->getInner();
-			if(in.first != in.second) {
+			if(in) {
 				// ここで判定関数を取得
 				// Innerに含まれる子オブジェクトは全て同じ型 という前提
-				ColFunc cf = GetCFunc(in.first.template get<IModel>()->getCID(), mdl1->getCID());
-				const void* core1 = mdl1->getCore();
+				ColFunc cf = GetCFunc(in.get()->getCID(), mdl1->getCID());
 				do {
-					if(cf(in.first.template get<IModel>()->getCore(), core1)) {
-						if(HitL(mdl1, in.first.template get<IModel>(), false))
+					if(cf(in.get(), mdl1)) {
+						if(HitL(mdl1, in.get(), false))
 							return true;
 					}
-				} while(++in.first != in.second);
+				} while(++in);
 			} else {
 				if(bSwap)
 					return true;

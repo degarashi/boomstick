@@ -55,6 +55,21 @@ namespace boom {
 			friend std::ostream& operator << (std::ostream& os, const Circle& c);
 		};
 
+		class TfBase;
+		using TfBase_SP = std::shared_ptr<TfBase>;
+		//! IModelインタフェースの子ノードイテレータ
+		struct MdlItr {
+			TfBase_SP	_sp;
+
+			MdlItr() = default;
+			MdlItr(const TfBase_SP& sp);
+
+			MdlItr& operator ++ ();
+			bool operator == (const MdlItr& m) const;
+			bool operator != (const MdlItr& m) const;
+			explicit operator bool () const;
+			const TfBase* get() const;
+		};
 		struct IModel : ::boom::IModelNode {
 			// ---- cacheable functions ----
 			virtual Vec2 im_getCenter() const = 0;
@@ -69,6 +84,7 @@ namespace boom {
 			//! 図形と点の判定
 			virtual bool im_hitPoint(const Vec2& p, float t=NEAR_THRESHOLD) const = 0;
 			virtual uint32_t getCID() const = 0;
+			virtual MdlItr getInner() const;
 
 			virtual Vec2 toLocal(const Vec2& v) const { return v; }
 			virtual Vec2 toLocalDir(const Vec2& v) const { return v; }
@@ -89,6 +105,7 @@ namespace boom {
 			using base_t = IModelP_base<T, IModel>;
 			using base_t::base_t;
 
+			Model() = default;
 			Model(const T& t): base_t(t) {}
 			Model(T&& t): base_t(std::move(t)) {}
 			// 各種ルーチンの中継
@@ -106,29 +123,70 @@ namespace boom {
 		}
 		using CircleM = Model<Circle>;
 
-		class TfNode : public spn::CheckAlign<16,TfNode>, public spn::TreeNode<TfNode> {
+		class TfBase : public spn::CheckAlign<16,TfBase>,
+						public spn::TreeNode<TfBase>,
+						virtual public IModel
+		{
 			private:
+				friend class spn::TreeNode<TfBase>;
 				#define SEQ_TFNODE \
 					((Pose)(spn::Pose2D)) \
 					((NodeAccum)(uint32_t)) \
 					((Global)(spn::AMat33)(Pose)(NodeAccum))
-				RFLAG_S(TfNode, SEQ_TFNODE)
-				void onParentChange(const SP&, const SP&);
+				RFLAG_S(TfBase, SEQ_TFNODE)
+			protected:
+				void* _getUserData(void*, std::true_type);
+				void* _getUserData(void* udata, std::false_type);
+				virtual void onChildAdded(const SP& node);
+				virtual void onChildRemove(const SP& node);
 			public:
 				RFLAG_SETMETHOD_S(SEQ_TFNODE)
 				RFLAG_GETMETHOD_S(SEQ_TFNODE)
 				RFLAG_REFMETHOD_S(SEQ_TFNODE)
 				#undef SEQ_TFNODE
-				friend std::ostream& operator << (std::ostream&, const TfNode&);
+				//! 子ノードの取得
+				MdlItr getInner() const override;
+				bool hasInner() const override;
+				friend std::ostream& operator << (std::ostream&, const TfBase&);
 		};
-		#define mgr_tf2d (::boom::geo2d::TfMgr::_ref())
-		class TfMgr : public spn::ResMgrA<spn::Pose2D, TfMgr> {};
+		template <class Boundary, class Ud>
+		class TfNode_base : public TfBase, Model<Boundary> {
+			private:
+				Boundary	_boundary;
+				Ud			_udata;
+			public:
+				/*! ユーザーデータがvoidの時は親ノードのデータを返す */
+				void* getUserData() override {
+					return _getUserData(&_udata, std::is_same<spn::none_t, Ud>());
+				}
+		};
+		template <class Boundary, class Ud=spn::none_t>
+		class TfNode_Static : public TfNode_base<Boundary, Ud> {
+			public:
+		};
+		template <class Boundary, class Ud=spn::none_t>
+		class TfNode_Dynamic : public TfNode_base<Boundary, Ud> {
+			private:
+				using base_t = TfNode_base<Boundary, Ud>;
+				using Time_t = typename base_t::Time_t;
+				using SP = typename base_t::SP;
+				Time_t		_time;
+			protected:
+				void onChildAdded(const SP& node) override;
+				void onChildRemove(const SP& node) override;
+			public:
+				void imn_refresh(Time_t t) override;
+		};
 
+		#define mgr_tf2d (::boom::geo2d::TfMgr::_ref())
+		class TfMgr : public spn::ResMgrA<TfBase_SP, TfMgr> {};
+
+		// 座標変換を親からかけるにはTreeNodeで繋がってる必要がある
 		//! 座標変換ありのモデル基底
 		class TModel : public IModel {
 			private:
-				HLMdl					_hlMdl;
-				HLTf					_hlTf;
+				HLMdl					_hlMdl;		// 単体 or 子ノード
+				HLTf					_hlTf;		// このノード自体にかかる変換
 				mutable spn::AMat32		_mToLocal,
 										_mToWorld;
 			public:
@@ -153,9 +211,9 @@ namespace boom {
 				uint32_t getCID() const override;
 				const void* getCore() const override;
 		};
+
 		using LNear = std::pair<Vec2, LinePos>;
 		struct Point : Vec2, ITagP<Point> {
-
 			// ---- cacheable functions ----
 			const float& bs_getArea() const;
 			const float& bs_getInertia() const;

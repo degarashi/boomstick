@@ -16,5 +16,24 @@ namespace boom {
 			NearestPoint(ls0, ls1, fn0, fn1);
 			return res0 & res1;
 		}
+
+		// ------------- MdlItr -------------
+		MdlItr::MdlItr(const TfBase_SP& sp): _sp(sp) {}
+		MdlItr& MdlItr::operator ++ () {
+			_sp = _sp->getSibling();
+			return *this;
+		}
+		bool MdlItr::operator == (const MdlItr& m) const {
+			return _sp == m._sp;
+		}
+		bool MdlItr::operator != (const MdlItr& m) const {
+			return !(operator == (m));
+		}
+		MdlItr::operator bool () const {
+			return static_cast<bool>(_sp);
+		}
+		const TfBase* MdlItr::get() const {
+			return _sp.get();
+		}
 	}
 }

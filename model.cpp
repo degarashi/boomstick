@@ -14,15 +14,17 @@ namespace boom {
 	float Area_x2(const Vec3& v0, const Vec3& v1) {
 		return v0.cross(v1).length();
 	}
-	// --------------------- IModelNode ---------------------
-	void IModelNode::notifyChange() {
-		if(pParent)
-			pParent->notifyChange();
+	// -------------------------- IModelNode --------------------------
+	void IModelNode::imn_refresh(Time_t t) {}
+	bool IModelNode::hasInner() const {
+		return false;
 	}
-	void IModelNode::applyChange() {}
-	MdlIP IModelNode::getInner() const { return MdlIP(); }
-	bool IModelNode::hasInner() const { return false; }
-	void* IModelNode::getUserData() const { return nullptr; }
+	const void* IModelNode::getCore() const {
+		return this;
+	}
+	void* IModelNode::getUserData() {
+		return nullptr;
+	}
 	std::ostream& operator << (std::ostream& os, const IModelNode& mdl) {
 		return mdl.print(os);
 	}
@@ -41,6 +43,9 @@ namespace boom {
 		}
 	}
 	namespace geo2d {
+		MdlItr IModel::getInner() const {
+			return MdlItr();
+		}
 		const AMat32 IModel::cs_idMat(AMat32::TagIdentity);
 		const AMat32& IModel::getToLocalI() const {
 			auto op = getToLocal();
@@ -51,6 +56,9 @@ namespace boom {
 			auto op = getToWorld();
 			if(op) return *op;
 			return cs_idMat;
+		}
+		std::ostream& operator << (std::ostream& os, const IModel& mdl) {
+			return mdl.print(os);
 		}
 /*
 		// -------------------------- TModel --------------------------
