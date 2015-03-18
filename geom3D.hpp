@@ -67,7 +67,9 @@ namespace boom {
 			bool hit(const Line& ls) const;
 			bool hit(const Segment& s) const;
 
-			static Sphere Cover(PtrItr mI, PtrItr mE);
+			void setBoundary(const IModel* m);
+			void appendBoundary(const IModel* m);
+			static Sphere Boundary(const IModel* m, size_t n, size_t stride);
 			friend std::ostream& operator << (std::ostream& os, const Sphere& s);
 		};
 		struct IModel : ::boom::IModelNode {

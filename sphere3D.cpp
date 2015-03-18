@@ -10,22 +10,35 @@ namespace boom {
 		Vec3 Sphere::support(const Vec3& dir) const {
 			return center + dir*radius;
 		}
-		Sphere Sphere::Cover(PtrItr mI, PtrItr mE) {
-			Sphere sp(Vec3(0),0);
-			int n = mE - mI;
-			if(n == 0)
-				return sp;
+		void Sphere::setBoundary(const IModel* m) {
+			*this = m->im_getBVolume();
+		}
+		void Sphere::appendBoundary(const IModel* m) {
+			Sphere s2 = m->im_getBVolume();
+			Vec3 toS2 = s2.center - center;
+			float lensq = toS2.len_sq(),
+				  rdsq = spn::Square(radius  - s2.radius);
+			// 現在の球で収まるか？
+			if(lensq > rdsq) {
+				toS2 *= spn::RSqrt(lensq);
+				// 新たな球を算出
+				Vec3 tv0 = s2.center + toS2 * s2.radius,
+					 tv1 = center - toS2 * radius;
+				center = (tv0 + tv1) * .5f;
+				radius = tv0.distance(tv1) * .5;
+			}
+		}
+		Sphere Sphere::Boundary(const IModel* m, size_t n, size_t stride) {
+			AssertT(Trap, n>0, (std::invalid_argument)(const char*), "size must not 0")
 
-			auto mI2 = mI;
-			while(mI2 != mE)
-				sp.center += mI2.get<IModel>()->im_getCenter();
-			sp.center /= n;
-
-			while(mI != mE) {
-				Sphere s2 = mI.get<IModel>()->im_getBVolume();
-				float d = sp.center.distance(mI.get<IModel>()->im_getCenter()) + s2.radius/2;
-				if(sp.radius < d)
-					sp.radius = d;
+			Sphere sp;
+			sp.setBoundary(m);
+			auto pv = reinterpret_cast<uintptr_t>(m);
+			pv += stride;
+			while(n-- > 1) {
+				m = reinterpret_cast<const IModel*>(pv);
+				sp.appendBoundary(m);
+				pv += stride;
 			}
 			return sp;
 		}
