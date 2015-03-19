@@ -139,6 +139,7 @@ namespace boom {
 				void* _getUserData(void* udata, std::false_type);
 				virtual void onChildAdded(const SP& node);
 				virtual void onChildRemove(const SP& node);
+				virtual void onParentChange(const SP& from, const SP& to);
 			public:
 				RFLAG_SETMETHOD_S(SEQ_TFNODE)
 				RFLAG_GETMETHOD_S(SEQ_TFNODE)
@@ -151,9 +152,9 @@ namespace boom {
 		};
 		template <class Boundary, class Ud>
 		class TfNode_base : public TfBase, Model<Boundary> {
-			private:
-				Boundary	_boundary;
-				Ud			_udata;
+			protected:
+				mutable Boundary	_boundary;
+				Ud					_udata;
 			public:
 				/*! ユーザーデータがvoidの時は親ノードのデータを返す */
 				void* getUserData() override {
@@ -161,8 +162,53 @@ namespace boom {
 				}
 		};
 		template <class Boundary, class Ud=spn::none_t>
-		class TfNode_Static : public TfNode_base<Boundary, Ud> {
+		class TfNode_Leaf : public TfNode_base<Boundary, Ud> {
+			private:
+				using base_t = TfNode_base<Boundary, Ud>;
 			public:
+				TfNode_Leaf() = default;
+				TfNode_Leaf(const Boundary& b) {
+					base_t::_boundary = b;
+				}
+				Boundary& refBoundary() {
+					return base_t::_boundary;
+				}
+		};
+		template <class Boundary, class Ud=spn::none_t>
+		class TfNode_Static : public TfNode_base<Boundary, Ud> {
+			private:
+				using base_t = TfNode_base<Boundary, Ud>;
+				using SP = typename base_t::SP;
+				using Time_t = typename base_t::Time_t;
+				mutable bool	_bChanged = true,
+								_bValid;
+			protected:
+				void onChildAdded(const TfBase::SP& node) override {
+					_bChanged = true;
+					base_t::onChildAdded(node);
+				}
+				void onChildRemove(const TfBase::SP& node) override {
+					_bChanged = true;
+					base_t::onChildRemove(node);
+				}
+			public:
+				bool imn_refresh(Time_t /*t*/) const override {
+					if(_bChanged) {
+						_bChanged = false;
+						std::vector<const IModel*> pm;
+						// 子ノードをリストアップ
+						this->iterateDepthFirst([&pm](auto& node, int /*depth*/){
+							pm.push_back(&node);
+							return TfBase::Iterate::Next;
+						});
+						if((_bValid = !pm.empty())) {
+							// 境界ボリュームの更新
+							base_t::_boundary = Boundary::Boundary(pm[0], pm.size(), sizeof(const IModel*));
+						}
+						// 子ノードが無い場合は常にヒットしない
+					}
+					return _bValid;
+				}
 		};
 		template <class Boundary, class Ud=spn::none_t>
 		class TfNode_Dynamic : public TfNode_base<Boundary, Ud> {
@@ -170,12 +216,38 @@ namespace boom {
 				using base_t = TfNode_base<Boundary, Ud>;
 				using Time_t = typename base_t::Time_t;
 				using SP = typename base_t::SP;
-				Time_t		_time;
+				using Time_OP = spn::Optional<Time_t>;
+				mutable Time_OP		_opTime = 0;
+				mutable bool		_bValid;
 			protected:
-				void onChildAdded(const SP& node) override;
-				void onChildRemove(const SP& node) override;
+				void onChildAdded(const SP& node) override {
+					_opTime = spn::none;
+					base_t::onChildAdded(node);
+				}
+				void onChildRemove(const SP& node) override {
+					_opTime = spn::none;
+					base_t::onChildRemove(node);
+				}
 			public:
-				void imn_refresh(Time_t t) override;
+				bool imn_refresh(Time_t t) const override {
+					// 更新時刻が古い時のみ処理を行う
+					if(!_opTime || *_opTime < t) {
+						_opTime = t;
+
+						std::vector<const IModel*> pm;
+						// 子ノードをリストアップ
+						this->iterateDepthFirst([&pm](auto& node, int /*depth*/){
+							pm.push_back(&node);
+							return TfBase::Iterate::Next;
+						});
+						if((_bValid = !pm.empty())) {
+							// 境界ボリュームの更新
+							base_t::_boundary = Boundary::Boundary(pm[0], pm.size(), sizeof(const IModel*));
+						}
+						// 子ノードが無い場合は常にヒットしない
+					}
+					return _bValid;
+				}
 		};
 
 		#define mgr_tf2d (::boom::geo2d::TfMgr::_ref())

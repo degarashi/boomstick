@@ -105,7 +105,7 @@ namespace boom {
 		using Time_t = uint32_t;
 
 		virtual ~IModelNode() {}
-		virtual void imn_refresh(Time_t t);
+		virtual bool imn_refresh(Time_t t) const;
 		virtual bool hasInner() const;
 		//! モデルの実体へのポインタ
 		virtual const void* getCore() const;
@@ -404,15 +404,18 @@ namespace boom {
 		static bool HitL(const IModel* mdl0, const IModel* mdl1, bool bSwap) {
 			auto in = mdl0->getInner();
 			if(in) {
-				// ここで判定関数を取得
-				// Innerに含まれる子オブジェクトは全て同じ型 という前提
-				ColFunc cf = GetCFunc(in.get()->getCID(), mdl1->getCID());
-				do {
-					if(cf(in.get(), mdl1)) {
-						if(HitL(mdl1, in.get(), false))
-							return true;
-					}
-				} while(++in);
+				// TODO: 時刻修正
+				if(mdl0->imn_refresh(0)) {
+					// ここで判定関数を取得
+					// Innerに含まれる子オブジェクトは全て同じ型 という前提
+					ColFunc cf = GetCFunc(in.get()->getCID(), mdl1->getCID());
+					do {
+						if(cf(in.get(), mdl1)) {
+							if(HitL(mdl1, in.get(), false))
+								return true;
+						}
+					} while(++in);
+				}
 			} else {
 				if(bSwap)
 					return true;

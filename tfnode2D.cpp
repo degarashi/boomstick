@@ -3,10 +3,9 @@
 namespace boom {
 	namespace geo2d {
 		// --------------- TfBase ---------------
-		void TfBase::onChildAdded(const SP& /*node*/) {
-			++this->refNodeAccum();
-		}
-		void TfBase::onChildRemove(const SP& /*node*/) {
+		void TfBase::onChildAdded(const SP& /*node*/) {}
+		void TfBase::onChildRemove(const SP& /*node*/) {}
+		void TfBase::onParentChange(const SP& /*from*/, const SP& /*to*/) {
 			++this->refNodeAccum();
 		}
 		uint32_t TfBase::_refresh(spn::AMat33& m, Global*) const {
