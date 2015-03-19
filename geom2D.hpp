@@ -151,7 +151,7 @@ namespace boom {
 				friend std::ostream& operator << (std::ostream&, const TfBase&);
 		};
 		template <class Boundary, class Ud>
-		class TfNode_base : public TfBase, Model<Boundary> {
+		class TfNode_base : public TfBase, public Model<Boundary> {
 			protected:
 				mutable Boundary	_boundary;
 				Ud					_udata;
