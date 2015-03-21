@@ -20,11 +20,12 @@ namespace boom {
 		TEST_F(Narrow, Dim2) {
 			auto rd = getRand();
 
+			;
 			// TODO: ランダムに当たり判定階層構造を作る
 			// とりあえずは単純な階層構造でテスト
 			auto fnN = [](){ return std::make_shared<geo2d::TfNode_Static<geo2d::Circle>>(); };
-			auto fnL = [&rd](){ return std::make_shared<geo2d::TfNode_Leaf<geo2d::Circle>>(test2d::GenRCircle(rd)); };
-			auto fnLen = [&]() { return rd.template getUniform<int>({1, 4}); };
+			auto fnL = [&rd](){ return std::make_shared<geo2d::TfLeaf<geo2d::Circle>>(test2d::GenRCircle(rd)); };
+			auto fnLen = [&]() { return rd.template getUniform<int>({1, 64}); };
 
 			auto c0 = fnN(),
 				 c1 = fnN();
@@ -39,6 +40,8 @@ namespace boom {
 			bool b0 = false;
 			auto v0 = c0->plainPtr(),
 				 v1 = c1->plainPtr();
+			v0.erase(v0.begin());
+			v1.erase(v1.begin());
 			for(auto* p0 : v0) {
 				for(auto* p1 : v1) {
 					if((b0 |= Narrow_t::Hit(p0, p1)))

@@ -390,6 +390,9 @@ namespace boom {
 		}
 		//! 2つの物体(階層構造可)を当たり判定
 		static bool Hit(const IModel* mdl0, const IModel* mdl1) {
+			// TODO: 時刻修正
+			mdl0->imn_refresh(0);
+			mdl1->imn_refresh(0);
 			if(GetCFunc(mdl0->getCID(), mdl1->getCID())(mdl0, mdl1)) {
 				if(mdl0->hasInner() | mdl1->hasInner())
 					return HitL(mdl1, mdl0, false);

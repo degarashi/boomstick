@@ -52,18 +52,26 @@ namespace boom {
 				fRadius = tv0.distance(tv1) * .5;
 			}
 		}
-		Circle Circle::Boundary(const IModel* p, size_t n, size_t stride) {
+		Circle Circle::Boundary(const void* pp, size_t n, size_t stride) {
+			AssertT(Trap, n>0, (std::invalid_argument)(const char*), "size must not 0")
+
+			auto pv = reinterpret_cast<uintptr_t>(pp);
+			Circle c;
+			c.setBoundary(reinterpret_cast<const IModel*>(pv));
+			pv += stride;
+			while(n-- > 1) {
+				c.appendBoundary(reinterpret_cast<const IModel*>(pv));
+				pv += stride;
+			}
+			return c;
+		}
+		Circle Circle::Boundary(const IModel** p, size_t n) {
 			AssertT(Trap, n>0, (std::invalid_argument)(const char*), "size must not 0")
 
 			Circle c;
-			c.setBoundary(p);
-			auto pv = reinterpret_cast<uintptr_t>(p);
-			pv += stride;
-			while(n-- > 1) {
-				p = reinterpret_cast<const IModel*>(pv);
-				c.appendBoundary(p);
-				pv += stride;
-			}
+			c.setBoundary(*p);
+			while(n-- > 1)
+				c.appendBoundary(*(++p));
 			return c;
 		}
 		// 半径のみ倍率をかける

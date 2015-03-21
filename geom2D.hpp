@@ -50,7 +50,8 @@ namespace boom {
 			Circle operator * (float s) const;
 			void setBoundary(const IModel* p);
 			void appendBoundary(const IModel* p);
-			static Circle Boundary(const IModel* p, size_t n, size_t stride);
+			static Circle Boundary(const IModel** p, size_t n );
+			static Circle Boundary(const void* p, size_t n, size_t stride);
 
 			friend std::ostream& operator << (std::ostream& os, const Circle& c);
 		};
@@ -123,17 +124,11 @@ namespace boom {
 		}
 		using CircleM = Model<Circle>;
 
-		class TfBase : public spn::CheckAlign<16,TfBase>,
-						public spn::TreeNode<TfBase>,
+		class TfBase : public spn::TreeNode<TfBase>,
 						virtual public IModel
 		{
 			private:
 				friend class spn::TreeNode<TfBase>;
-				#define SEQ_TFNODE \
-					((Pose)(spn::Pose2D)) \
-					((NodeAccum)(uint32_t)) \
-					((Global)(spn::AMat33)(Pose)(NodeAccum))
-				RFLAG_S(TfBase, SEQ_TFNODE)
 			protected:
 				void* _getUserData(void*, std::true_type);
 				void* _getUserData(void* udata, std::false_type);
@@ -141,37 +136,52 @@ namespace boom {
 				virtual void onChildRemove(const SP& node);
 				virtual void onParentChange(const SP& from, const SP& to);
 			public:
-				RFLAG_SETMETHOD_S(SEQ_TFNODE)
-				RFLAG_GETMETHOD_S(SEQ_TFNODE)
-				RFLAG_REFMETHOD_S(SEQ_TFNODE)
-				#undef SEQ_TFNODE
 				//! 子ノードの取得
 				MdlItr getInner() const override;
 				bool hasInner() const override;
-				friend std::ostream& operator << (std::ostream&, const TfBase&);
 		};
-		template <class Boundary, class Ud>
-		class TfNode_base : public TfBase, public Model<Boundary> {
-			protected:
-				mutable Boundary	_boundary;
+		class TfLeaf_base : public spn::CheckAlign<16, TfLeaf_base>,
+							public TfBase
+		{
+			private:
+				#define SEQ_TFLEAF \
+					((Pose)(spn::Pose2D)) \
+					((NodeAccum)(uint32_t)) \
+					((Global)(spn::AMat33)(Pose)(NodeAccum))
+				RFLAG_S(TfLeaf_base, SEQ_TFLEAF)
+			public:
+				RFLAG_SETMETHOD_S(SEQ_TFLEAF)
+				RFLAG_GETMETHOD_S(SEQ_TFLEAF)
+				RFLAG_REFMETHOD_S(SEQ_TFLEAF)
+				#undef SEQ_TFLEAF
+				friend std::ostream& operator << (std::ostream&, const TfLeaf_base&);
+		};
+		template <class Shape, class Ud=spn::none_t>
+		class TfLeaf : public TfLeaf_base,
+						public Model<Shape>
+		{
+			private:
+				using model_t = Model<Shape>;
 				Ud					_udata;
 			public:
+				using model_t::model_t;
 				/*! ユーザーデータがvoidの時は親ノードのデータを返す */
 				void* getUserData() override {
 					return _getUserData(&_udata, std::is_same<spn::none_t, Ud>());
 				}
 		};
-		template <class Boundary, class Ud=spn::none_t>
-		class TfNode_Leaf : public TfNode_base<Boundary, Ud> {
-			private:
-				using base_t = TfNode_base<Boundary, Ud>;
+		template <class Boundary, class Ud>
+		class TfNode_base : public TfBase,
+							public Model<Boundary>
+		{
+			protected:
+				using model_t = Model<Boundary>;
+				Ud					_udata;
 			public:
-				TfNode_Leaf() = default;
-				TfNode_Leaf(const Boundary& b) {
-					base_t::_boundary = b;
-				}
-				Boundary& refBoundary() {
-					return base_t::_boundary;
+				using model_t::model_t;
+				/*! ユーザーデータがvoidの時は親ノードのデータを返す */
+				void* getUserData() override {
+					return _getUserData(&_udata, std::is_same<spn::none_t, Ud>());
 				}
 		};
 		template <class Boundary, class Ud=spn::none_t>
@@ -197,13 +207,16 @@ namespace boom {
 						_bChanged = false;
 						std::vector<const IModel*> pm;
 						// 子ノードをリストアップ
-						this->iterateDepthFirst([&pm](auto& node, int /*depth*/){
+						this->iterateDepthFirst([&pm](auto& node, int depth){
+							if(depth == 0)
+								return TfBase::Iterate::StepIn;
 							pm.push_back(&node);
 							return TfBase::Iterate::Next;
 						});
 						if((_bValid = !pm.empty())) {
 							// 境界ボリュームの更新
-							base_t::_boundary = Boundary::Boundary(pm[0], pm.size(), sizeof(const IModel*));
+							auto* core = const_cast<Boundary*>(reinterpret_cast<const Boundary*>(base_t::getCore()));
+							*core = Boundary::Boundary(&pm[0], pm.size());
 						}
 						// 子ノードが無い場合は常にヒットしない
 					}
@@ -236,13 +249,16 @@ namespace boom {
 
 						std::vector<const IModel*> pm;
 						// 子ノードをリストアップ
-						this->iterateDepthFirst([&pm](auto& node, int /*depth*/){
+						this->iterateDepthFirst([&pm](auto& node, int depth){
+							if(depth == 0)
+								return TfBase::Iterate::StepIn;
 							pm.push_back(&node);
 							return TfBase::Iterate::Next;
 						});
 						if((_bValid = !pm.empty())) {
 							// 境界ボリュームの更新
-							base_t::_boundary = Boundary::Boundary(pm[0], pm.size(), sizeof(const IModel*));
+							auto* core = const_cast<Boundary*>(reinterpret_cast<const Boundary*>(base_t::getCore()));
+							*core = Boundary::Boundary(&pm[0], pm.size());
 						}
 						// 子ノードが無い場合は常にヒットしない
 					}
@@ -417,7 +433,8 @@ namespace boom {
 
 			void setBoundary(const IModel* p);
 			void appendBoundary(const IModel* p);
-			static AABB Boundary(const IModel* p, size_t n, size_t stride);
+			static AABB Boundary(const IModel** p, size_t n );
+			static AABB Boundary(const void* p, size_t n, size_t stride);
 
 			friend std::ostream& operator << (std::ostream& os, const AABB& a);
 		};

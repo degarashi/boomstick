@@ -126,19 +126,27 @@ namespace boom {
 			minV.y = std::min(minV.y, p->im_support(Vec2(0,-1)).y);
 			maxV.y = std::max(maxV.y, p->im_support(Vec2(0,1)).y);
 		}
-		AABB AABB::Boundary(const IModel* p, size_t n, size_t stride) {
+		AABB AABB::Boundary(const void* pp, size_t n, size_t stride) {
 			AssertT(Trap, n>0, (std::invalid_argument)(const char*), "size must not 0")
 
-			AABB a;
-			a.setBoundary(p);
-			auto pv = reinterpret_cast<uintptr_t>(p);
+			auto pv = reinterpret_cast<uintptr_t>(pp);
+			AABB c;
+			c.setBoundary(reinterpret_cast<const IModel*>(pv));
 			pv += stride;
 			while(n-- > 1) {
-				p = reinterpret_cast<const IModel*>(pv);
-				a.appendBoundary(p);
+				c.appendBoundary(reinterpret_cast<const IModel*>(pv));
 				pv += stride;
 			}
-			return a;
+			return c;
+		}
+		AABB AABB::Boundary(const IModel** p, size_t n) {
+			AssertT(Trap, n>0, (std::invalid_argument)(const char*), "size must not 0")
+
+			AABB c;
+			c.setBoundary(*p);
+			while(n-- > 1)
+				c.appendBoundary(*(++p));
+			return c;
 		}
 		std::ostream& operator << (std::ostream& os, const AABB& a) {
 			return os << "AABB(2d) [ min: " << a.minV << std::endl
