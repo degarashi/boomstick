@@ -28,20 +28,6 @@ namespace boom {
 				radius = tv0.distance(tv1) * .5;
 			}
 		}
-		Sphere Sphere::Boundary(const IModel* m, size_t n, size_t stride) {
-			AssertT(Trap, n>0, (std::invalid_argument)(const char*), "size must not 0")
-
-			Sphere sp;
-			sp.setBoundary(m);
-			auto pv = reinterpret_cast<uintptr_t>(m);
-			pv += stride;
-			while(n-- > 1) {
-				m = reinterpret_cast<const IModel*>(pv);
-				sp.appendBoundary(m);
-				pv += stride;
-			}
-			return sp;
-		}
 		Sphere Sphere::operator * (const AMat43& m) const {
 			return Sphere(center.asVec4(1) * m,
 						radius);

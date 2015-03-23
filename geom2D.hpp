@@ -7,6 +7,7 @@
 #include <memory>
 #include "spinner/structure/treenode.hpp"
 #include "spinner/rflag.hpp"
+#include "boundary.hpp"
 
 namespace boom {
 	namespace geo2d {
@@ -49,10 +50,10 @@ namespace boom {
 			void getArcPoints(PointL& dst, float ang0, float ang1, float deep) const;
 			Circle operator * (const AMat32& m) const;
 			Circle operator * (float s) const;
+
+			// ---- for MakeBoundary ----
 			void setBoundary(const IModel* p);
 			void appendBoundary(const IModel* p);
-			static Circle Boundary(const IModel** p, size_t n );
-			static Circle Boundary(const void* p, size_t n, size_t stride);
 
 			friend std::ostream& operator << (std::ostream& os, const Circle& c);
 		};
@@ -140,6 +141,7 @@ namespace boom {
 				//! 子ノードの取得
 				MdlItr getInner() const override;
 				bool hasInner() const override;
+				virtual bool isLeaf() const { return false; }
 		};
 		class TfLeaf_base : public spn::CheckAlign<16, TfLeaf_base>,
 							public TfBase
@@ -170,6 +172,7 @@ namespace boom {
 				void* getUserData() override {
 					return _getUserData(&_udata, std::is_same<spn::none_t, Ud>());
 				}
+				bool isLeaf() const override { return true; }
 		};
 		template <class Boundary, class Ud>
 		class TfNode_base : public TfBase,
@@ -203,7 +206,7 @@ namespace boom {
 					base_t::onChildRemove(node);
 				}
 			public:
-				bool imn_refresh(Time_t /*t*/) const override {
+				bool imn_refresh(Time_t t) const override {
 					if(_bChanged) {
 						_bChanged = false;
 						std::vector<const IModel*> pm;
@@ -217,7 +220,9 @@ namespace boom {
 						if((_bValid = !pm.empty())) {
 							// 境界ボリュームの更新
 							auto* core = const_cast<Boundary*>(reinterpret_cast<const Boundary*>(base_t::getCore()));
-							*core = Boundary::Boundary(&pm[0], pm.size());
+							auto op = MakeBoundary<Boundary>(&pm[0], pm.size(), t);
+							if((_bValid = op))
+								*core = *op;
 						}
 						// 子ノードが無い場合は常にヒットしない
 					}
@@ -259,7 +264,9 @@ namespace boom {
 						if((_bValid = !pm.empty())) {
 							// 境界ボリュームの更新
 							auto* core = const_cast<Boundary*>(reinterpret_cast<const Boundary*>(base_t::getCore()));
-							*core = Boundary::Boundary(&pm[0], pm.size());
+							auto op = MakeBoundary<Boundary>(&pm[0], pm.size(), t);
+							if((_bValid = op))
+								*core = *op;
 						}
 						// 子ノードが無い場合は常にヒットしない
 					}
@@ -432,10 +439,9 @@ namespace boom {
 			bool hit(const Segment& l, float t=NEAR_THRESHOLD) const;
 			bool hit(const AABB& ab, float t=NEAR_THRESHOLD) const;
 
+			// ---- for MakeBoundary ----
 			void setBoundary(const IModel* p);
 			void appendBoundary(const IModel* p);
-			static AABB Boundary(const IModel** p, size_t n );
-			static AABB Boundary(const void* p, size_t n, size_t stride);
 
 			friend std::ostream& operator << (std::ostream& os, const AABB& a);
 		};

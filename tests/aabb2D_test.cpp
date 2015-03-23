@@ -53,7 +53,7 @@ namespace boom {
 			for(int i=0 ; i<n ; i++)
 				av.push_back(GenRAABB(rd));
 			// ランダムな個数のAABBで境界(代表)AABBを算出
-			AABBM abound(AABB::Boundary(av.data(), n, sizeof(AABBM)));
+			AABBM abound(*MakeBoundaryPtr<AABB, geo2d::IModel>(av.data(), n, sizeof(AABBM), 0));
 
 			for(int i=0 ; i<0x100 ; i++) {
 				AABBM atest = GenRAABB(rd);

@@ -9,6 +9,7 @@
 #include <unordered_set>
 #include <map>
 
+// TODO: 3D用にIModelNodeインタフェース定義
 namespace boom {
 	namespace geo2d {
 		struct Convex;
@@ -69,7 +70,6 @@ namespace boom {
 
 			void setBoundary(const IModel* m);
 			void appendBoundary(const IModel* m);
-			static Sphere Boundary(const IModel* m, size_t n, size_t stride);
 			friend std::ostream& operator << (std::ostream& os, const Sphere& s);
 		};
 		struct IModel : ::boom::IModelNode {

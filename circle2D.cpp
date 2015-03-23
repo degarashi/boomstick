@@ -45,38 +45,30 @@ namespace boom {
 		void Circle::appendBoundary(const IModel* p) {
 			Circle c2 = p->im_getBVolume();
 			Vec2 toC2 = c2.vCenter - vCenter;
-			float lensq = toC2.len_sq(),
-				  rdsq = spn::Square(fRadius - c2.fRadius);
-			if(lensq > rdsq) {
+			float lensq = toC2.len_sq();
+			if(lensq >= ZEROVEC_LENGTH_SQ) {
 				toC2 *= spn::RSqrt(lensq);
-				// サポート写像で新たな円を算出
-				Vec2 tv0 = c2.vCenter + toC2 * c2.fRadius,
-					 tv1 = vCenter - toC2 * fRadius;
-				vCenter = (tv0 + tv1) * .5f;
-				fRadius = tv0.distance(tv1) * .5;
+				Vec2 tv(support(toC2) - c2.support(-toC2));
+				float r_min = std::min(fRadius, c2.fRadius);
+				if(tv.dot(toC2) < 0 ||
+					tv.len_sq() < spn::Square(r_min*2))
+				{
+					// 新たな円を算出
+					Vec2 tv0(vCenter - toC2*fRadius),
+						 tv1(c2.vCenter + toC2*c2.fRadius);
+					fRadius = tv0.distance(tv1) * .5f;
+					vCenter = (tv0+tv1) * .5f;
+				} else {
+					// 円が内包されている
+					if(fRadius < c2.fRadius) {
+						fRadius = c2.fRadius;
+						vCenter = c2.vCenter;
+					}
+				}
+			} else {
+				// 円の中心が同じ位置にある
+				fRadius = std::max(c2.fRadius, fRadius);
 			}
-		}
-		Circle Circle::Boundary(const void* pp, size_t n, size_t stride) {
-			AssertT(Trap, n>0, (std::invalid_argument)(const char*), "size must not 0")
-
-			auto pv = reinterpret_cast<uintptr_t>(pp);
-			Circle c;
-			c.setBoundary(reinterpret_cast<const IModel*>(pv));
-			pv += stride;
-			while(n-- > 1) {
-				c.appendBoundary(reinterpret_cast<const IModel*>(pv));
-				pv += stride;
-			}
-			return c;
-		}
-		Circle Circle::Boundary(const IModel** p, size_t n) {
-			AssertT(Trap, n>0, (std::invalid_argument)(const char*), "size must not 0")
-
-			Circle c;
-			c.setBoundary(*p);
-			while(n-- > 1)
-				c.appendBoundary(*(++p));
-			return c;
 		}
 		// 半径のみ倍率をかける
 		Circle Circle::operator * (float s) const {

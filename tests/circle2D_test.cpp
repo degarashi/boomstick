@@ -53,7 +53,7 @@ namespace boom {
 			for(int i=0 ; i<n ; i++)
 				cv.push_back(GenRCircle(rd));
 			// ランダムな個数の円で境界(代表)円を算出
-			CircleM cbound(Circle::Boundary(cv.data(), n, sizeof(CircleM)));
+			CircleM cbound(*MakeBoundaryPtr<Circle, geo2d::IModel>(cv.data(), n, sizeof(CircleM), 0));
 
 			for(int i=0 ; i<0x100 ; i++) {
 				CircleM ctest = GenRCircle(rd);
