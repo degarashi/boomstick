@@ -207,8 +207,8 @@ namespace boom {
 					if(_bChanged) {
 						_bChanged = false;
 						std::vector<const IModel*> pm;
-						// 子ノードをリストアップ
-						this->iterateDepthFirst([&pm](auto& node, int depth){
+						// 直下の子ノードをリストアップ
+						this->template iterateDepthFirst<false>([&pm](auto& node, int depth){
 							if(depth == 0)
 								return TfBase::Iterate::StepIn;
 							pm.push_back(&node);
@@ -250,7 +250,7 @@ namespace boom {
 
 						std::vector<const IModel*> pm;
 						// 子ノードをリストアップ
-						this->iterateDepthFirst([&pm](auto& node, int depth){
+						this->template iterateDepthFirst<false>([&pm](auto& node, int depth){
 							if(depth == 0)
 								return TfBase::Iterate::StepIn;
 							pm.push_back(&node);
