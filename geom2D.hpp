@@ -43,6 +43,7 @@ namespace boom {
 
 			spn::none_t hit(...) const;
 			bool hit(const Vec2& p, float t=NEAR_THRESHOLD) const;
+			bool hit(const Segment& s, float t=NEAR_THRESHOLD) const;
 			bool hit(const Circle& c, float t=NEAR_THRESHOLD) const;
 
 			void getArcPoints(PointL& dst, float ang0, float ang1, float deep) const;

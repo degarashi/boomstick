@@ -24,6 +24,10 @@ namespace boom {
 		bool Circle::hit(const Circle& c, float t) const {
 			return vCenter.dist_sq(c.vCenter) <= spn::Square(fRadius + c.fRadius + t);
 		}
+		bool Circle::hit(const Segment& s, float t) const {
+			Vec2 np = s.nearest(vCenter).first;
+			return np.dist_sq(vCenter) <= spn::Square(fRadius + t);
+		}
 		Circle Circle::operator * (const AMat32& m) const {
 			auto& m2 = reinterpret_cast<const AMat22&>(m);
 			Vec2 tx(vCenter + Vec2(fRadius,0)),
