@@ -110,8 +110,8 @@ namespace boom {
 		}
 		Circle AABB::bs_getBVolume() const {
 			// 対角線 = 直径
-			return Circle((minV + maxV) * 0.5f,
-								minV.distance(maxV));
+			return Circle((minV + maxV) * .5f,
+							minV.distance(maxV) * .5f);
 		}
 
 		void AABB::setBoundary(const IModel* p) {
