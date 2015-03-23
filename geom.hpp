@@ -363,6 +363,7 @@ namespace boom {
 		using CTGeo = typename Types::CTGeo;
 		using IModel = typename Types::IModel;
 		using GJK = typename Types::GJK;
+		using Time_t = typename IModelNode::Time_t;
 
 		constexpr static int WideBits = spn::CTBit::MSB_N<CTGeo::size>::result + 1,
 							ArraySize = 1<<(WideBits*2);
@@ -378,6 +379,7 @@ namespace boom {
 		static ColFunc GetCFunc(int id0, int id1) {
 			return cs_cfunc[(id0 << WideBits) | id1];
 		}
+		//! IModelインタフェースを介さず直接判定
 		template <class T0, class T1,
 			class = typename std::enable_if<!std::is_pointer<T0>::value>::type,
 			class = typename std::enable_if<!std::is_pointer<T1>::value>::type>
@@ -389,40 +391,39 @@ namespace boom {
 			return GetCFunc(id0, id1)(&tmp0, &tmp1);
 		}
 		//! 2つの物体(階層構造可)を当たり判定
-		static bool Hit(const IModel* mdl0, const IModel* mdl1) {
-			// TODO: 時刻修正
-			mdl0->imn_refresh(0);
-			mdl1->imn_refresh(0);
-			if(GetCFunc(mdl0->getCID(), mdl1->getCID())(mdl0, mdl1)) {
-				if(mdl0->hasInner() | mdl1->hasInner())
-					return HitL(mdl1, mdl0, false);
-				return true;
+		static bool Hit(const IModel* mdl0, const IModel* mdl1, Time_t t) {
+			if(mdl0->imn_refresh(t) && mdl1->imn_refresh(t)) {
+				if(GetCFunc(mdl0->getCID(), mdl1->getCID())(mdl0, mdl1)) {
+					if(mdl0->hasInner() | mdl1->hasInner())
+						return _HitL(mdl1, mdl0, false, t) ||
+								_HitL(mdl0, mdl1, true, t);
+					return true;
+				}
 			}
 			return false;
 		}
 		//! mdl0を展開したものとmdl1を当たり判定
-		/*! \param[in] mdl0 展開する方のインタフェース
+		/*! mdl1は既にrefreshをかけてある前提
+			\param[in] mdl0 展開する方のインタフェース
 			\param[in] mdl1 展開されない方のインタフェース
 			\param[in] bSwap 左右を入れ替えて判定している場合はtrue */
-		static bool HitL(const IModel* mdl0, const IModel* mdl1, bool bSwap) {
+		static bool _HitL(const IModel* mdl0, const IModel* mdl1, bool bSwap, Time_t t) {
+			if(!mdl0->imn_refresh(t))
+				return false;
 			auto in = mdl0->getInner();
 			if(in) {
-				// TODO: 時刻修正
-				if(mdl0->imn_refresh(0)) {
-					// ここで判定関数を取得
-					// Innerに含まれる子オブジェクトは全て同じ型 という前提
+				// TODO: ここで判定関数を取得してInnerに含まれる子オブジェクトは全て同じ型 という前提にする
+				do {
 					ColFunc cf = GetCFunc(in.get()->getCID(), mdl1->getCID());
-					do {
-						if(cf(in.get(), mdl1)) {
-							if(HitL(mdl1, in.get(), false))
-								return true;
-						}
-					} while(++in);
-				}
+					if(cf(in.get(), mdl1)) {
+						if(_HitL(mdl1, in.get(), false, t))
+							return true;
+					}
+				} while(++in);
 			} else {
 				if(bSwap)
 					return true;
-				return HitL(mdl1, mdl0, true);
+				return _HitL(mdl1, mdl0, true, t);
 			}
 			return false;
 		}
