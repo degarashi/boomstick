@@ -8,6 +8,7 @@ namespace boom {
 		using namespace spn::test;
 		using spn::Vec2;
 		using geo2d::PointM;
+		using geo2d::SegmentM;
 		using geo2d::CircleM;
 		using geo2d::Circle;
 		using geo2d::GSimplex;
@@ -31,6 +32,16 @@ namespace boom {
 
 			bool b0 = c0.hit(c1);
 			bool b1 = GSimplex(c0,c1).getResult();
+			ASSERT_EQ(b0, b1);
+		}
+		TEST_F(Circle2D, Hit_Segment) {
+			auto rd = getRand();
+
+			CircleM c(GenRCircle(rd));
+			SegmentM s(GenRSegment(rd));
+
+			bool b0 = c.hit(s);
+			bool b1 = GSimplex(c,s).getResult();
 			ASSERT_EQ(b0, b1);
 		}
 		TEST_F(Circle2D, Support) {
