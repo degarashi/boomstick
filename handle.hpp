@@ -9,15 +9,15 @@ namespace boom {
 		DEF_AHANDLE(TfMgr, Tf, TfNode_SP, TfNode_SP)
 
 		struct IModel;
-		using UPModel = std::unique_ptr<IModel>;
+		using Model_SP = std::shared_ptr<IModel>;
 		class ModelMgr;
-		DEF_AHANDLE(ModelMgr, Mdl, UPModel, UPModel)
+		DEF_AHANDLE(ModelMgr, Mdl, Model_SP, Model_SP)
 	}
 	namespace geo3d {
 		struct IModel;
-		using UPModel = std::unique_ptr<IModel>;
+		using Model_SP = std::shared_ptr<IModel>;
 		class ModelMgr;
-		DEF_AHANDLE(ModelMgr, Mdl, UPModel, UPModel)
+		DEF_AHANDLE(ModelMgr, Mdl, Model_SP, Model_SP)
 	}
 }
 

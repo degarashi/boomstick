@@ -95,7 +95,7 @@ namespace boom {
 			const AMat43& getToWorldI() const;
 		};
 		#define mgr_model3d (::boom::geo3d::ModelMgr::_ref())
-		class ModelMgr : public spn::ResMgrA<UPModel, ModelMgr> {};
+		class ModelMgr : public spn::ResMgrA<Model_SP, ModelMgr> {};
 
 		template <class T>
 		struct Model : IModelP_base<T, IModel> {

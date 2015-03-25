@@ -100,7 +100,7 @@ namespace boom {
 			const AMat32& getToWorldI() const;
 		};
 		#define mgr_model2d (::boom::geo2d::ModelMgr::_ref())
-		class ModelMgr : public spn::ResMgrA<UPModel, ModelMgr> {};
+		class ModelMgr : public spn::ResMgrA<Model_SP, ModelMgr> {};
 
 		//! TにIModelインタフェースを付加
 		template <class T>
