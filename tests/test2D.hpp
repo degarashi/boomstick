@@ -43,5 +43,72 @@ namespace boom {
 			v1.selectMax(tmp);
 			return geo2d::AABBM(v0, v1);
 		}
+		class Narrow : public spn::test::RandomTestInitializer {
+			protected:
+				using base_t = spn::test::RandomTestInitializer;
+				using Types = ::boom::geo2d::Types;
+				using Narrow_t = Types::Narrow;
+				void SetUp() override;
+		};
+
+		using TfSP = std::shared_ptr<geo2d::TfBase>;
+		using TfSP_V = std::vector<TfSP>;
+		using TfBase2DPtr_V = std::vector<const geo2d::TfBase*>;
+		TfBase2DPtr_V CollectLeaf(const TfSP& spRoot);
+		template <class T, class A>
+		TfSP MakeAsLeaf(const A& s) {
+			return std::make_shared<geo2d::TfLeaf<T>>(s);
+		}
+		template <class T>
+		TfSP MakeAsNode() {
+			return std::make_shared<geo2d::TfNode_Static<T>>();
+		}
+		template <class RD>
+		TfSP MakeRandomTree(RD& rd, int nIteration, int maxDepth) {
+			using geo2d::Circle;
+			using geo2d::AABB;
+			using test2d::GenRCircle;
+			using test2d::GenRAABB;
+			enum Manipulation {
+				MNP_Add,			//!< 現在の階層にリーフノードを加える
+				MNP_Up,				//!< 階層を上がる
+				MNP_MakeChild,		//!< 子ノードを作ってそこにカーソルを移動
+				N_Manipulation
+			};
+			auto fnI = [&rd](const spn::RangeI& r){ return rd.template getUniform<int>(r); };
+			TfSP spRoot = (fnI({0,1}) == 0) ?
+							MakeAsNode<Circle>() : MakeAsNode<AABB>();
+			auto spCursor = spRoot;
+			int cursorDepth = 0;
+			int nIter = fnI({0, nIteration});
+			for(int i=0 ; i<nIter ; i++) {
+				int m = fnI({0, N_Manipulation-1});
+				switch(m) {
+					case MNP_Add: {
+						spCursor->addChild((fnI({0,1})==0) ?
+								MakeAsLeaf<Circle>(GenRCircle(rd)) : MakeAsLeaf<AABB>(GenRAABB(rd)));
+						break; }
+					case MNP_Up:
+						// 深度が0の時は何もしない
+						if(cursorDepth > 0) {
+							spCursor = spCursor->getParent();
+							--cursorDepth;
+						}
+						break;
+					case MNP_MakeChild:
+						// 最大深度を超えている時は何もしない
+						if(cursorDepth < maxDepth) {
+							auto c = (fnI({0,1}) == 0) ?
+										MakeAsNode<Circle>() : MakeAsNode<AABB>();
+							spCursor->addChild(c);
+							spCursor = c;
+							++cursorDepth;
+						}
+						break;
+				}
+				Assert(Trap, cursorDepth <= maxDepth)
+			}
+			return spRoot;
+		}
 	}
 }
