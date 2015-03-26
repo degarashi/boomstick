@@ -9,15 +9,6 @@ namespace boom {
 			base_t::SetUp();
 			Narrow_t::Initialize();
 		}
-		TfBase2DPtr_V CollectLeaf(const TfSP& spRoot) {
-			TfBase2DPtr_V v;
-			spRoot->template iterateDepthFirst<false>([&v](auto& node, int depth){
-				if(node.isLeaf())
-					v.push_back(&node);
-				return geo2d::TfBase::Iterate::StepIn;
-			});
-			return std::move(v);
-		}
 	}
 	namespace test {
 		using geo2d::PointM;

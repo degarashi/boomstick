@@ -53,8 +53,18 @@ namespace boom {
 
 		using TfSP = std::shared_ptr<geo2d::TfBase>;
 		using TfSP_V = std::vector<TfSP>;
-		using TfBase2DPtr_V = std::vector<const geo2d::TfBase*>;
-		TfBase2DPtr_V CollectLeaf(const TfSP& spRoot);
+		using TfBase2DPtr_V = std::vector<geo2d::TfBase*>;
+		using TfBase2DPtrC_V = std::vector<const geo2d::TfBase*>;
+		template <class T>
+		auto CollectLeaf(T& spRoot) {
+			std::vector<decltype(spRoot.get())> v;
+			spRoot->template iterateDepthFirst<false>([&v](auto& node, int depth){
+				if(node.isLeaf())
+					v.push_back(&node);
+				return geo2d::TfBase::Iterate::StepIn;
+			});
+			return std::move(v);
+		}
 		template <class T, class A>
 		TfSP MakeAsLeaf(const A& s) {
 			return std::make_shared<geo2d::TfLeaf<T>>(s);
