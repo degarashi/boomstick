@@ -98,6 +98,7 @@ namespace boom {
 		IModelP_base() = default;
 		IModelP_base(T&& t): T(std::move(t)) {}
 		IModelP_base(const T& t): T(t) {}
+		void* getCore() override { return static_cast<T*>(this); }
 		const void* getCore() const override { return static_cast<const T*>(this); }
 		uint32_t getCID() const override { return T::GetCID(); }
 	};
@@ -108,6 +109,7 @@ namespace boom {
 		virtual bool imn_refresh(Time_t t) const;
 		virtual bool hasInner() const;
 		//! モデルの実体へのポインタ
+		virtual void* getCore();
 		virtual const void* getCore() const;
 		//! 最寄りのユーザーデータを取得
 		/*! このノードが持っていればそれを返し、無ければ親を遡って探す */
