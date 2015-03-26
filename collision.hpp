@@ -221,8 +221,9 @@ namespace boom {
 			HistVec& _switchHist() {
 				_doRelease(false);
 				_swHist ^= 1;
-				_hist[_swHist].clear();
-				return _hist[_swHist];
+				auto& cur = _getCurHist();
+				cur.clear();
+				return cur;
 			}
 			void _doRelease(bool bBoth) {
 				//! 解放を一時的に遅延させていたハンドルを処理
@@ -232,9 +233,13 @@ namespace boom {
 					_getCurRM().clear();
 				_bDelete = false;
 			}
+			bool release(spn::SHandle) override {
+				Assert(Throw, false, "invalid function call");
+				return false;
+			}
 		public:
 			ColMgr(): _broadC([this](spn::SHandle sh){
-								return HCol(sh).cref().getBVolume(); })
+								return HCol::FromSHandle(sh).cref().getBVolume(); })
 			{
 				Narrow::Initialize();
 			}
@@ -280,10 +285,11 @@ namespace boom {
 					// 同じハンドルという事はあり得ない筈
 					AssertP(Trap, sh0!=sh1)
 
-					HCol hc0(sh0), hc1(sh1);
+					HCol hc0(HCol::FromSHandle(sh0)),
+						hc1(HCol::FromSHandle(sh1));
 					// 詳細判定
 					// 毎フレームヒットリストを再構築
-					if(Narrow::Hit(hc0.ref().getModel(), hc1.ref().getModel())) {
+					if(Narrow::Hit(hc0.ref().getModel(), hc1.ref().getModel(), _accum)) {
 						auto fn = [this, &hist](HCol hc0, HCol hc1){
 							auto &c0 = hc0.ref(),
 								&c1 = hc1.ref();
