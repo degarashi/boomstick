@@ -23,10 +23,9 @@ namespace boom {
 						last;	//!< 線形リスト末尾インデックス
 
 				//! リストに何もつないでない状態に初期化
-				void init(CTime tm) {
-					time = tm;
-					front = last = spn::none;
-				}
+				Index(CTime tm):
+					time(tm)
+				{}
 				//! リスト末尾に新しくインデックスを加える
 				/*!	\param[in] idx 新しく加えるインデックス値
 					\return 直前の先頭インデックス値 */
@@ -39,7 +38,8 @@ namespace boom {
 					return ret;
 				}
 			};
-			Index		_cur,
+			using Index_OP = spn::Optional<Index>;
+			Index_OP	_cur,
 						_prev;
 			HLMDL		_hlMdl;
 			BCID		_bcid;
@@ -51,10 +51,7 @@ namespace boom {
 				_mask(ms),
 				_hlMdl(hm),
 				_udata(std::forward<UD2>(ud))
-			{
-				_cur.init(0);
-				_prev.init(0);
-			}
+			{}
 			void setBCID(const BCID& ns) {
 				_bcid = ns;
 			}
@@ -63,6 +60,9 @@ namespace boom {
 			}
 			auto getBVolume() const -> decltype(_hlMdl.cref()->im_getBVolume()) {
 				return _hlMdl.cref()->im_getBVolume();
+			}
+			decltype(_hlMdl.get()) getModelHandle() const {
+				return _hlMdl.get();
 			}
 			auto getModel() const -> decltype(_hlMdl.cref().get()) {
 				return _hlMdl.cref().get();
@@ -79,9 +79,15 @@ namespace boom {
 			void getCollision(CB&& cb) const {
 				auto& m = CMGR::_ref();
 				CTime tm = m.getAccum();
-				// 現在の時刻より新しい時に巡回
-				if(_cur.time >= tm && _cur.front)
-					m.iterateHistCur(*_cur.front, std::forward<CB>(cb));
+				if(_cur) {
+					auto& cur = *_cur;
+					// 現在の時刻と等しい時に巡回
+					if(cur.time == tm) {
+						m.iterateHistCur(*cur.front, [&cb](const auto& h){
+							std::forward<CB>(cb)(h);
+						});
+					}
+				}
 			}
 			//! 衝突判定結果を参照 (コリジョン終了判定)
 			/*! \param cb[in,out] コールバック(CMgr::Hist) */
@@ -89,40 +95,51 @@ namespace boom {
 			void getEndCollision(CB&& cb) const {
 				auto& m = CMGR::_ref();
 				CTime tm = m.getAccum();
-				if(_cur.time == tm) {
-					// 今回何かと衝突していて前回も判定済の場合
-					if(_prev.time == tm-1 && _prev.front) {
+				if(_prev && _prev->time == tm-1) {
+					if(_cur->time == tm) {
+						// 前回何かと衝突していて前回も判定済の場合
 						// _prevにあって_curに無い物が対象
-						m.iterateHistPrev(*_prev.front, [&cb](const auto& h) {
-							// _prevで一度参照されたエントリにはフラグが立ててある -> (nFrame==0)
-							if(h.nFrame > 0)
-								std::forward<CB>(cb)(h);
+						int prev = *(_prev->front),
+							cur = *(_cur->front);
+						m.iterateHistPrev(prev, [cur, &m, &cb](const auto& hPrev){
+							bool bFound = false;
+							m.iterateHistCur(cur, [&bFound, &hPrev](const auto& hCur){
+								if(hCur.hCol == hPrev.hCol) {
+									bFound = true;
+								}
+							});
+							if(!bFound)
+								std::forward<CB>(cb)(hPrev);
 						});
 					}
-				} else if(_cur.time == tm-1 && _cur.front) {
+				}
+				if(_cur && _cur->time == tm-1) {
 					// 今回何とも衝突しなかった場合
 					// _cur のリスト全部対象。ただし履歴はColMgr上では過去のものになってるのでPrevを参照
-					m.iterateHistPrev(*_cur.front, std::forward<CB>(cb));
+					m.iterateHistPrev(*_cur->front, std::forward<CB>(cb));
 				}
 			}
 			//! 引数の時刻-1と合致する方のリストインデックス先頭を取得
 			/*! \return どちらも無効ならspn::none */
 			Int_OP getPrevIndex(CTime tm) const {
-				if(_cur.time == tm-1)
-					return _cur.front;
-				if(_prev.time == tm-1)
-					return _prev.front;
+				if(_cur && _cur->time == tm-1)
+					return _cur->front;
+				if(_prev && _prev->time == tm-1)
+					return _prev->front;
 				return spn::none;
 			}
 			//! カレントリスト末尾に新しくインデックスを加える
 			/*! \return 直前の先頭インデックス値 */
 			Int_OP setLastIndex(CTime tm, int idx) {
 				// もし新しい時刻の設定だったらカーソルの新旧入れ替え
-				if(tm > _cur.time) {
-					_prev = _cur;
-					_cur.init(tm);
-				}
-				return _cur.setLastIndex(idx);
+				if(_cur) {
+					if(_cur->time < tm) {
+						_prev = _cur;
+						_cur = spn::construct(tm);
+					}
+				} else
+					_cur = spn::construct(tm);
+				return _cur->setLastIndex(idx);
 			}
 	};
 	/*!	\tparam	BC		BroadCollision class template<BVolume, IModel>
@@ -276,39 +293,39 @@ namespace boom {
 				}
 				base::release(hCol);
 			}
+			void bccb(HistVec& hist, spn::SHandle sh0, spn::SHandle sh1) {
+				// 同じハンドルという事はあり得ない筈
+				AssertP(Trap, sh0!=sh1)
+
+				HCol hc0(HCol::FromSHandle(sh0)),
+					hc1(HCol::FromSHandle(sh1));
+				// 詳細判定
+				// 毎フレームヒットリストを再構築
+				if(Narrow::Hit(hc0.ref().getModel(), hc1.ref().getModel(), _accum)) {
+					bccb2(hist, hc0, hc1);
+					bccb2(hist, hc1, hc0);
+				}
+			}
+			void bccb2(HistVec& hist, HCol hc0, HCol hc1) {
+				auto &c0 = hc0.ref(),
+					&c1 = hc1.ref();
+				// 前のフレームでの継続フレームリストを探索
+				int nf = 0;
+				if(auto hist = _hasPrevCollision(hc0, hc1))
+					nf = hist->nFrame + 1;
+				int nextID = hist.size();
+				Int_OP lastID = c0.setLastIndex(_accum, nextID);
+				if(lastID)
+					hist[*lastID].nextOffset = (nextID - *lastID) * sizeof(Hist);
+				hist.push_back(Hist(hc1, nf));
+			}
 			//! 時間を1進め、衝突履歴の更新
 			void update() {
 				auto& hist = _switchHist();
 
 				++_accum;
 				_broadC.broadCollision([this, &hist](spn::SHandle sh0, spn::SHandle sh1){
-					// 同じハンドルという事はあり得ない筈
-					AssertP(Trap, sh0!=sh1)
-
-					HCol hc0(HCol::FromSHandle(sh0)),
-						hc1(HCol::FromSHandle(sh1));
-					// 詳細判定
-					// 毎フレームヒットリストを再構築
-					if(Narrow::Hit(hc0.ref().getModel(), hc1.ref().getModel(), _accum)) {
-						auto fn = [this, &hist](HCol hc0, HCol hc1){
-							auto &c0 = hc0.ref(),
-								&c1 = hc1.ref();
-							// 前のフレームでの継続フレームリストを探索
-							int nf = 0;
-							if(auto hist = _hasPrevCollision(hc0, hc1)) {
-								nf = hist->nFrame;
-								// 衝突が継続中なので目印としてnFrameを0にしておく
-								hist->nFrame = 0;
-							}
-							int nextID = hist.size();
-							Int_OP lastID = c0.setLastIndex(_accum, nextID);
-							if(lastID)
-								hist[*lastID].nextOffset = (nextID - *lastID) * sizeof(Hist);
-							hist.push_back(Hist(hc1, nf+1));
-						};
-						fn(hc0, hc1);
-						fn(hc1, hc0);
-					}
+					bccb(hist, sh0, sh1);
 				});
 			}
 	};
