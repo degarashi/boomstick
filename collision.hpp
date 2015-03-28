@@ -293,39 +293,36 @@ namespace boom {
 				}
 				base::release(hCol);
 			}
-			void bccb(HistVec& hist, spn::SHandle sh0, spn::SHandle sh1) {
-				// 同じハンドルという事はあり得ない筈
-				AssertP(Trap, sh0!=sh1)
-
-				HCol hc0(HCol::FromSHandle(sh0)),
-					hc1(HCol::FromSHandle(sh1));
-				// 詳細判定
-				// 毎フレームヒットリストを再構築
-				if(Narrow::Hit(hc0.ref().getModel(), hc1.ref().getModel(), _accum)) {
-					bccb2(hist, hc0, hc1);
-					bccb2(hist, hc1, hc0);
-				}
-			}
-			void bccb2(HistVec& hist, HCol hc0, HCol hc1) {
-				auto &c0 = hc0.ref(),
-					&c1 = hc1.ref();
-				// 前のフレームでの継続フレームリストを探索
-				int nf = 0;
-				if(auto hist = _hasPrevCollision(hc0, hc1))
-					nf = hist->nFrame + 1;
-				int nextID = hist.size();
-				Int_OP lastID = c0.setLastIndex(_accum, nextID);
-				if(lastID)
-					hist[*lastID].nextOffset = (nextID - *lastID) * sizeof(Hist);
-				hist.push_back(Hist(hc1, nf));
-			}
 			//! 時間を1進め、衝突履歴の更新
 			void update() {
 				auto& hist = _switchHist();
 
 				++_accum;
 				_broadC.broadCollision([this, &hist](spn::SHandle sh0, spn::SHandle sh1){
-					bccb(hist, sh0, sh1);
+					// 同じハンドルという事はあり得ない筈
+					AssertP(Trap, sh0!=sh1)
+
+					HCol hc0(HCol::FromSHandle(sh0)),
+						hc1(HCol::FromSHandle(sh1));
+					// 詳細判定
+					// 毎フレームヒットリストを再構築
+					if(Narrow::Hit(hc0.ref().getModel(), hc1.ref().getModel(), _accum)) {
+						auto fn = [this, &hist](HCol hc0, HCol hc1) {
+							auto &c0 = hc0.ref(),
+								&c1 = hc1.ref();
+							// 前のフレームでの継続フレームリストを探索
+							int nf = 0;
+							if(auto hist = _hasPrevCollision(hc0, hc1))
+								nf = hist->nFrame + 1;
+							int nextID = hist.size();
+							Int_OP lastID = c0.setLastIndex(_accum, nextID);
+							if(lastID)
+								hist[*lastID].nextOffset = (nextID - *lastID) * sizeof(Hist);
+							hist.push_back(Hist(hc1, nf));
+						};
+						fn(hc0, hc1);
+						fn(hc1, hc0);
+					}
 				});
 			}
 	};
