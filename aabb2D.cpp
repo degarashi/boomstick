@@ -126,6 +126,22 @@ namespace boom {
 			minV.y = std::min(minV.y, p->im_support(Vec2(0,-1)).y);
 			maxV.y = std::max(maxV.y, p->im_support(Vec2(0,1)).y);
 		}
+		AABB AABB::operator * (const spn::AMat32& m) const {
+			AABB ret;
+			// AABBを座標変換した物を包むAABB
+			Vec2 v[] = {
+				minV.asVec3(1) * m,
+				Vec3(minV.x, maxV.y, 1) * m,
+				Vec3(maxV.x, minV.y, 1) * m,
+				maxV.asVec3(1) * m
+			};
+			ret.minV = ret.maxV = v[0];
+			for(int i=1 ; i<4 ; i++) {
+				ret.minV.selectMin(v[i]);
+				ret.maxV.selectMax(v[i]);
+			}
+			return ret;
+		}
 		std::ostream& operator << (std::ostream& os, const AABB& a) {
 			return os << "AABB(2d) [ min: " << a.minV << std::endl
 						<< "max: " << a.maxV << ']';

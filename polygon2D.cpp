@@ -113,6 +113,12 @@ namespace boom {
 		void Poly::invert() {
 			std::swap(point[1], point[2]);
 		}
+		Poly Poly::operator * (const spn::AMat32& m) const {
+			Poly ret;
+			for(int i=0 ; i<3 ; i++)
+				ret.point[i] = point[i].asVec3(1) * m;
+			return ret;
+		}
 		std::ostream& operator << (std::ostream& os, const Poly& p) {
 			return os << "Polygon(2d) [ 0: " << p.point[0] << std::endl
 						<< "1: " << p.point[1] << std::endl

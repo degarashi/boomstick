@@ -438,6 +438,7 @@ namespace boom {
 			bool hit(const Vec2& p, float t=NEAR_THRESHOLD) const;
 			bool hit(const Segment& l, float t=NEAR_THRESHOLD) const;
 			bool hit(const AABB& ab, float t=NEAR_THRESHOLD) const;
+			AABB operator * (const AMat32& m) const;
 
 			// ---- for MakeBoundary ----
 			void setBoundary(const IModel* p);
@@ -482,6 +483,7 @@ namespace boom {
 			/*! isInTriangleとは異なり辺上もHitとみなす */
 			bool hit(const Vec2& p, float t=NEAR_THRESHOLD) const;
 			bool hit(const Poly& p, float t=NEAR_THRESHOLD) const;
+			Poly operator * (const AMat32& m) const;
 			friend std::ostream& operator << (std::ostream& os, const Poly& p);
 		};
 		using PolyM = Model<Poly>;
