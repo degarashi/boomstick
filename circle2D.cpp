@@ -30,12 +30,12 @@ namespace boom {
 		}
 		Circle Circle::operator * (const AMat32& m) const {
 			auto& m2 = reinterpret_cast<const AMat22&>(m);
-			Vec2 tx(vCenter + Vec2(fRadius,0)),
-				ty(vCenter + Vec2(0,fRadius)),
+			Vec2 tx(fRadius,0),
+				ty(0,fRadius),
 				ori(vCenter);
 			ori = ori.asVec3(1) * m;
-			tx = tx * m2 - ori;
-			ty = ty * m2 - ori;
+			tx = tx * m2;
+			ty = ty * m2;
 			return Circle(ori,
 						spn::Sqrt(std::max(tx.len_sq(), ty.len_sq())));
 		}
