@@ -21,6 +21,9 @@ namespace boom {
 	bool IModelNode::hasInner() const {
 		return false;
 	}
+	bool IModelNode::canCacheShape() const {
+		return true;
+	}
 	void* IModelNode::getCore() {
 		return this;
 	}

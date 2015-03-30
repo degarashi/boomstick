@@ -143,37 +143,6 @@ namespace boom {
 				bool hasInner() const override;
 				virtual bool isLeaf() const { return false; }
 		};
-		class TfLeaf_base : public spn::CheckAlign<16, TfLeaf_base>,
-							public TfBase
-		{
-			private:
-				#define SEQ_TFLEAF \
-					((Pose)(spn::Pose2D)) \
-					((NodeAccum)(uint32_t)) \
-					((Global)(spn::AMat33)(Pose)(NodeAccum))
-				RFLAG_S(TfLeaf_base, SEQ_TFLEAF)
-			public:
-				RFLAG_SETMETHOD_S(SEQ_TFLEAF)
-				RFLAG_GETMETHOD_S(SEQ_TFLEAF)
-				RFLAG_REFMETHOD_S(SEQ_TFLEAF)
-				#undef SEQ_TFLEAF
-				friend std::ostream& operator << (std::ostream&, const TfLeaf_base&);
-		};
-		template <class Shape, class Ud=spn::none_t>
-		class TfLeaf : public TfLeaf_base,
-						public Model<Shape>
-		{
-			private:
-				using model_t = Model<Shape>;
-				Ud					_udata;
-			public:
-				using model_t::model_t;
-				/*! ユーザーデータがvoidの時は親ノードのデータを返す */
-				void* getUserData() override {
-					return _getUserData(&_udata, std::is_same<spn::none_t, Ud>());
-				}
-				bool isLeaf() const override { return true; }
-		};
 		template <class Boundary, class Ud>
 		class TfNode_base : public TfBase,
 							public Model<Boundary>
@@ -276,37 +245,6 @@ namespace boom {
 
 		#define mgr_tf2d (::boom::geo2d::TfMgr::_ref())
 		class TfMgr : public spn::ResMgrA<TfBase_SP, TfMgr> {};
-
-		// 座標変換を親からかけるにはTreeNodeで繋がってる必要がある
-		//! 座標変換ありのモデル基底
-		class TModel : public IModel {
-			private:
-				HLMdl					_hlMdl;		// 単体 or 子ノード
-				HLTf					_hlTf;		// このノード自体にかかる変換
-				mutable spn::AMat32		_mToLocal,
-										_mToWorld;
-			public:
-				TModel(HMdl hMdl, HTf hTf);
-
-				Circle im_getBVolume() const override;
-				float im_getInertia() const override;
-				float im_getArea() const override;
-				Vec2 im_getCenter() const override;
-				Vec2 im_support(const Vec2& dir) const override;
-				bool im_hitPoint(const Vec2& p, float t=NEAR_THRESHOLD) const override;
-
-				Vec2 toLocal(const Vec2& v) const override;
-				Vec2 toLocalDir(const Vec2& v) const override;
-				Vec2 toWorld(const Vec2& v) const override;
-				Vec2 toWorldDir(const Vec2& v) const override;
-
-				const AMat32& tm_getToLocal() const;
-				const AMat32& tm_getToWorld() const;
-				spn::Optional<const AMat32&> getToLocal() const override;
-				spn::Optional<const AMat32&> getToWorld() const override;
-				uint32_t getCID() const override;
-				const void* getCore() const override;
-		};
 
 		using LNear = std::pair<Vec2, LinePos>;
 		struct Point : Vec2, ITagP<Point> {

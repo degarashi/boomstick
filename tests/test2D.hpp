@@ -1,6 +1,7 @@
 #pragma once
 #include "test.hpp"
 #include "geom2D.hpp"
+#include "tfleaf2D.hpp"
 
 namespace boom {
 	namespace test2d {

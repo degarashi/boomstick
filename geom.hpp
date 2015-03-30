@@ -108,6 +108,7 @@ namespace boom {
 		virtual ~IModelNode() {}
 		virtual bool imn_refresh(Time_t t) const;
 		virtual bool hasInner() const;
+		virtual bool canCacheShape() const;
 		//! モデルの実体へのポインタ
 		virtual void* getCore();
 		virtual const void* getCore() const;
@@ -392,10 +393,20 @@ namespace boom {
 			IModelSP<T1, IModel> tmp1(t1);
 			return GetCFunc(id0, id1)(&tmp0, &tmp1);
 		}
+		static bool _HitSingle(const IModel* mdl0, const IModel* mdl1) {
+			if(mdl0->canCacheShape() & mdl1->canCacheShape()) {
+				// 変換後のキャッシュされた形状で判定
+				return GetCFunc(mdl0->getCID(), mdl1->getCID())(mdl0, mdl1);
+			} else {
+				// GJKで判定
+				GJK gjk(*mdl0, *mdl1);
+				return gjk.getResult();
+			}
+		}
 		//! 2つの物体(階層構造可)を当たり判定
 		static bool Hit(const IModel* mdl0, const IModel* mdl1, Time_t t) {
 			if(mdl0->imn_refresh(t) && mdl1->imn_refresh(t)) {
-				if(GetCFunc(mdl0->getCID(), mdl1->getCID())(mdl0, mdl1)) {
+				if(_HitSingle(mdl0, mdl1)) {
 					if(mdl0->hasInner() | mdl1->hasInner())
 						return _HitL(mdl1, mdl0, false, t) ||
 								_HitL(mdl0, mdl1, true, t);
@@ -416,8 +427,9 @@ namespace boom {
 			if(in) {
 				// TODO: ここで判定関数を取得してInnerに含まれる子オブジェクトは全て同じ型 という前提にする
 				do {
-					ColFunc cf = GetCFunc(in.get()->getCID(), mdl1->getCID());
-					if(cf(in.get(), mdl1)) {
+// 					ColFunc cf = GetCFunc(in.get()->getCID(), mdl1->getCID());
+// 					if(cf(in.get(), mdl1)) {
+					if(_HitSingle(in.get(), mdl1)) {
 						if(_HitL(mdl1, in.get(), false, t))
 							return true;
 					}
