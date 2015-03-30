@@ -35,5 +35,30 @@ namespace boom {
 			// 両者は一致する筈
 			ASSERT_EQ(b0, b1);
 		}
+		using namespace spn::test;
+		// 単一ノードによる姿勢変換テスト
+		TEST_F(Narrow, TFNode2D) {
+			auto rd = getRand();
+
+			// 基本の形状に姿勢変換を掛けた物(=A)と
+			// 変換後の座標で直接生成した物(=B)の2種類を用意
+			geo2d::CircleM c = test2d::GenRCircle(rd);
+			spn::Pose2D ps(GenR2Vec(rd, {-1e3f, 1e3f}),
+							spn::DegF(rd.template getUniform<float>({-180.f, 180.f})),
+							GenR2VecAbs(rd, {1e-1f, 1e2f}, {1e-1f, 1e2f}));
+			auto spA = std::make_shared<geo2d::TfLeaf<geo2d::Circle>>(c * ps.getToWorld()),
+				 spB = std::make_shared<geo2d::TfLeaf<geo2d::Circle>>(c);
+			spB->setPose(ps);
+
+			int nCheck = 500;
+			while(--nCheck >= 0) {
+				// 衝突試験用の形状を1つ用意
+				auto check = test2d::GenRSegment(rd);
+				// 結果は同じになる筈
+				bool bA = Narrow_t::Hit(spA.get(), &check, 0),
+					 bB = Narrow_t::Hit(spB.get(), &check, 0);
+				ASSERT_EQ(bA, bB);
+			}
+		}
 	}
 }
