@@ -17,7 +17,9 @@ namespace boom {
 		struct Poly;
 		struct Circle;
 		struct Convex;
-		using CTGeo = spn::CType<Convex, Circle, Poly, AABB, Segment, Point>;
+		struct Ray;
+		struct Line;
+		using CTGeo = spn::CType<Convex, Circle, Poly, AABB, Segment, Ray, Line, Point>;
 		template <class T>
 		using ITagP = ITagP_base<T, CTGeo>;
 
@@ -278,7 +280,11 @@ namespace boom {
 			Line() = default;
 			Line(const Vec2& p, const Vec2& d);
 
-			DEF_INVALID_BSFUNCS
+			float bs_getArea() const;
+			float bs_getInertia() const;
+			const Vec2& bs_getCenter() const;
+			const Circle& bs_getBVolume() const;
+
 			Vec2x2 nearest(const Line& st) const;
 			Vec2 nearest(const Vec2& p) const;
 			float distance(const Vec2& p) const;
@@ -289,6 +295,7 @@ namespace boom {
 			Line operator * (const AMat32& m) const;
 			LineDivision checkSide(const Vec2& p, float t=DOT_THRESHOLD) const;
 
+			Vec2 support(const Vec2& dir) const;
 			spn::none_t hit(...) const;
 			bool hit(const Vec2& p, float t=NEAR_THRESHOLD) const;
 			friend std::ostream& operator << (std::ostream& os, const Line& l);
@@ -301,12 +308,17 @@ namespace boom {
 			Ray() = default;
 			Ray(const Vec2& p, const Vec2& d);
 
-			DEF_INVALID_BSFUNCS
+			float bs_getArea() const;
+			float bs_getInertia() const;
+			const Vec2& bs_getCenter() const;
+			const Circle& bs_getBVolume() const;
+
 			const Line& asLine() const;
 			Vec2x2 nearest(const Ray& r) const;
 			Vec2 nearest(const Vec2& p) const;
 			Ray operator * (const AMat32& m) const;
 
+			Vec2 support(const Vec2& dir) const;
 			spn::none_t hit(...) const;
 			bool hit(const Vec2& p, float t=NEAR_THRESHOLD) const;
 			friend std::ostream& operator << (std::ostream& os, const Ray& r);

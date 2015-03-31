@@ -14,9 +14,20 @@ namespace boom {
 		Ray Ray::operator * (const AMat32& m) const {
 			return Ray{pos.asVec3(1)*m, dir.asVec3(0)*m};
 		}
+		float Ray::bs_getArea() const { INVOKE_ERROR }
+		float Ray::bs_getInertia() const { INVOKE_ERROR }
+		const Vec2& Ray::bs_getCenter() const {
+			return pos;
+		}
+		const Circle& Ray::bs_getBVolume() const { INVOKE_ERROR }
 		std::ostream& operator << (std::ostream& os, const Ray& r) {
 			return os << "Ray [ pos: " << r.pos << std::endl
 						<< "dir: " << r.dir << ']';
+		}
+		Vec2 Ray::support(const Vec2& dir) const {
+			if(dir.dot(dir) > 0)
+				return pos + dir*INFINITY_LENGTH;
+			return pos;
 		}
 		bool Ray::hit(const Vec2& p, float t) const {
 			Vec2 v = p - pos;

@@ -18,7 +18,8 @@ namespace boom {
 							SQUARE_RATIO = 1e-2f,
 							DOT_THRESHOLD_SQ = DOT_THRESHOLD * SQUARE_RATIO,
 							NEAR_THRESHOLD_SQ = NEAR_THRESHOLD * SQUARE_RATIO,
-							ZEROVEC_LENGTH_SQ = ZEROVEC_LENGTH * SQUARE_RATIO;
+							ZEROVEC_LENGTH_SQ = ZEROVEC_LENGTH * SQUARE_RATIO,
+							INFINITY_LENGTH = 1e6f;		//!< 無限遠にあるとみなす距離
 
 	using spn::Vec2; using spn::Vec3; using spn::Vec4;
 	using spn::AVec2; using spn::AVec3; using spn::AVec4;

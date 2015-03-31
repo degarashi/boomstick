@@ -10,6 +10,13 @@ namespace boom {
 		Vec2 Line::nearest(const Vec2& p) const {
 			return pos + dir * (p-pos).dot(dir);
 		}
+		float Line::bs_getArea() const { INVOKE_ERROR }
+		float Line::bs_getInertia() const { INVOKE_ERROR }
+		const Vec2& Line::bs_getCenter() const {
+			return pos;
+		}
+		const Circle& Line::bs_getBVolume() const { INVOKE_ERROR }
+
 		float Line::distance(const Vec2& p) const {
 			return std::fabs(dir.ccw(p - pos));
 		}
@@ -35,6 +42,11 @@ namespace boom {
 		std::ostream& operator << (std::ostream& os, const Line& l) {
 			return os << "Line [ pos: " << l.pos << std::endl
 						<< "dir: " << l.dir << ']';
+		}
+		Vec2 Line::support(const Vec2& dir) const {
+			if(dir.dot(dir) > 0)
+				return pos + dir*INFINITY_LENGTH;
+			return pos + dir*-INFINITY_LENGTH;
 		}
 		bool Line::hit(const Vec2& p, float t) const {
 			Vec2 v = p - pos;
