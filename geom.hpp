@@ -78,7 +78,7 @@ namespace boom {
 	}
 
 	//! サポートされていない関数を読んだ時の実行時エラーを送出
-	#define INVOKE_ERROR Assert(Trap, false, "not supported function: ", __func__) throw 0;
+	#define INVOKE_ERROR Assert(Trap, false, "not supported function: %1%", __func__) throw 0;
 	//! IModelから指定の型にキャスト出来ればその参照を返す関数のデフォルト実装
 	#define DEF_CASTFUNC(typ) virtual spn::Optional<typ&> castAs##typ() { return spn::none; } \
 			virtual spn::Optional<const typ&> castAs##typ() const { auto ref = const_cast<IModel*>(this)->castAs##typ(); \
