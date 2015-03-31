@@ -35,28 +35,47 @@ namespace boom {
 			// 両者は一致する筈
 			ASSERT_EQ(b0, b1);
 		}
+
+		template <class T>
+		class TfNode : public Narrow {
+			public:
+				using Narrow::Narrow;
+		};
+		using TfNodeTypeList = ::testing::Types<geo2d::Circle,
+												geo2d::Segment,
+												geo2d::Line,
+												geo2d::Ray,
+												geo2d::Poly,
+												geo2d::AABB>;
+		TYPED_TEST_CASE(TfNode, TfNodeTypeList);
+
 		using namespace spn::test;
 		// 単一ノードによる姿勢変換テスト
-		TEST_F(Narrow, TFNode2D) {
-			auto rd = getRand();
+		TYPED_TEST(TfNode, TFNode2D) {
+			auto rd = this->getRand();
 
+			using Shape = TypeParam;
+			using ShapeM = geo2d::Model<Shape>;
 			// 基本の形状に姿勢変換を掛けた物(=A)と
 			// 変換後の座標で直接生成した物(=B)の2種類を用意
-			geo2d::CircleM c = test2d::GenRCircle(rd);
+			ShapeM s;
+			test2d::GenRShape(s, rd);
 			spn::Pose2D ps(GenR2Vec(rd, {-1e3f, 1e3f}),
 							spn::DegF(rd.template getUniform<float>({-180.f, 180.f})),
 							GenR2VecAbs(rd, {1e-1f, 1e2f}, {1e-1f, 1e2f}));
-			auto spA = std::make_shared<geo2d::TfLeaf<geo2d::Circle>>(c * ps.getToWorld()),
-				 spB = std::make_shared<geo2d::TfLeaf<geo2d::Circle>>(c);
+			auto spA = std::make_shared<geo2d::TfLeaf<Shape>>(s * ps.getToWorld()),
+				 spB = std::make_shared<geo2d::TfLeaf<Shape>>(s);
 			spB->setPose(ps);
 
 			int nCheck = 500;
 			while(--nCheck >= 0) {
 				// 衝突試験用の形状を1つ用意
-				auto check = test2d::GenRSegment(rd);
+				ShapeM check;
+				test2d::GenRShape(check, rd);
 				// 結果は同じになる筈
-				bool bA = Narrow_t::Hit(spA.get(), &check, 0),
-					 bB = Narrow_t::Hit(spB.get(), &check, 0);
+				using this_t = TfNode<TypeParam>;
+				bool bA = this_t::Narrow_t::Hit(spA.get(), &check, 0),
+					 bB = this_t::Narrow_t::Hit(spB.get(), &check, 0);
 				ASSERT_EQ(bA, bB);
 			}
 		}
