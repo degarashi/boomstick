@@ -261,6 +261,7 @@ namespace boom {
 			float distance(const Segment& s) const;
 			LNear nearest(const Segment& s) const;
 			const Vec2& support(const Vec2& dir) const;
+			Point operator * (const AMat32& m) const;
 
 			spn::none_t hit(...) const;
 			bool hit(const Vec2& p, float t=NEAR_THRESHOLD) const;
