@@ -514,6 +514,7 @@ namespace boom {
 			static Convex GetOverlappingConvex(const Convex& m0, const Convex& m1, const Vec2& inner);
 			//! 凸包が直線と交差している箇所を2点計算
 			std::tuple<bool,Vec2,Vec2> checkCrossingLine(const Line& l) const;
+			Convex operator * (const AMat32& m) const;
 			Convex& operator *= (const AMat32& m);
 			//! 頂点が時計回りになっているか
 			bool checkCW() const;

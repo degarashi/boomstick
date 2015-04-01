@@ -96,6 +96,13 @@ namespace boom {
 			return Line(point[n], (point[spn::CndSub(n+1, point.size())] - point[n]).normalization());
 		}
 
+		Convex Convex::operator * (const AMat32& m) const {
+			int nP = point.size();
+			PointL pl(nP);
+			for(int i=0 ; i<nP ; i++)
+				pl[i] = point[i].asVec3(1) * m;
+			return std::move(pl);
+		}
 		Convex& Convex::operator *= (const AMat32& m) {
 			for(auto& p : point)
 				p = p.asVec3(1) * m;
