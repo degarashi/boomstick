@@ -36,7 +36,10 @@ namespace boom {
 			return geo2d::PolyM(rv(), rv(), rv());
 		}
 		template <class RD>
-		geo2d::ConvexM GenRConvex(RD& rd, int n, const spn::RangeF& rV={-1e3f, 1e3f}) {
+		geo2d::ConvexM GenRConvex(RD& rd, int n=-1, const spn::RangeF& rV={-1e3f, 1e3f}) {
+			if(n < 0)
+				n = rd.template getUniform<int>({3, 32});
+
 			return geo2d::ConvexM(
 					geo2d::Convex::FromConcave(
 						test::GenRVectors<2>(rd, n, rV, NEAR_THRESHOLD_SQ)
@@ -68,10 +71,7 @@ namespace boom {
 		template <class RD>
 		void GenRShape(geo2d::AABBM& p, RD& rd) { p = GenRAABB(rd); }
 		template <class RD>
-		void GenRShape(geo2d::ConvexM& p, RD& rd) {
-			int n = rd.template getUniform<int>({3,32});
-			p = GenRConvex(rd, n);
-		}
+		void GenRShape(geo2d::ConvexM& p, RD& rd) { p = GenRConvex(rd); }
 
 		class Narrow : public spn::test::RandomTestInitializer {
 			protected:
@@ -103,7 +103,34 @@ namespace boom {
 		TfSP MakeAsNode() {
 			return std::make_shared<geo2d::TfNode_Static<T>>();
 		}
+		TfSP GenRNode(int id);
 		template <class RD>
+		TfSP GenRLeaf(RD& rd, int id) {
+			#define MAKELEAF(typ)	case geo2d::typ::GetCID(): return MakeAsLeaf<geo2d::typ>(GenR##typ(rd));
+			switch(id) {
+				MAKELEAF(Point)
+				MAKELEAF(Line)
+				MAKELEAF(Ray)
+				MAKELEAF(Segment)
+				MAKELEAF(AABB)
+				MAKELEAF(Poly)
+				MAKELEAF(Circle)
+				MAKELEAF(Convex)
+				default:
+					Assert(Trap, false, "unknown collision-id")
+			}
+			#undef MAKELEAF
+			return nullptr;
+		}
+		template <template <class...> class CT>
+		void SetCid(int* dst, CT<>*) {}
+		template <template <class...> class CT,
+					class T0, class... Ts>
+		void SetCid(int* dst, CT<T0, Ts...>*) {
+			*dst = T0::GetCID();
+			SetCid(dst+1, (CT<Ts...>*)nullptr);
+		}
+		template <class CTNode, class CTLeaf, class RD>
 		TfSP MakeRandomTree(RD& rd, int nIteration, int maxDepth) {
 			using geo2d::Circle;
 			using geo2d::AABB;
@@ -116,8 +143,14 @@ namespace boom {
 				N_Manipulation
 			};
 			auto fnI = [&rd](const spn::RangeI& r){ return rd.template getUniform<int>(r); };
-			TfSP spRoot = (fnI({0,1}) == 0) ?
-							MakeAsNode<Circle>() : MakeAsNode<AABB>();
+			constexpr int NLeaf = CTLeaf::size,
+							NNode = CTNode::size;
+			int CidId_Leaf[NLeaf],
+				CidId_Node[NNode];
+			SetCid(CidId_Leaf, (CTLeaf*)nullptr);
+			SetCid(CidId_Node, (CTNode*)nullptr);
+
+			TfSP spRoot = GenRNode(CidId_Node[fnI({0,NNode-1})]);
 			auto spCursor = spRoot;
 			int cursorDepth = 0;
 			int nIter = fnI({0, nIteration});
@@ -125,8 +158,7 @@ namespace boom {
 				int m = fnI({0, N_Manipulation-1});
 				switch(m) {
 					case MNP_Add: {
-						spCursor->addChild((fnI({0,1})==0) ?
-								MakeAsLeaf<Circle>(GenRCircle(rd)) : MakeAsLeaf<AABB>(GenRAABB(rd)));
+						spCursor->addChild(GenRLeaf(rd, CidId_Leaf[fnI({0,NLeaf-1})]));
 						break; }
 					case MNP_Up:
 						// 深度が0の時は何もしない
@@ -138,8 +170,7 @@ namespace boom {
 					case MNP_MakeChild:
 						// 最大深度を超えている時は何もしない
 						if(cursorDepth < maxDepth) {
-							auto c = (fnI({0,1}) == 0) ?
-										MakeAsNode<Circle>() : MakeAsNode<AABB>();
+							auto c = GenRNode(CidId_Node[fnI({0,NNode-1})]);
 							spCursor->addChild(c);
 							spCursor = c;
 							++cursorDepth;

@@ -9,6 +9,17 @@ namespace boom {
 			base_t::SetUp();
 			Narrow_t::Initialize();
 		}
+		TfSP GenRNode(int id) {
+			#define MAKENODE(typ)	case typ::GetCID(): return MakeAsNode<typ>();
+			switch(id) {
+				MAKENODE(geo2d::AABB)
+				MAKENODE(geo2d::Circle)
+				default:
+					Assert(Trap, false, "unknown collision-id")
+			}
+			#undef MAKENODE
+			return nullptr;
+		}
 	}
 	namespace test {
 		using geo2d::PointM;
@@ -18,8 +29,9 @@ namespace boom {
 			auto rd = getRand();
 
 			// ランダムに当たり判定階層構造を作る
-			auto c0 = test2d::MakeRandomTree(rd, 64, 8);
-			auto c1 = test2d::MakeRandomTree(rd, 64, 8);
+			using CT = spn::CType<geo2d::Circle, geo2d::AABB>;
+			auto c0 = test2d::MakeRandomTree<CT,CT>(rd, 64, 8);
+			auto c1 = test2d::MakeRandomTree<CT,CT>(rd, 64, 8);
 			auto v0 = test2d::CollectLeaf(c0),
 				 v1 = test2d::CollectLeaf(c1);
 			// 個別に判定した結果

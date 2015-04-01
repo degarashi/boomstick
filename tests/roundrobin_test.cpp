@@ -53,11 +53,12 @@ namespace boom {
 			auto& cm = getColMgr();
 
 			auto fnN = [&](const spn::RangeI& r){ return rd.template getUniform<int>(r); };
+			using CT = spn::CType<geo2d::Circle, geo2d::AABB>;
 			// ランダムな階層構造の形状定義
 			auto fnInit = [&rd, &cm](int n, auto mask, auto ud) {
 				HLCol_V v(n);
 				for(int i=0 ; i<n ; i++) {
-					auto sp = test2d::MakeRandomTree(rd, 4, 1);
+					auto sp = test2d::MakeRandomTree<CT,CT>(rd, 4, 1);
 					v[i] = cm.addCol(mask, mgr_model2d.emplace(sp), ud);
 				}
 				return std::move(v);
