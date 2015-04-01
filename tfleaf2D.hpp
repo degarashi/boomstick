@@ -3,6 +3,7 @@
 
 namespace boom {
 	namespace geo2d {
+		// スケーリングはX,Yとも同じ比率のみ許可
 		template <class Shape, class Ud=spn::none_t>
 		class TfLeafBase : public spn::CheckAlign<16, TfLeafBase<Shape,Ud>>,
 							public TfBase,
@@ -51,8 +52,10 @@ namespace boom {
 				float im_getInertia() const override { return getInertia(); }
 				float im_getArea() const override { return getArea(); }
 				Vec2 im_getCenter() const override { return getCenter(); }
-				Vec2 im_support(const spn::Vec2& dir) const override {
-					return toWorldDir(model_t::support(toLocalDir(dir)));
+				Vec2 im_support(const Vec2& dir) const override {
+					auto& sc = getPose().getScale();
+					AssertP(Trap, std::abs(sc.x - sc.y) < 1e-4f);
+					return toWorld(model_t::support(toLocalDir(dir)));
 				}
 				bool im_hitPoint(const Vec2& p, float t=NEAR_THRESHOLD) const override {
 					return model_t::hit(toLocal(p), t);
@@ -61,13 +64,13 @@ namespace boom {
 					return v.asVec3(1) * getLocal();
 				}
 				Vec2 toLocalDir(const Vec2& v) const override {
-					return v.asVec3(0) * getLocal();
+					return (v.asVec3(0) * getLocal()).normalization();
 				}
 				Vec2 toWorld(const Vec2& v) const override {
 					return v.asVec3(1) * getGlobal();
 				}
 				Vec2 toWorldDir(const Vec2& v) const override {
-					return v.asVec3(0) * getGlobal();
+					return (v.asVec3(0) * getGlobal()).normalization();
 				}
 				spn::Optional<const AMat32&> getToLocal() const override {
 					return getLocal();
@@ -94,6 +97,10 @@ namespace boom {
 		uint32_t TfLeafBase<Shape,Ud>::_refresh(AMat32& m, Global*) const {
 			getNodeAccum();
 			auto& ps = getPose();
+			{
+				auto& sc = ps.getScale();
+				AssertP(Trap, std::abs(sc.x - sc.y) < 1e-4f);
+			}
 			ps.getToWorld().convert(m);
 			return 0;
 		}
@@ -124,15 +131,13 @@ namespace boom {
 		template <class Shape, class Ud>
 		uint32_t TfLeafBase<Shape,Ud>::_refresh(spn::Vec2& v, Center*) const {
 			getModelAccum();
-			v = model_t::bs_getCenter();
-			v = v.asVec3(1) * getGlobal();
+			v = toWorld(model_t::bs_getCenter());
 			return 0;
 		}
 		template <class Shape, class Ud>
 		uint32_t TfLeafBase<Shape,Ud>::_refresh(spn::Vec2& v, GCenter*) const {
 			getModelAccum();
-			v = model_t::bs_getGCenter();
-			v = v.asVec3(1) * getGlobal();
+			v = toWorld(model_t::bs_getGCenter());
 			return 0;
 		}
 		template <class Shape, class Ud>
@@ -140,7 +145,7 @@ namespace boom {
 			getModelAccum();
 			c = model_t::bs_getBVolume();
 			auto& ps = getPose();
-			c.vCenter = c.vCenter.asVec3(1) * ps.getToWorld();
+			c.vCenter = toWorld(c.vCenter);
 			auto m = ps.getToWorld().convertA22();
 			c.fRadius *= getDeterminant();
 			return 0;
@@ -190,7 +195,9 @@ namespace boom {
 		{
 			private:
 				using this_t = TfLeaf<Convex,Ud>;
+				using base_t = TfLeafBase<Convex, Ud>;
 			public:
+				using base_t::base_t;
 				bool canCacheShape() const override {
 					return false;
 				}

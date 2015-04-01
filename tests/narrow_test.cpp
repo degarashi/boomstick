@@ -62,7 +62,7 @@ namespace boom {
 			test2d::GenRShape(s, rd);
 			spn::Pose2D ps(GenR2Vec(rd, {-1e3f, 1e3f}),
 							spn::DegF(rd.template getUniform<float>({-180.f, 180.f})),
-							GenR2VecAbs(rd, {1e-1f, 1e2f}, {1e-1f, 1e2f}));
+							Vec2(rd.template getUniform<float>({1e-2f, 1e2f})));
 			auto spA = std::make_shared<geo2d::TfLeaf<Shape>>(s * ps.getToWorld()),
 				 spB = std::make_shared<geo2d::TfLeaf<Shape>>(s);
 			spB->setPose(ps);
