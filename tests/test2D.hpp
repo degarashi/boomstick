@@ -68,7 +68,10 @@ namespace boom {
 		template <class RD>
 		void GenRShape(geo2d::AABBM& p, RD& rd) { p = GenRAABB(rd); }
 		template <class RD>
-		void GenRShape(geo2d::ConvexM& p, RD& rd) { p = GenRConvex(rd); }
+		void GenRShape(geo2d::ConvexM& p, RD& rd) {
+			int n = rd.template getUniform<int>({3,32});
+			p = GenRConvex(rd, n);
+		}
 
 		class Narrow : public spn::test::RandomTestInitializer {
 			protected:

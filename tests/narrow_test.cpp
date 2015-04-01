@@ -46,7 +46,8 @@ namespace boom {
 												geo2d::Line,
 												geo2d::Ray,
 												geo2d::Poly,
-												geo2d::AABB>;
+												geo2d::AABB,
+												geo2d::Convex>;
 		TYPED_TEST_CASE(TfNode, TfNodeTypeList);
 
 		using namespace spn::test;
@@ -67,8 +68,15 @@ namespace boom {
 				 spB = std::make_shared<geo2d::TfLeaf<Shape>>(s);
 			spB->setPose(ps);
 
-			int nCheck = 500;
-			while(--nCheck >= 0) {
+			// サポート写像が一致するか確認
+			constexpr int nCheck = 100;
+			for(int i=0 ; i<nCheck ; i++) {
+				auto dir = spn::test::GenR2Dir(rd);
+				auto p0 = spA->im_support(dir);
+				auto p1 = spB->im_support(dir);
+				ASSERT_LE(p0.distance(p1), 1e-3f);
+			}
+			for(int i=0 ; i<nCheck ; i++) {
 				// 衝突試験用の形状を1つ用意
 				ShapeM check;
 				test2d::GenRShape(check, rd);
