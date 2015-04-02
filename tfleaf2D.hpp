@@ -186,6 +186,9 @@ namespace boom {
 					getTfShape();
 					return &_tfShape;
 				}
+				typename base_t::SP clone() const override {
+					return std::make_shared<TfLeaf>(*this);
+				}
 		};
 
 		//! 座標変換ありのモデル基底
@@ -194,7 +197,6 @@ namespace boom {
 								public TfLeafBase<Convex, Ud>
 		{
 			private:
-				using this_t = TfLeaf<Convex,Ud>;
 				using base_t = TfLeafBase<Convex, Ud>;
 			public:
 				using base_t::base_t;
@@ -207,6 +209,9 @@ namespace boom {
 				}
 				void* getCore[[noreturn]]() override {
 					throw std::domain_error("calling getCore() is not valid for TfLeaf<Convex>");
+				}
+				typename base_t::SP clone() const override {
+					return std::make_shared<TfLeaf>(*this);
 				}
 		};
 	}

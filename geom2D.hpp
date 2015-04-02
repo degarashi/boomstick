@@ -133,6 +133,7 @@ namespace boom {
 		{
 			private:
 				friend class spn::TreeNode<TfBase>;
+				using base_t = spn::TreeNode<TfBase>;
 			protected:
 				void* _getUserData(void*, std::true_type);
 				void* _getUserData(void* udata, std::false_type);
@@ -144,6 +145,7 @@ namespace boom {
 				MdlItr getInner() const override;
 				bool hasInner() const override;
 				virtual bool isLeaf() const { return false; }
+				virtual typename base_t::SP clone() const = 0;
 		};
 		template <class Boundary, class Ud>
 		class TfNode_base : public TfBase,
@@ -177,6 +179,9 @@ namespace boom {
 					base_t::onChildRemove(node);
 				}
 			public:
+				SP clone() const override {
+					return std::make_shared<TfNode_Static>(*this);
+				}
 				bool imn_refresh(Time_t t) const override {
 					if(_bChanged) {
 						_bChanged = false;
@@ -219,6 +224,9 @@ namespace boom {
 					base_t::onChildRemove(node);
 				}
 			public:
+				SP clone() const override {
+					return std::make_shared<TfNode_Dynamic>(*this);
+				}
 				bool imn_refresh(Time_t t) const override {
 					// 更新時刻が古い時のみ処理を行う
 					if(!_opTime || *_opTime < t) {
