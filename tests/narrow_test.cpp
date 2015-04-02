@@ -99,5 +99,39 @@ namespace boom {
 				ASSERT_EQ(bA, bB);
 			}
 		}
+		// ツリーノードによる姿勢変換テスト
+		TEST_F(Narrow, TfTree2D) {
+			auto rd = this->getRand();
+
+			using CTLeaf = spn::CType<geo2d::Circle, geo2d::AABB>;
+			using CTNode = spn::CType<geo2d::Circle>;
+			auto spA = test2d::MakeRandomTree<CTNode, CTNode>(rd, 64, 8),
+				spB = spA->cloneTree();
+			auto vA = test2d::CollectLeaf(spA),
+				 vB = test2d::CollectLeaf(spB);
+
+			// 基本の形状に姿勢変換を掛けた物(=A)と
+			// 変換後の座標で直接生成した物(=B)の2種類を用意
+			spn::Pose2D ps(GenR2Vec(rd, {-1e3f, 1e3f}),
+							spn::DegF(rd.template getUniform<float>({-180.f, 180.f})),
+							Vec2(rd.template getUniform<float>({1e-2f, 1e2f})));
+			for(auto& vs : vA) {
+				auto* vsp = static_cast<geo2d::TfLeaf<geo2d::Circle>*>(vs);
+				vsp->setPose(ps);
+			}
+			auto& toWorld = ps.getToWorld();
+			for(auto& vs : vB) {
+				auto* vsp = static_cast<geo2d::TfLeaf<geo2d::Circle>*>(vs);
+				static_cast<geo2d::Circle&>(*vsp) = *vsp * toWorld;
+			}
+
+			constexpr int nCheck = 5;
+			for(int i=0 ; i<nCheck ; i++) {
+				auto t0 = test2d::MakeRandomTree<CTNode, CTLeaf>(rd, 64, 8);
+				bool bA = Narrow_t::Hit(spA.get(), t0.get(), 0),
+					bB = Narrow_t::Hit(spB.get(), t0.get(), 0);
+				ASSERT_EQ(bA, bB);
+			}
+		}
 	}
 }
