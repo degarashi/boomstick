@@ -23,8 +23,8 @@ namespace boom {
 					((Area)(float)(ModelAccum)(Determinant)) \
 					((Center)(spn::Vec2)(ModelAccum)(Global)) \
 					((GCenter)(spn::Vec2)(ModelAccum)(Global)) \
-					((BVolume)(Circle)(ModelAccum)(Determinant)(Global)) \
-					((ShapeAccum)(uint32_t)(ModelAccum)(Global))
+					((BVolume)(Circle)(ModelAccum)(Pose)) \
+					((ShapeAccum)(uint32_t)(ModelAccum)(Pose))
 				RFLAG_S(TfLeafBase, SEQ_TFLEAF)
 			private:
 				void _init() {
@@ -90,7 +90,7 @@ namespace boom {
 		uint32_t TfLeafBase<Shape,Ud>::_refresh(uint32_t& a, ShapeAccum*) const {
 			++a;
 			getModelAccum();
-			getGlobal();
+			getPose();
 			return 0;
 		}
 		template <class Shape, class Ud>
@@ -144,10 +144,7 @@ namespace boom {
 		uint32_t TfLeafBase<Shape,Ud>::_refresh(Circle& c, BVolume*) const {
 			getModelAccum();
 			c = model_t::bs_getBVolume();
-			auto& ps = getPose();
-			c.vCenter = toWorld(c.vCenter);
-			auto m = ps.getToWorld().convertA22();
-			c.fRadius *= getDeterminant();
+			c = c * getPose().getToWorld();
 			return 0;
 		}
 
@@ -184,6 +181,8 @@ namespace boom {
 				}
 				void* getCore() override {
 					getTfShape();
+					// データが改変されるかも知れないので更新フラグを立てる
+					++base_t::refModelAccum();
 					return &_tfShape;
 				}
 				typename base_t::SP clone() const override {
