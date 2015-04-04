@@ -163,31 +163,31 @@ namespace boom {
 		}
 		// デバッグ用Print関数
 		namespace {
-			void PrintV(const Vec2& v) {
-				std::cout << '[' << v.x << ',' << v.y << ']';
+			void PrintV(std::ostream& os, const Vec2& v) {
+				os << '[' << v.x << ',' << v.y << ']';
 			}
-			void PrintV(const Vec2x2& v) {
-				PrintV(v.first);
-				PrintV(v.second);
+			void PrintV(std::ostream& os, const Vec2x2& v) {
+				PrintV(os, v.first);
+				PrintV(os, v.second);
 			}
 		}
-		void GEpa::_printASV() const {
+		void GEpa::_printASV(std::ostream& os) const {
 			int nV = _szVl;
 			for(int i=0 ; i<nV ; i++) {
-				PrintV(*_vl[i]);
-				std::cout << std::endl;
+				PrintV(os, *_vl[i]);
+				os << std::endl;
 			}
 			for(auto itr=_asv.cbegin() ; itr!=_asv.cend() ; itr++) {
-				std::cout << itr->dist << ':';
-				PrintV(itr->dir);
-				std::cout << std::hex << itr->vtx[0] << ',' << itr->vtx[1] << std::endl;
+				os << itr->dist << ':';
+				PrintV(os, itr->dir);
+				os << std::hex << itr->vtx[0] << ',' << itr->vtx[1] << std::endl;
 			}
 		}
 
-		int GEpa::_getIndex(const Vec2x2 *vp) const {
+		Int_OP GEpa::_getIndex(const Vec2x2 *vp) const {
 			auto itr = std::find(_vl.begin(), _vl.end(), vp);
 			if(itr == _vl.end())
-				return 0xffff;
+				return spn::none;
 			return itr-_vl.begin();
 		}
 		namespace {
@@ -196,64 +196,76 @@ namespace boom {
 		bool GEpa::_addAsv(const Vec2x2& v0, const Vec2x2& v1) {
 			auto res = Segment(v0.first, v1.first).nearest(c_origin);
 			if(res.second == LinePos::OnLine) {
-				float len = res.first.length();
-				res.first *= spn::Rcp22Bit(len);
+				float len = res.first.normalize();
 				_asv.insert(LmLen{len, res.first, {&v0,&v1}});
 				return true;
 			}
-			return res.second != LinePos::NotHit;
+			return false;
 		}
-		void GEpa::_epaMethodOnHit() {
-			// 衝突時: 脱出ベクトルを求める
-			float minLen = std::numeric_limits<float>::max();
+		void GEpa::_epaMethodOnHit(float threshold) {
+			AssertP(Trap, !_asv.empty())
+			float minDist = std::numeric_limits<float>::max();
+			bool bValid = false;
+			// 探索候補が空か候補の中で一番近い線分がこれまでの最短より遠ければ計算終了
 			while(!_asv.empty()) {
 				auto fr = _asv.pop_frontR();
-
-				const Vec2x2 &v1 = _minkowskiSub(fr.dir, _getIndex(fr.vtx[0])),
+				// v0,v2 = 前からあった頂点
+				// v1 = 新しく追加される頂点
+				const Vec2x2 &v1 = _minkowskiSub(fr.dir, *_getIndex(fr.vtx[0])),
 							&v0 = *fr.vtx[0],
 							&v2 = *fr.vtx[1];
+				// 前回の結果からdirベクトル方向の距離がほぼ変わらなかった場合
 				float d1 = fr.dir.dot(v1.first);
-				if(spn::EqAbs(d1, fr.dist, 5e-4f)) {
-					if(minLen > fr.dist) {
-						minLen = fr.dist;
-						_pvec = fr.dir * fr.dist;
-					}
-					if(_asv.empty() || _asv.front().dist > fr.dist)
-						break;
+				if(d1 <= fr.dist + threshold) {
+					_pvec = fr.dir * -fr.dist;
+					return;
 				}
-
-				if(_addAsv(v0, v1) || _addAsv(v1, v2)) {
-					_pvec = fr.dir * fr.dist;
-					break;
+				// 新しく追加された頂点を交えて線分候補を作成
+				if(!_addAsv(v0, v1) & !_addAsv(v1, v2)) {
+					if(d1 <= minDist) {
+						minDist = d1;
+						_pvec = fr.dir * -fr.dist;
+						bValid = true;
+					}
 				}
 			}
+			AssertP(Trap, bValid)
 		}
-		void GEpa::_epaMethodNoHit() {
+		void GEpa::_epaMethodNoHit(float threshold) {
+			auto fnSetVec = [&nvec = _nvec](const Vec2& v, const LmLen& lm){
+				nvec.first = v + lm.dir * lm.dist;
+				nvec.second = v;
+			};
 			// 無衝突時: 最近傍対を求める
 			while(!_asv.empty()) {
 				auto fr = _asv.pop_frontR();
+				// 線分ではなく点候補の時はここで探索を終了
 				if(!fr.vtx[1]) {
 					auto& p = *fr.vtx[0];
-					_nvec.second = p.second;
-					_nvec.first = p.second + fr.dir * fr.dist;
+					fnSetVec(p.second, fr);
 					return;
 				}
-				if(fr.dist < 1e-6f || IsNaN(fr.dir)) {
+				// 原点と候補の線分がほぼ重なっている時はゼロ距離とみなす
+				if(fr.dist < NEAR_THRESHOLD || IsNaN(fr.dir)) {
 					_nvec.first = _nvec.second = fr.vtx[0]->second;
 					return;
 				}
-				const Vec2x2& v1 = _minkowskiSub(-fr.dir, _getIndex(fr.vtx[0])),
+
+				// v0,v2 = 前からあった頂点
+				// v1 = 新しく追加される頂点
+				const Vec2x2& v1 = _minkowskiSub(-fr.dir, *_getIndex(fr.vtx[0])),
 							&v0 = *fr.vtx[0],
 							&v2 = *fr.vtx[1];
 				float d1 = fr.dir.dot(v1.first);
-				if(spn::EqAbs(std::fabs(d1), fr.dist, 5e-4f)) {
-					_nvec.second = v1.second;
-					_nvec.first = v1.second + fr.dir * fr.dist;
+				// 前回の結果からdirベクトル方向の距離がほぼ進展しなかった場合
+				if(d1 >= fr.dist - threshold) {
+					fnSetVec(v1.second, fr);
 					return;
 				}
-				if(_addAsv(v0, v1) || _addAsv(v1, v2)) {
-					_nvec.second = v1.second;
-					_nvec.first = v1.second + fr.dir * fr.dist;
+				// 新しく追加された頂点を交えて線分候補を作成
+				if(!_addAsv(v0, v1) & !_addAsv(v1, v2)) {
+					// どちらの線分上にも原点が存在しない = 点(v1)が一番近い
+					fnSetVec(v1.second, fr);
 					return;
 				}
 			}
@@ -313,12 +325,12 @@ namespace boom {
 		}
 		void GEpa::_recover2OnHit() {
 			LmLen lm;
-			lm.dist = 0;
+			lm.dist = -1;
 			lm.dir = _poly.point[0]-_poly.point[1];
 			lm.dir.normalize();
-			lm.dir *= cs_mRot90[0];
 			lm.vtx[0] = _vl[0];
 			lm.vtx[1] = _vl[1];
+			lm.dir *= cs_mRot90[0];
 			_asv.insert(lm);
 
 			std::swap(lm.vtx[0], lm.vtx[1]);
@@ -326,7 +338,10 @@ namespace boom {
 			_asv.insert(lm);
 		}
 
-		GEpa::GEpa(const IModel& m0, const IModel& m1): GSimplex(m0,m1), _szVl(0) {
+		GEpa::GEpa(const IModel& m0, const IModel& m1, float threshold):
+			GSimplex(m0,m1),
+			_szVl(0)
+		{
 			int nV = _nVtx;
 			_szVl = nV;
 			for(int i=0 ; i<nV ; i++) {
@@ -346,7 +361,7 @@ namespace boom {
 						_adjustLoop3();
 						_geneASV();
 					}
-					_epaMethodOnHit();
+					_epaMethodOnHit(threshold);
 				} else {
 					if(nV == 1) {
 						const Vec2& v = _minkowskiSub(-_poly.point[0].normalization()).first;
@@ -367,7 +382,7 @@ namespace boom {
 						_adjustLoop3();
 						_geneASV();
 					}
-					_epaMethodNoHit();
+					_epaMethodNoHit(threshold);
 				}
 			} while(false);
 		}

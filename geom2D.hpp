@@ -11,6 +11,7 @@
 
 namespace boom {
 	namespace geo2d {
+		using Int_OP = spn::Optional<int>;
 		struct Point;
 		struct Segment;
 		struct AABB;
@@ -560,6 +561,8 @@ namespace boom {
 		//! GJKで最近傍対を求める
 		/*! 常に頂点リストを時計回りに保つ */
 		class GEpa : public GSimplex {
+			/*! ミンコフスキー差の凸形状を構成する最大頂点数(VList)
+				必要ならvectorでやっても良いがとりあえず決め打ち */
 			constexpr static int MAX_VERT = 0x100;
 			using VPool = boost::object_pool<Vec2x2>;
 			static thread_local VPool tls_vPool;
@@ -567,8 +570,12 @@ namespace boom {
 
 			VList	_vl;
 			size_t	_szVl;
+			//! 新しく頂点メモリを確保
+			/*! \param n 格納先のインデックス (負数なら末尾) */
 			Vec2x2* _allocVert(int n=-1);
-			int _getIndex(const Vec2x2* vp) const;
+			//! 頂点ポインタからのインデックス検索
+			/*! \param vp 検索する頂点ポインタ */
+			Int_OP _getIndex(const Vec2x2* vp) const;
 
 			//! 点と辺の両対応
 			struct LmLen {
@@ -582,21 +589,25 @@ namespace boom {
 			};
 			//! 最短距離リスト
 			spn::AssocVec<LmLen>	_asv;
-			void _printASV() const;
+			//! デバッグ用
+			void _printASV(std::ostream& os) const;
 
 			union {
 				Vec2	_pvec;
 				Vec2x2	_nvec;
 			};
+			//! v0.firstとv1.firstからなる線分候補をリストに追加
+			/*!	\return 線分候補が追加されればtrue, それ以外はfalse */
 			bool _addAsv(const Vec2x2& v0, const Vec2x2& v1);
 
+			//! 指定方向へのミンコフスキー差
 			/*! \param[in] n 計算した頂点の挿入先インデックス */
 			const Vec2x2& _minkowskiSub(const Vec2& dir, int n=-1);
 			//! Hit時の脱出ベクトル
 			/*! 最低でも3頂点以上持っている前提 */
-			void _epaMethodOnHit();
+			void _epaMethodOnHit(float threshold);
 			//! NoHit時の最短ベクトル
-			void _epaMethodNoHit();
+			void _epaMethodNoHit(float threshold);
 
 			//! NoHit: 頂点が2つしか無い時の補正
 			void _recover2NoHit();
@@ -609,7 +620,7 @@ namespace boom {
 			void _clear();
 
 			public:
-				GEpa(const IModel& m0, const IModel& m1);
+				GEpa(const IModel& m0, const IModel& m1, float threshold=NEAR_THRESHOLD);
 				~GEpa();
 				/*! 非衝突時に有効
 					\return A側の最近傍点, B側の最近傍点 */
