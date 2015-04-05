@@ -53,6 +53,7 @@ namespace boom {
 			void getArcPoints(PointL& dst, float ang0, float ang1, float deep) const;
 			Circle operator * (const AMat32& m) const;
 			Circle operator * (float s) const;
+			void distend(float width);
 
 			// ---- for MakeBoundary ----
 			void setBoundary(const IModel* p);
@@ -399,6 +400,7 @@ namespace boom {
 			bool hit(const Segment& l, float t=NEAR_THRESHOLD) const;
 			bool hit(const AABB& ab, float t=NEAR_THRESHOLD) const;
 			AABB operator * (const AMat32& m) const;
+			void distend(float width);
 
 			// ---- for MakeBoundary ----
 			void setBoundary(const IModel* p);
