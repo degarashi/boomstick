@@ -204,8 +204,7 @@ namespace boom {
 		}
 		void GEpa::_epaMethodOnHit(float threshold) {
 			AssertP(Trap, !_asv.empty())
-			float minDist = std::numeric_limits<float>::max();
-			bool bValid = false;
+			const float threshold_sq = threshold * SQUARE_RATIO;
 			// 探索候補が空か候補の中で一番近い線分がこれまでの最短より遠ければ計算終了
 			while(!_asv.empty()) {
 				auto fr = _asv.pop_frontR();
@@ -214,28 +213,31 @@ namespace boom {
 				const Vec2x2 &v1 = _minkowskiSub(fr.dir, *_getIndex(fr.vtx[0])),
 							&v0 = *fr.vtx[0],
 							&v2 = *fr.vtx[1];
-				// 前回の結果からdirベクトル方向の距離がほぼ変わらなかった場合
+				// 既に検出済みの頂点だった場合は終了
+				float vd0 = fr.vtx[0]->first.dist_sq(v1.first),
+						vd1 = fr.vtx[1]->first.dist_sq(v1.first);
+				if(vd0 < threshold_sq || vd1 < threshold_sq) {
+					_pvec = fr.dir * -fr.dist;
+					return;
+				}
+				// 前回の結果からdirベクトル方向の距離がほぼ変わらなかった場合は終了
 				float d1 = fr.dir.dot(v1.first);
 				if(d1 <= fr.dist + threshold) {
 					_pvec = fr.dir * -fr.dist;
 					return;
 				}
 				// 新しく追加された頂点を交えて線分候補を作成
-				if(!_addAsv(v0, v1) & !_addAsv(v1, v2)) {
-					if(d1 <= minDist) {
-						minDist = d1;
-						_pvec = fr.dir * -fr.dist;
-						bValid = true;
-					}
-				}
+				_addAsv(v0, v1);
+				_addAsv(v1, v2);
 			}
-			AssertP(Trap, bValid)
+			AssertP(Trap, false)
 		}
 		void GEpa::_epaMethodNoHit(float threshold) {
 			auto fnSetVec = [&nvec = _nvec](const Vec2& v, const LmLen& lm){
 				nvec.first = v + lm.dir * lm.dist;
 				nvec.second = v;
 			};
+			const float threshold_sq = threshold * SQUARE_RATIO;
 			// 無衝突時: 最近傍対を求める
 			while(!_asv.empty()) {
 				auto fr = _asv.pop_frontR();
@@ -251,15 +253,22 @@ namespace boom {
 					return;
 				}
 
+				Segment seg(fr.vtx[0]->first, fr.vtx[1]->first);
 				// v0,v2 = 前からあった頂点
 				// v1 = 新しく追加される頂点
 				const Vec2x2& v1 = _minkowskiSub(-fr.dir, *_getIndex(fr.vtx[0])),
 							&v0 = *fr.vtx[0],
 							&v2 = *fr.vtx[1];
 				float d1 = fr.dir.dot(v1.first);
-				// 前回の結果からdirベクトル方向の距離がほぼ進展しなかった場合
-				if(d1 >= fr.dist - threshold) {
-					fnSetVec(v1.second, fr);
+				// 既に検出済みの頂点だった場合は終了
+				float vd0 = fr.vtx[0]->first.dist_sq(v1.first),
+						vd1 = fr.vtx[1]->first.dist_sq(v1.first);
+				// または前回の結果からdirベクトル方向の距離がほぼ進展しなかった場合
+				if(vd0 < threshold_sq || vd1 < threshold_sq ||
+						d1 >= fr.dist - threshold)
+				{
+					auto ln = seg.nearest(Vec2(0,0));
+					fnSetVec(ln.first, fr);
 					return;
 				}
 				// 新しく追加された頂点を交えて線分候補を作成
@@ -272,10 +281,11 @@ namespace boom {
 			AssertP(Trap, false)
 		}
 		void GEpa::_adjustLoop3() {
+			// 頂点数が3の時専用
 			AssertP(Trap, _szVl == 3)
 			Vec2 v01(_vl[1]->first - _vl[0]->first),
 				v02(_vl[2]->first - _vl[0]->first);
-			if(v01.ccw(v02) < 0)
+			if(v01.cw(v02) < 0)
 				std::swap(_vl[0], _vl[1]);
 		}
 		void GEpa::_clear() {
