@@ -108,6 +108,11 @@ namespace boom {
 				p = p.asVec3(1) * m;
 			return *this;
 		}
+		Convex& Convex::operator += (const Vec2& ofs) {
+			for(auto& p : point)
+				p += ofs;
+			return *this;
+		}
 
 		bool Convex::checkCW() const {
 			int nV = point.size();

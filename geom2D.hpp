@@ -53,6 +53,7 @@ namespace boom {
 			void getArcPoints(PointL& dst, float ang0, float ang1, float deep) const;
 			Circle operator * (const AMat32& m) const;
 			Circle operator * (float s) const;
+			Circle& operator += (const Vec2& ofs);
 			void distend(float width);
 
 			// ---- for MakeBoundary ----
@@ -400,6 +401,7 @@ namespace boom {
 			bool hit(const Segment& l, float t=NEAR_THRESHOLD) const;
 			bool hit(const AABB& ab, float t=NEAR_THRESHOLD) const;
 			AABB operator * (const AMat32& m) const;
+			AABB& operator += (const Vec2& ofs);
 			void distend(float width);
 
 			// ---- for MakeBoundary ----
@@ -446,6 +448,7 @@ namespace boom {
 			bool hit(const Vec2& p, float t=NEAR_THRESHOLD) const;
 			bool hit(const Poly& p, float t=NEAR_THRESHOLD) const;
 			Poly operator * (const AMat32& m) const;
+			Poly& operator += (const Vec2& ofs);
 			friend std::ostream& operator << (std::ostream& os, const Poly& p);
 		};
 		using PolyM = Model<Poly>;
@@ -528,6 +531,7 @@ namespace boom {
 			std::tuple<bool,Vec2,Vec2> checkCrossingLine(const Line& l) const;
 			Convex operator * (const AMat32& m) const;
 			Convex& operator *= (const AMat32& m);
+			Convex& operator += (const Vec2& ofs);
 			//! 頂点が時計回りになっているか
 			bool checkCW() const;
 			//! 頂点の並びを時計回りに修正

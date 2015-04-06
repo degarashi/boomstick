@@ -142,6 +142,11 @@ namespace boom {
 			}
 			return ret;
 		}
+		AABB& AABB::operator += (const Vec2& ofs) {
+			minV += ofs;
+			maxV += ofs;
+			return *this;
+		}
 		void AABB::distend(float width) {
 			Vec2 v(width, width);
 			minV -= v;

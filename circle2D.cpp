@@ -39,6 +39,10 @@ namespace boom {
 			return Circle(ori,
 						spn::Sqrt(std::max(tx.len_sq(), ty.len_sq())));
 		}
+		Circle& Circle::operator += (const Vec2& ofs) {
+			vCenter += ofs;
+			return *this;
+		}
 		void Circle::setBoundary(const IModel* p) {
 			*this = p->im_getBVolume();
 		}

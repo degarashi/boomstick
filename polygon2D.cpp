@@ -119,6 +119,11 @@ namespace boom {
 				ret.point[i] = point[i].asVec3(1) * m;
 			return ret;
 		}
+		Poly& Poly::operator += (const Vec2& ofs) {
+			for(auto& v : point)
+				v += ofs;
+			return *this;
+		}
 		std::ostream& operator << (std::ostream& os, const Poly& p) {
 			return os << "Polygon(2d) [ 0: " << p.point[0] << std::endl
 						<< "1: " << p.point[1] << std::endl
