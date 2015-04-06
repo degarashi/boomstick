@@ -363,7 +363,7 @@ namespace boom {
 			do {
 				if(getResult()) {
 					if(nV == 1) {
-						_pvec *= 0;
+						_pvec = Vec2(0,0);
 						break;
 					} else if(nV == 2)
 						_recover2OnHit();
