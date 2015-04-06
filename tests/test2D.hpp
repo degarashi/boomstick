@@ -5,38 +5,51 @@
 
 namespace boom {
 	namespace test2d {
+		using RangeF_OP = spn::Optional<spn::RangeF>;
+		using Int_OP = spn::Optional<int>;
+		namespace defval {
+			const spn::RangeF point_pos{-1e4f, 1e4f},
+								circle_center(point_pos),
+								circle_radius{0, 1e3f},
+								ray_pos{-1e3f, 1e3f},
+								line_pos(ray_pos),
+								segment_pos(ray_pos),
+								poly_pos(ray_pos),
+								convex_pos(ray_pos),
+								aabb_pos(ray_pos);
+		}
 		template <class RD>
-		geo2d::PointM GenRPoint(RD& rd, const spn::RangeF& r={-1e4f, 1e4f}) {
+		geo2d::PointM GenRPoint(RD& rd, const spn::RangeF& r=defval::point_pos) {
 			return geo2d::PointM(spn::test::GenR2Vec(rd, r));
 		}
 		template <class RD>
-		geo2d::CircleM GenRCircle(RD& rd, const spn::RangeF& rC={-1e4f, 1e4f},
-											const spn::RangeF& rR={0, 1e3f})
+		geo2d::CircleM GenRCircle(RD& rd, const spn::RangeF& rC=defval::circle_center,
+										const spn::RangeF& rR=defval::circle_radius)
 		{
 			return geo2d::CircleM(spn::test::GenR2Vec(rd, rC),
 							rd.template getUniform<float>(rR));
 		}
 		template <class RD>
-		geo2d::RayM GenRRay(RD& rd, const spn::RangeF& rV={-1e3f, 1e3f}) {
+		geo2d::RayM GenRRay(RD& rd, const spn::RangeF& rV=defval::ray_pos) {
 			return geo2d::RayM(spn::test::GenR2Vec(rd, rV),
 								spn::test::GenR2Dir(rd));
 		}
 		template <class RD>
-		geo2d::LineM GenRLine(RD& rd, const spn::RangeF& rV={-1e3f, 1e3f}) {
+		geo2d::LineM GenRLine(RD& rd, const spn::RangeF& rV=defval::line_pos) {
 			return GenRRay(rd, rV).asLine();
 		}
 		template <class RD>
-		geo2d::SegmentM GenRSegment(RD& rd, const spn::RangeF& rV={-1e3f, 1e3f}) {
+		geo2d::SegmentM GenRSegment(RD& rd, const spn::RangeF& rV=defval::segment_pos) {
 			auto rv = [&](){ return spn::test::GenR2Vec(rd, rV); };
 			return geo2d::SegmentM(rv(), rv());
 		}
 		template <class RD>
-		geo2d::PolyM GenRPoly(RD& rd, const spn::RangeF& rV={-1e3f, 1e3f}) {
+		geo2d::PolyM GenRPoly(RD& rd, const spn::RangeF& rV=defval::poly_pos) {
 			auto rv = [&](){ return spn::test::GenR2Vec(rd, rV); };
 			return geo2d::PolyM(rv(), rv(), rv());
 		}
 		template <class RD>
-		geo2d::ConvexM GenRConvex(RD& rd, int n=-1, const spn::RangeF& rV={-1e3f, 1e3f}) {
+		geo2d::ConvexM GenRConvex(RD& rd, const spn::RangeF& rV=defval::convex_pos, int n=-1) {
 			if(n < 0)
 				n = rd.template getUniform<int>({3, 32});
 
@@ -47,7 +60,7 @@ namespace boom {
 			);
 		}
 		template <class RD>
-		geo2d::AABBM GenRAABB(RD& rd, const spn::RangeF& rV={-1e3f, 1e3f}) {
+		geo2d::AABBM GenRAABB(RD& rd, const spn::RangeF& rV=defval::aabb_pos) {
 			auto rv = [&](){ return spn::test::GenR2Vec(rd, rV); };
 			Vec2 v0 = rv(),
 				 v1 = rv(),
@@ -56,22 +69,22 @@ namespace boom {
 			v1.selectMax(tmp);
 			return geo2d::AABBM(v0, v1);
 		}
-		template <class RD>
-		void GenRShape(geo2d::PointM& p, RD& rd) { p = GenRPoint(rd); }
-		template <class RD>
-		void GenRShape(geo2d::CircleM& p, RD& rd) { p = GenRCircle(rd); }
-		template <class RD>
-		void GenRShape(geo2d::RayM& p, RD& rd) { p = GenRRay(rd); }
-		template <class RD>
-		void GenRShape(geo2d::LineM& p, RD& rd) { p = GenRLine(rd); }
-		template <class RD>
-		void GenRShape(geo2d::SegmentM& p, RD& rd) { p = GenRSegment(rd); }
-		template <class RD>
-		void GenRShape(geo2d::PolyM& p, RD& rd) { p = GenRPoly(rd); }
-		template <class RD>
-		void GenRShape(geo2d::AABBM& p, RD& rd) { p = GenRAABB(rd); }
-		template <class RD>
-		void GenRShape(geo2d::ConvexM& p, RD& rd) { p = GenRConvex(rd); }
+		template <class... Args>
+		void GenRShape(geo2d::PointM& p, Args&&... args) { p = GenRPoint(std::forward<Args>(args)...); }
+		template <class... Args>
+		void GenRShape(geo2d::CircleM& p, Args&&... args) { p = GenRCircle(std::forward<Args>(args)...); }
+		template <class... Args>
+		void GenRShape(geo2d::RayM& p, Args&&... args) { p = GenRRay(std::forward<Args>(args)...); }
+		template <class... Args>
+		void GenRShape(geo2d::LineM& p, Args&&... args) { p = GenRLine(std::forward<Args>(args)...); }
+		template <class... Args>
+		void GenRShape(geo2d::SegmentM& p, Args&&... args) { p = GenRSegment(std::forward<Args>(args)...); }
+		template <class... Args>
+		void GenRShape(geo2d::PolyM& p, Args&&... args) { p = GenRPoly(std::forward<Args>(args)...); }
+		template <class... Args>
+		void GenRShape(geo2d::AABBM& p, Args&&... args) { p = GenRAABB(std::forward<Args>(args)...); }
+		template <class... Args>
+		void GenRShape(geo2d::ConvexM& p, Args&&... args) { p = GenRConvex(std::forward<Args>(args)...); }
 
 		class Narrow : public spn::test::RandomTestInitializer {
 			protected:

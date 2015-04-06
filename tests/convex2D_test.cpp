@@ -20,7 +20,7 @@ namespace boom {
 			auto rcf = [&](){ return rd.template getUniform<float>({0, 1.f}); };
 
 			int np = rd.template getUniform<int>({3, 64});
-			ConvexM cv = GenRConvex(rd, np);
+			ConvexM cv = GenRConvex(rd, defval::convex_pos, np);
 			np = cv.getNPoints();
 			ASSERT_TRUE(cv.checkCW());
 			Vec2 center = (cv.getPoint(0) + cv.getPoint(1) + cv.getPoint(2)) / 3.f;
@@ -47,7 +47,7 @@ namespace boom {
 
 			// 凸包の頂点数(3〜64)
 			int np = rd.template getUniform<int>({3, 64});
-			ConvexM c = GenRConvex(rd, np);
+			ConvexM c = GenRConvex(rd, defval::convex_pos, np);
 			PointM p(GenRPoint(rd, {-1e3f, 1e3f}));
 			bool b0 = c.hit(p);
 			bool b1 = GSimplex(c,p).getResult();
@@ -57,8 +57,8 @@ namespace boom {
 			auto rd = getRand();
 			auto rnp = [&](){ return rd.template getUniform<int>({3, 64}); };
 			// 凸包の頂点数(3〜64)
-			ConvexM c0 = GenRConvex(rd, rnp(), {-1e2f, 1e2f}),
-					c1 = GenRConvex(rd, rnp(), {-1e2f, 1e2f});
+			ConvexM c0 = GenRConvex(rd, {-1e2f, 1e2f}, rnp()),
+					c1 = GenRConvex(rd, {-1e2f, 1e2f}, rnp());
 			int nc0 = c0.getNPoints(),
 				nc1 = c1.getNPoints();
 			// ポリゴンを総当りで地道に(確実に)判定
