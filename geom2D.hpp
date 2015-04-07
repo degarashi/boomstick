@@ -449,6 +449,7 @@ namespace boom {
 			bool hit(const Poly& p, float t=NEAR_THRESHOLD) const;
 			Poly operator * (const AMat32& m) const;
 			Poly& operator += (const Vec2& ofs);
+			void distend(float width);
 			friend std::ostream& operator << (std::ostream& os, const Poly& p);
 		};
 		using PolyM = Model<Poly>;
@@ -532,6 +533,7 @@ namespace boom {
 			Convex operator * (const AMat32& m) const;
 			Convex& operator *= (const AMat32& m);
 			Convex& operator += (const Vec2& ofs);
+			void distend(float width);
 			//! 頂点が時計回りになっているか
 			bool checkCW() const;
 			//! 頂点の並びを時計回りに修正

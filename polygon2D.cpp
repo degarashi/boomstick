@@ -124,6 +124,11 @@ namespace boom {
 				v += ofs;
 			return *this;
 		}
+		void Poly::distend(float width) {
+			Vec2 center = bs_getCenter();
+			for(auto& v : point)
+				v += (v - center).normalization() * width;
+		}
 		std::ostream& operator << (std::ostream& os, const Poly& p) {
 			return os << "Polygon(2d) [ 0: " << p.point[0] << std::endl
 						<< "1: " << p.point[1] << std::endl

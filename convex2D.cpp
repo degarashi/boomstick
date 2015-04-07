@@ -113,6 +113,20 @@ namespace boom {
 				p += ofs;
 			return *this;
 		}
+		void Convex::distend(float width) {
+			// 左右の頂点から法線を算出
+			int nP = point.size();
+			PointL tmp(nP);
+			for(int i=0 ; i<nP ; i++) {
+				const auto &v0 = point[(i-1)%nP],
+							&v1 = point[i],
+							&v2 = point[(i+1)%nP];
+				auto nml = (v0 + v2).normalization();
+				Vec2 nml90(-nml.y, nml.x);
+				tmp[i] = v1 + nml90 * width;
+			}
+			std::swap(point, tmp);
+		}
 
 		bool Convex::checkCW() const {
 			int nV = point.size();
