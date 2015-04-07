@@ -12,12 +12,28 @@ namespace boom {
 				{0,1,2},
 				{1,2,0}
 			};
+			float GetRatio(const Vec2& v0, const Vec2& v1, const Vec2& pos) {
+				if(std::abs(v0.x - v1.x) > std::abs(v0.y - v1.y))
+					return (pos.x - v0.x) / (v1.x - v0.x);
+				return (pos.y - v0.y) / (v1.y - v0.y);
+			}
 		}
 		void GSimplex::_minkowskiSub(const Vec2& dir, int n) {
 			_posB[n] = _m1.im_support(-dir);
 			_poly.point[n] = (_m0.im_support(dir) - _posB[n]);
 		}
-		bool GSimplex::_gjkMethod() {
+		void GSimplex::_setAsHit(int nv, const Vec2& inner, bool bOnline) {
+			_nVtx = nv;
+			_bHit = true;
+			_bOnline = bOnline;
+			_inner = inner;
+		}
+		void GSimplex::_setAsNotHit(int nv) {
+			_nVtx = nv;
+			_bHit = false;
+			_bOnline = false;
+		}
+		void GSimplex::_gjkMethod() {
 			// とりあえず物体の中心位置でサポートベクトルを決める
 			Vec2 dir(_m1.im_getCenter() - _m0.im_getCenter());
 			float lens = dir.len_sq();
@@ -27,17 +43,14 @@ namespace boom {
 				dir *= spn::RSqrt(lens);
 
 			_minkowskiSub(dir, 0);
-			if(dir.dot(_poly.point[0]) < -DOT_THRESHOLD) {
-				_nVtx = 1;
-				return false;
-			}
+			if(dir.dot(_poly.point[0]) < -DOT_THRESHOLD)
+				return _setAsNotHit(1);
+
 			// 原点と重なっていたら終了 = 内部点
 			lens = _poly.point[0].len_sq();
-			if(lens < NEAR_THRESHOLD_SQ) {
-				_nVtx = 1;
-				_inner = _posB[0];
-				return true;
-			}
+			if(lens < NEAR_THRESHOLD_SQ)
+				return _setAsHit(1, _posB[0], true);
+
 			dir = _poly.point[0] * spn::RSqrt(lens) * -1.f;
 			_minkowskiSub(dir, 1);
 
@@ -47,19 +60,19 @@ namespace boom {
 			tmp *= spn::Rcp22Bit(tmpLen);
 			float r = tmp.dot(-_poly.point[0]);
 			if(r > tmpLen)
-				return false;
+				return _setAsNotHit(1);
 			tmp = _poly.point[0] + tmp*r;
 
 			lens = tmp.len_sq();
 			if(lens < NEAR_THRESHOLD_SQ) {
 				// ライン上に原点がある
-				_inner =_posB[0].l_intp(_posB[1], r * spn::Rcp22Bit(tmpLen));
-				_nVtx = 2;
-				return true;
+				return _setAsHit(2,
+								_posB[0].l_intp(_posB[1], r * spn::Rcp22Bit(tmpLen)),
+								true);
 			}
 
-			_nVtx = 3;
 			LNear res(tmp, LinePos::OnLine);
+			float minDist = std::numeric_limits<float>::max();
 			int idx = 2;
 			for(;;) {
 				// 新たな頂点を追加
@@ -67,15 +80,18 @@ namespace boom {
 				_minkowskiSub(dir, idx);
 				auto& rV = _poly.point[idx];
 				if(dir.dot(rV) < -DOT_THRESHOLD)
-					return false;
+					return _setAsNotHit(3);
 
 				// 既存の頂点と同じ座標だったらこれ以上進展はないということで、終了
 				auto& ts = ToSearch[idx];
-				if(rV.dist_sq(_poly.point[ts[0]]) < NEAR_THRESHOLD_SQ ||
-					rV.dist_sq(_poly.point[ts[2]]) < NEAR_THRESHOLD_SQ)
-				{
-					return false;
-				}
+				auto &rV0 = _poly.point[ts[0]],
+						&rV1 = _poly.point[ts[1]],
+						&rV2 = _poly.point[ts[2]];
+				float d1 = rV1.dot(dir),
+					d0 = rV0.dot(dir),
+					d2 = rV2.dot(dir);
+				if(d1-NEAR_THRESHOLD < d0 || d1-NEAR_THRESHOLD < d2)
+					return _setAsNotHit(3);
 
 				// 現時点で三角形が原点を含んでいるか
 				bool bIn;
@@ -90,15 +106,19 @@ namespace boom {
 					// 交差領域の1点を算出
 					float cf[3];
 					spn::BarycentricCoord(cf, _poly.point[0], _poly.point[1], _poly.point[2], ori);
-					_inner = spn::MixVector(cf, _posB[0], _posB[1], _posB[2]);
-					return true;
+					auto v = spn::MixVector(cf, _posB[0], _posB[1], _posB[2]);
+					return _setAsHit(3, v, false);
 				}
 				float dist = std::numeric_limits<float>::max();
 				idx = -1;
 				res = Segment(_poly.point[ts[0]], _poly.point[ts[1]]).nearest(ori);
 				if(res.second == LinePos::OnLine) {
 					float td = res.first.len_sq();
-					if(dist > td) {
+					if(td < 1e-5f) {
+						float r = GetRatio(rV0, rV1, res.first);
+						auto in = _posB[ts[0]]*r + _posB[ts[1]]*(1-r);
+						return _setAsHit(3, in, true);
+					} else if(dist > td) {
 						dist = td;
 						// この辺について調べる
 						idx = ts[2];
@@ -108,6 +128,11 @@ namespace boom {
 					auto res2 = Segment(_poly.point[ts[1]], _poly.point[ts[2]]).nearest(ori);
 					if(res2.second == LinePos::OnLine) {
 						float td = res2.first.len_sq();
+						if(td < 1e-5f) {
+							float r = GetRatio(rV1, rV2, res.first);
+							auto in = _posB[ts[1]]*r + _posB[ts[2]]*(1-r);
+							return _setAsHit(3, in, true);
+						}
 						if(dist > td) {
 							dist = td;
 							// この辺について調べる
@@ -116,16 +141,24 @@ namespace boom {
 						}
 					}
 				}
+				if(dist > minDist)
+					return _setAsNotHit(3);
+				minDist = dist;
 				if(idx < 0)
-					return false;
+					return _setAsNotHit(3);
 			}
 		}
 		GSimplex::GSimplex(const IModel& m0, const IModel& m1):
 			_m0(m0),
-			_m1(m1),
-			_bHit(_gjkMethod()) {}
+			_m1(m1)
+		{
+			_gjkMethod();
+		}
 		bool GSimplex::getResult() const {
 			return _bHit;
+		}
+		bool GSimplex::isOnline() const {
+			return _bOnline;
 		}
 		const Vec2& GSimplex::getInner() const {
 			return _inner;
@@ -193,14 +226,16 @@ namespace boom {
 		namespace {
 			const Vec2 c_origin(0);
 		}
-		bool GEpa::_addAsv(const Vec2x2& v0, const Vec2x2& v1) {
+		int GEpa::_addAsv(const Vec2x2& v0, const Vec2x2& v1) {
 			auto res = Segment(v0.first, v1.first).nearest(c_origin);
 			if(res.second == LinePos::OnLine) {
+				if(res.first.len_sq() < 1e-5f)
+					return 0x02;
 				float len = res.first.normalize();
 				_asv.insert(LmLen{len, res.first, {&v0,&v1}});
-				return true;
+				return 0x01;
 			}
-			return false;
+			return 0x00;
 		}
 		void GEpa::_epaMethodOnHit(float threshold) {
 			AssertP(Trap, !_asv.empty())
@@ -214,21 +249,25 @@ namespace boom {
 							&v0 = *fr.vtx[0],
 							&v2 = *fr.vtx[1];
 				// 既に検出済みの頂点だった場合は終了
+				float d1 = v1.first.dot(fr.dir);
 				float vd0 = fr.vtx[0]->first.dist_sq(v1.first),
 						vd1 = fr.vtx[1]->first.dist_sq(v1.first);
-				if(vd0 < threshold_sq || vd1 < threshold_sq) {
-					_pvec = fr.dir * -fr.dist;
-					return;
-				}
 				// 前回の結果からdirベクトル方向の距離がほぼ変わらなかった場合は終了
-				float d1 = fr.dir.dot(v1.first);
-				if(d1 <= fr.dist + threshold) {
-					_pvec = fr.dir * -fr.dist;
+				if(vd0 < threshold_sq || vd1 < threshold_sq || d1 <= fr.dist + threshold) {
+					if(fr.dist < 0) {
+						// recover関数からの初期値
+						_pvec = Vec2(0,0);
+					} else {
+						_pvec = fr.dir * -fr.dist;
+					}
 					return;
 				}
 				// 新しく追加された頂点を交えて線分候補を作成
-				_addAsv(v0, v1);
-				_addAsv(v1, v2);
+				int flag = _addAsv(v0, v1) | _addAsv(v1, v2);
+				if(flag & 0x02) {
+					_pvec = Vec2(0,0);
+					return;
+				}
 			}
 			AssertP(Trap, false)
 		}
@@ -237,6 +276,9 @@ namespace boom {
 				nvec.first = v + lm.dir * lm.dist;
 				nvec.second = v;
 			};
+
+			float minDist = std::numeric_limits<float>::max();
+			LmLen minFr;
 			const float threshold_sq = threshold * SQUARE_RATIO;
 			// 無衝突時: 最近傍対を求める
 			while(!_asv.empty()) {
@@ -244,14 +286,20 @@ namespace boom {
 				// 線分ではなく点候補の時はここで探索を終了
 				if(!fr.vtx[1]) {
 					auto& p = *fr.vtx[0];
-					fnSetVec(p.second, fr);
-					return;
+					return fnSetVec(p.second, fr);
 				}
 				// 原点と候補の線分がほぼ重なっている時はゼロ距離とみなす
 				if(fr.dist < NEAR_THRESHOLD || IsNaN(fr.dir)) {
 					_nvec.first = _nvec.second = fr.vtx[0]->second;
 					return;
 				}
+
+				if(minDist < fr.dist) {
+					auto ln = Segment(minFr.vtx[0]->first, minFr.vtx[1]->first).nearest(Vec2(0,0));
+					return fnSetVec(ln.first, minFr);
+				}
+				minDist = fr.dist;
+				minFr = fr;
 
 				Segment seg(fr.vtx[0]->first, fr.vtx[1]->first);
 				// v0,v2 = 前からあった頂点
@@ -268,14 +316,17 @@ namespace boom {
 						d1 >= fr.dist - threshold)
 				{
 					auto ln = seg.nearest(Vec2(0,0));
-					fnSetVec(ln.first, fr);
-					return;
+					return fnSetVec(ln.first, fr);
 				}
 				// 新しく追加された頂点を交えて線分候補を作成
-				if(!_addAsv(v0, v1) & !_addAsv(v1, v2)) {
+				int flag = _addAsv(v0, v1) | _addAsv(v1, v2);
+				if(flag == 0x00) {
 					// どちらの線分上にも原点が存在しない = 点(v1)が一番近い
-					fnSetVec(v1.second, fr);
-					return;
+					return fnSetVec(v1.second, fr);
+				}
+				if(flag == 0x02) {
+					float r = GetRatio(fr.vtx[0]->first, fr.vtx[1]->first, v1.first);
+					return fnSetVec(fr.vtx[0]->second*r + fr.vtx[1]->second*(1-r), fr);
 				}
 			}
 			AssertP(Trap, false)
@@ -305,7 +356,7 @@ namespace boom {
 					&p1 = *_vl[(i+1)%nV];
 				auto res = Segment(p1.first, p0.first).nearest(c_origin);
 				float len = res.first.length();
-				if(len < 1e-5f) {
+				if(len < 1e-4f) {
 					// 線分上に原点があるので少し小細工
 					// 線分方向90度回転かつ線分に関わっていない頂点側
 					Vec2 dir(p1.first - p0.first);
@@ -352,6 +403,11 @@ namespace boom {
 			GSimplex(m0,m1),
 			_szVl(0)
 		{
+			if(isOnline()) {
+				_pvec = Vec2(0,0);
+				return;
+			}
+
 			int nV = _nVtx;
 			_szVl = nV;
 			for(int i=0 ; i<nV ; i++) {

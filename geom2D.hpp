@@ -554,15 +554,19 @@ namespace boom {
 				Poly	_poly;			//!< 凸包を構成するポリゴン
 				Vec2	_posB[3],		//!< vtxを求める時に使ったB側のインデックス
 						_inner;			//!< 内部点
-				bool	_bHit;
-				int		_nVtx;
+				bool	_bHit,			//!< 衝突の有無
+						_bOnline;		//!< 原点が線分上に位置するか(=深度0)
+				int		_nVtx;			//!< 使用された頂点の数(min=1, max=3)
 			private:
 				void _minkowskiSub(const Vec2& dir, int n);
-				bool _gjkMethod();
+				void _gjkMethod();
+				void _setAsHit(int nv, const Vec2& inner, bool bOnline);
+				void _setAsNotHit(int nv);
 			public:
 				//! 初期化 = GJKによる判定(ヒットチェックだけ)
 				GSimplex(const IModel& m0, const IModel& m1);
 				bool getResult() const;
+				bool isOnline() const;
 				//! 衝突時: 内部点を取得
 				const Vec2& getInner() const;
 		};
@@ -605,8 +609,8 @@ namespace boom {
 				Vec2x2	_nvec;
 			};
 			//! v0.firstとv1.firstからなる線分候補をリストに追加
-			/*!	\return 線分候補が追加されればtrue, それ以外はfalse */
-			bool _addAsv(const Vec2x2& v0, const Vec2x2& v1);
+			/*!	\return 最近傍点が原点と重なっていれば0x02, 線分候補が追加されれば0x01, それ以外は0x00 */
+			int _addAsv(const Vec2x2& v0, const Vec2x2& v1);
 
 			//! 指定方向へのミンコフスキー差
 			/*! \param[in] n 計算した頂点の挿入先インデックス */
