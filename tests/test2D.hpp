@@ -46,7 +46,11 @@ namespace boom {
 		template <class RD>
 		geo2d::PolyM GenRPoly(RD& rd, const spn::RangeF& rV=defval::poly_pos) {
 			auto rv = [&](){ return spn::test::GenR2Vec(rd, rV); };
-			return geo2d::PolyM(rv(), rv(), rv());
+			auto p = geo2d::PolyM(rv(), rv(), rv());
+			// 頂点が時計回りになっているかチェック
+			if(!p.isCW())
+				p.invert();
+			return p;
 		}
 		template <class RD>
 		geo2d::ConvexM GenRConvex(RD& rd, const spn::RangeF& rV=defval::convex_pos, int n=-1) {
