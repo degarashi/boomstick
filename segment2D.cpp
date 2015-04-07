@@ -41,15 +41,16 @@ namespace boom {
 				toV1(to-from);
 			if(toV1.len_sq() < ZEROVEC_LENGTH_SQ)
 				return LNear(from, LinePos::Begin);
-			float lenV1 = toV1.length();
-			toV1 *= spn::Rcp22Bit(lenV1);
+			float lenV1 = toV1.normalize();
 			float d = toV1.dot(toP);
 			if(d <= 0)
 				return LNear(from, LinePos::Begin);
 			else if(d >= lenV1)
 				return LNear(to, LinePos::End);
-			else
-				return LNear(from+toV1*d, LinePos::OnLine);
+			else {
+				float t = d / lenV1;
+				return LNear(from*(1-t) + to*t, LinePos::OnLine);
+			}
 		}
 		float Segment::ratio(const Vec2& p) const {
 			Vec2 toP(p-from),
