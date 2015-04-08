@@ -44,7 +44,7 @@ namespace boom {
 				auto pv = gepa.getPVector();
 				// 左辺に指定した物体を衝突回避ベクトル分移動させたら衝突回避出来る筈
 				c0 += pv;
-				c0.distend(-ErrorAdjust);
+				c0.distend(-ErrorAdjust, MinDist);
 				GEpa gepa2(c0, c1, ErrorAdjust);
 				ASSERT_TRUE(!gepa2.getResult() ||
 							gepa2.getPVector().length() < ErrorAdjust);
@@ -53,13 +53,13 @@ namespace boom {
 				// 左辺の物体を最近傍対ベクトル分(p1 - p0)移動させたら衝突する筈
 				auto pv = (np.second - np.first);
 				c0 += pv;
-				c0.distend(ErrorAdjust);
+				c0.distend(ErrorAdjust, MinDist);
 				GEpa gepa2(c0, c1, ErrorAdjust);
 				bool b = gepa2.getResult();
 				if(!b) {
 					auto np2 = gepa2.getNearestPair();
 					float d2 = np2.first.distance(np2.second);
-					// 誤差の関係で割と範囲を広めにとる
+					// 誤差の関係で範囲を広めにとる
 					ASSERT_LT(d2, 1e-1);
 				}
 			}

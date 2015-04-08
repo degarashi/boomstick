@@ -147,10 +147,15 @@ namespace boom {
 			maxV += ofs;
 			return *this;
 		}
-		void AABB::distend(float width) {
-			Vec2 v(width, width);
-			minV -= v;
-			maxV += v;
+		void AABB::distend(float width, float mindist) {
+			Vec2 center = (minV + maxV) * .5f,
+				diff = maxV - minV,
+				tmp(mindist);
+			tmp.selectMax(diff + Vec2(width));
+			tmp *= .5f;
+
+			minV = center - tmp;
+			maxV = center + tmp;
 		}
 		std::ostream& operator << (std::ostream& os, const AABB& a) {
 			return os << "AABB(2d) [ min: " << a.minV << std::endl

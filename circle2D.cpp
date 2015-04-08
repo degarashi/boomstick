@@ -78,8 +78,8 @@ namespace boom {
 		Circle Circle::operator * (float s) const {
 			return Circle(vCenter, fRadius*s);
 		}
-		void Circle::distend(float width) {
-			fRadius += width;
+		void Circle::distend(float width, float mindist) {
+			fRadius = std::max(mindist, fRadius+width);
 		}
 		std::ostream& operator << (std::ostream& os, const Circle& c) {
 			return os << "Circle(2d) [ center: " << c.vCenter << std::endl

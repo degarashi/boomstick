@@ -54,7 +54,7 @@ namespace boom {
 			Circle operator * (const AMat32& m) const;
 			Circle operator * (float s) const;
 			Circle& operator += (const Vec2& ofs);
-			void distend(float width);
+			void distend(float width, float mindist);
 
 			// ---- for MakeBoundary ----
 			void setBoundary(const IModel* p);
@@ -402,7 +402,7 @@ namespace boom {
 			bool hit(const AABB& ab, float t=NEAR_THRESHOLD) const;
 			AABB operator * (const AMat32& m) const;
 			AABB& operator += (const Vec2& ofs);
-			void distend(float width);
+			void distend(float width, float mindist);
 
 			// ---- for MakeBoundary ----
 			void setBoundary(const IModel* p);
@@ -449,7 +449,7 @@ namespace boom {
 			bool hit(const Poly& p, float t=NEAR_THRESHOLD) const;
 			Poly operator * (const AMat32& m) const;
 			Poly& operator += (const Vec2& ofs);
-			void distend(float width);
+			void distend(float width, float mindist);
 			friend std::ostream& operator << (std::ostream& os, const Poly& p);
 		};
 		using PolyM = Model<Poly>;
@@ -533,7 +533,7 @@ namespace boom {
 			Convex operator * (const AMat32& m) const;
 			Convex& operator *= (const AMat32& m);
 			Convex& operator += (const Vec2& ofs);
-			void distend(float width);
+			void distend(float width, float mindist);
 			//! 頂点が時計回りになっているか
 			bool checkCW() const;
 			//! 頂点の並びを時計回りに修正

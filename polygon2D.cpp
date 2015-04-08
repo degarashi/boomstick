@@ -124,10 +124,14 @@ namespace boom {
 				v += ofs;
 			return *this;
 		}
-		void Poly::distend(float width) {
+		void Poly::distend(float width, float mindist) {
 			Vec2 center = bs_getCenter();
-			for(auto& v : point)
-				v += (v - center).normalization() * width;
+			for(auto& v : point) {
+				auto tmp = v - center;
+				float dist = tmp.normalize();
+				dist = std::max(mindist, dist+width);
+				v = center + tmp * dist;
+			}
 		}
 		std::ostream& operator << (std::ostream& os, const Poly& p) {
 			return os << "Polygon(2d) [ 0: " << p.point[0] << std::endl

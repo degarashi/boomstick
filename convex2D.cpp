@@ -113,19 +113,18 @@ namespace boom {
 				p += ofs;
 			return *this;
 		}
-		void Convex::distend(float width) {
-			// 左右の頂点から法線を算出
+		void Convex::distend(float width, float mindist) {
 			int nP = point.size();
 			PointL tmp(nP);
+			// 単純に重心からの方向ベクトルで算出
+			auto center = bs_getCenter();
 			for(int i=0 ; i<nP ; i++) {
-				const auto &v0 = point[(i-1)%nP],
-							&v1 = point[i],
-							&v2 = point[(i+1)%nP];
-				auto nml = (v0 + v2).normalization();
-				Vec2 nml90(-nml.y, nml.x);
-				tmp[i] = v1 + nml90 * width;
+				auto dir = point[i] - center;
+				float dist = dir.normalize();
+				dist = std::max(mindist, dist+width);
+				tmp[i] = center + dir*dist;
 			}
-			std::swap(point, tmp);
+			*this = FromConcave(tmp);
 		}
 
 		bool Convex::checkCW() const {
