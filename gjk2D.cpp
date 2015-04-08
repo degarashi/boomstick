@@ -22,16 +22,14 @@ namespace boom {
 			_posB[n] = _m1.im_support(-dir);
 			_poly.point[n] = (_m0.im_support(dir) - _posB[n]);
 		}
-		void GSimplex::_setAsHit(int nv, const Vec2& inner, bool bOnline) {
+		void GSimplex::_setAsHit(int nv, const Vec2& inner) {
 			_nVtx = nv;
 			_bHit = true;
-			_bOnline = bOnline;
 			_inner = inner;
 		}
 		void GSimplex::_setAsNotHit(int nv) {
 			_nVtx = nv;
 			_bHit = false;
-			_bOnline = false;
 		}
 		void GSimplex::_gjkMethod() {
 			// とりあえず物体の中心位置でサポートベクトルを決める
@@ -49,7 +47,7 @@ namespace boom {
 			// 原点と重なっていたら終了 = 内部点
 			lens = _poly.point[0].len_sq();
 			if(lens < NEAR_THRESHOLD_SQ)
-				return _setAsHit(1, _posB[0], true);
+				return _setAsHit(1, _posB[0]);
 
 			dir = _poly.point[0] * spn::RSqrt(lens) * -1.f;
 			_minkowskiSub(dir, 1);
@@ -66,9 +64,7 @@ namespace boom {
 			lens = tmp.len_sq();
 			if(lens < NEAR_THRESHOLD_SQ) {
 				// ライン上に原点がある
-				return _setAsHit(2,
-								_posB[0].l_intp(_posB[1], r * spn::Rcp22Bit(tmpLen)),
-								true);
+				return _setAsHit(2, _posB[0].l_intp(_posB[1], r * spn::Rcp22Bit(tmpLen)));
 			}
 
 			LNear res(tmp, LinePos::OnLine);
@@ -107,7 +103,7 @@ namespace boom {
 					float cf[3];
 					spn::BarycentricCoord(cf, _poly.point[0], _poly.point[1], _poly.point[2], ori);
 					auto v = spn::MixVector(cf, _posB[0], _posB[1], _posB[2]);
-					return _setAsHit(3, v, false);
+					return _setAsHit(3, v);
 				}
 				float dist = std::numeric_limits<float>::max();
 				idx = -1;
@@ -117,7 +113,7 @@ namespace boom {
 					if(td < 1e-5f) {
 						float r = GetRatio(rV0, rV1, res.first);
 						auto in = _posB[ts[0]]*r + _posB[ts[1]]*(1-r);
-						return _setAsHit(3, in, true);
+						return _setAsHit(3, in);
 					} else if(dist > td) {
 						dist = td;
 						// この辺について調べる
@@ -131,7 +127,7 @@ namespace boom {
 						if(td < 1e-5f) {
 							float r = GetRatio(rV1, rV2, res.first);
 							auto in = _posB[ts[1]]*r + _posB[ts[2]]*(1-r);
-							return _setAsHit(3, in, true);
+							return _setAsHit(3, in);
 						}
 						if(dist > td) {
 							dist = td;
@@ -156,9 +152,6 @@ namespace boom {
 		}
 		bool GSimplex::getResult() const {
 			return _bHit;
-		}
-		bool GSimplex::isOnline() const {
-			return _bOnline;
 		}
 		const Vec2& GSimplex::getInner() const {
 			return _inner;
@@ -356,7 +349,7 @@ namespace boom {
 					&p1 = *_vl[(i+1)%nV];
 				auto res = Segment(p1.first, p0.first).nearest(c_origin);
 				float len = res.first.length();
-				if(len < 1e-4f) {
+				if(len < 5e-3f) {
 					// 線分上に原点があるので少し小細工
 					// 線分方向90度回転かつ線分に関わっていない頂点側
 					Vec2 dir(p1.first - p0.first);
@@ -403,11 +396,6 @@ namespace boom {
 			GSimplex(m0,m1),
 			_szVl(0)
 		{
-			if(isOnline()) {
-				_pvec = Vec2(0,0);
-				return;
-			}
-
 			int nV = _nVtx;
 			_szVl = nV;
 			for(int i=0 ; i<nV ; i++) {

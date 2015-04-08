@@ -554,19 +554,17 @@ namespace boom {
 				Poly	_poly;			//!< 凸包を構成するポリゴン
 				Vec2	_posB[3],		//!< vtxを求める時に使ったB側のインデックス
 						_inner;			//!< 内部点
-				bool	_bHit,			//!< 衝突の有無
-						_bOnline;		//!< 原点が線分上に位置するか(=深度0)
+				bool	_bHit;			//!< 衝突の有無
 				int		_nVtx;			//!< 使用された頂点の数(min=1, max=3)
 			private:
 				void _minkowskiSub(const Vec2& dir, int n);
 				void _gjkMethod();
-				void _setAsHit(int nv, const Vec2& inner, bool bOnline);
+				void _setAsHit(int nv, const Vec2& inner);
 				void _setAsNotHit(int nv);
 			public:
 				//! 初期化 = GJKによる判定(ヒットチェックだけ)
 				GSimplex(const IModel& m0, const IModel& m1);
 				bool getResult() const;
-				bool isOnline() const;
 				//! 衝突時: 内部点を取得
 				const Vec2& getInner() const;
 		};
