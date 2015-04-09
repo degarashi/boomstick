@@ -10,9 +10,10 @@ namespace boom {
 		using geo2d::GEpa;
 		template <class T>
 		class Epa2D : public spn::test::RandomTestInitializer {};
-		using Epa2DTypeList = ::testing::Types<geo2d::Poly,
-												geo2d::Circle,
-												geo2d::AABB>;
+		using Epa2DTypeList = ::testing::Types<geo2d::Circle,
+												geo2d::AABB,
+												geo2d::Poly,
+												geo2d::Convex>;
 		TYPED_TEST_CASE(Epa2D, Epa2DTypeList);
 		namespace {
 			const spn::RangeF c_rangeV{-1e2f, 1e2f},
@@ -38,7 +39,8 @@ namespace boom {
 			ShapeM c0, c1;
 			GenRShapeEPA(c0, rd);
 			GenRShapeEPA(c1, rd);
-			constexpr float ErrorAdjust = 5e-3f;
+			constexpr float ErrorAdjust = 5e-3f,
+							MinDist = 1e-3f;
 			GEpa gepa(c0, c1, ErrorAdjust);
 			if(gepa.getResult()) {
 				auto pv = gepa.getPVector();
@@ -46,8 +48,10 @@ namespace boom {
 				c0 += pv;
 				c0.distend(-ErrorAdjust, MinDist);
 				GEpa gepa2(c0, c1, ErrorAdjust);
-				ASSERT_TRUE(!gepa2.getResult() ||
-							gepa2.getPVector().length() < ErrorAdjust);
+				if(gepa2.getResult()) {
+					auto pv2 = gepa2.getPVector();
+					ASSERT_TRUE(pv2.length() < ErrorAdjust);
+				}
 			} else {
 				auto np = gepa.getNearestPair();
 				// 左辺の物体を最近傍対ベクトル分(p1 - p0)移動させたら衝突する筈
