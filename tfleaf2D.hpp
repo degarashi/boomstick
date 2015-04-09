@@ -37,9 +37,8 @@ namespace boom {
 				RFLAG_GETMETHOD_S(SEQ_TFLEAF)
 				RFLAG_REFMETHOD_S(SEQ_TFLEAF)
 				#undef SEQ_TFLEAF
-				TfLeafBase() { _init(); }
-				TfLeafBase(const model_t& m): model_t(m) { _init(); }
-				TfLeafBase(model_t&& m): model_t(std::move(m)) { _init(); }
+				template <class... Args>
+				TfLeafBase(Args&&... args): model_t(std::forward<Args>(args)...) { _init(); }
 
 				/*! ユーザーデータがvoidの時は親ノードのデータを返す */
 				void* getUserData() override {

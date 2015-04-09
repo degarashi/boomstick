@@ -308,8 +308,7 @@ namespace boom {
 					// 毎フレームヒットリストを再構築
 					if(Narrow::Hit(hc0.ref().getModel(), hc1.ref().getModel(), _accum)) {
 						auto fn = [this, &hist](HCol hc0, HCol hc1) {
-							auto &c0 = hc0.ref(),
-								&c1 = hc1.ref();
+							auto &c0 = hc0.ref();
 							// 前のフレームでの継続フレームリストを探索
 							int nf = 0;
 							if(auto hist = _hasPrevCollision(hc0, hc1))
