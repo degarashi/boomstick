@@ -256,7 +256,7 @@ namespace boom {
 			}
 		public:
 			ColMgr(): _broadC([this](spn::SHandle sh){
-								return HCol::FromSHandle(sh).cref().getBVolume(); })
+								return HCol::FromHandle(sh).cref().getBVolume(); })
 			{
 				Narrow::Initialize();
 			}
@@ -302,8 +302,8 @@ namespace boom {
 					// 同じハンドルという事はあり得ない筈
 					AssertP(Trap, sh0!=sh1)
 
-					HCol hc0(HCol::FromSHandle(sh0)),
-						hc1(HCol::FromSHandle(sh1));
+					HCol hc0(HCol::FromHandle(sh0)),
+						hc1(HCol::FromHandle(sh1));
 					// 詳細判定
 					// 毎フレームヒットリストを再構築
 					if(Narrow::Hit(hc0.ref().getModel(), hc1.ref().getModel(), _accum)) {
