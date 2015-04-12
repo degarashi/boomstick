@@ -243,15 +243,19 @@ namespace boom {
 				return cur;
 			}
 			void _doRelease(bool bBoth) {
+				struct Flag {
+					bool& flag;
+					Flag(bool& b): flag(b) { flag=true; }
+					~Flag() { flag=false; }
+				};
 				//! 解放を一時的に遅延させていたハンドルを処理
-				_bDelete = true;
+				Flag f(_bDelete);
 				_getPrevRM().clear();
 				if(bBoth)
 					_getCurRM().clear();
-				_bDelete = false;
 			}
-			bool release(spn::SHandle) override {
-				Assert(Throw, false, "invalid function call");
+			bool release(spn::SHandle sh) override {
+				release(HCol::FromHandle(sh));
 				return false;
 			}
 		public:
