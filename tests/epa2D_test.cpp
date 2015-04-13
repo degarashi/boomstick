@@ -40,17 +40,21 @@ namespace boom {
 			GenRShapeEPA(c0, rd);
 			GenRShapeEPA(c1, rd);
 			constexpr float ErrorAdjust = 5e-3f,
-							MinDist = 1e-3f;
+							MinDist = 1e-3f,
+							HitPoint_Dist = 1e-2f;
 			GEpa gepa(c0, c1, ErrorAdjust);
 			if(gepa.getResult()) {
-				auto pv = gepa.getPVector();
+				// pv = (first=最深点, second=回避ベクトル)
+				auto& pv = gepa.getPVector();
+				// 回避ベクトルは物体Bの内部にある筈
+				EXPECT_TRUE(c1.im_hitPoint(pv.first, HitPoint_Dist));
 				// 左辺に指定した物体を衝突回避ベクトル分移動させたら衝突回避出来る筈
-				c0 += pv;
+				c0 += pv.second;
 				c0.distend(-ErrorAdjust, MinDist);
 				GEpa gepa2(c0, c1, ErrorAdjust);
 				if(gepa2.getResult()) {
 					auto pv2 = gepa2.getPVector();
-					ASSERT_TRUE(pv2.length() < ErrorAdjust);
+					ASSERT_TRUE(pv2.second.length() < ErrorAdjust);
 				}
 			} else {
 				auto np = gepa.getNearestPair();

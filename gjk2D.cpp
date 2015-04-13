@@ -249,16 +249,20 @@ namespace boom {
 				if(vd0 < threshold_sq || vd1 < threshold_sq || d1 <= fr.dist + threshold) {
 					if(fr.dist < 0) {
 						// recover関数からの初期値
-						_pvec = Vec2(0,0);
+						_pvec.second = Vec2(0,0);
 					} else {
-						_pvec = fr.dir * -fr.dist;
+						_pvec.second = fr.dir * -fr.dist;
 					}
+					float r = std::max(0.f, fr.dist);
+					r = GetRatio(v0.first, v2.first, fr.dir * r);
+					_pvec.first = v0.second*r + v2.second*(1-r);
 					return;
 				}
 				// 新しく追加された頂点を交えて線分候補を作成
 				int flag = _addAsv(v0, v1) | _addAsv(v1, v2);
 				if(flag & 0x02) {
-					_pvec = Vec2(0,0);
+					_pvec.first = v1.second;
+					_pvec.second = Vec2(0,0);
 					return;
 				}
 			}
@@ -407,7 +411,8 @@ namespace boom {
 			do {
 				if(getResult()) {
 					if(nV == 1) {
-						_pvec = Vec2(0,0);
+						_pvec.first = _posB[0];
+						_pvec.second = Vec2(0,0);
 						break;
 					} else if(nV == 2)
 						_recover2OnHit();
@@ -440,15 +445,14 @@ namespace boom {
 				}
 			} while(false);
 		}
-		Vec2x2 GEpa::getNearestPair() const {
+		const Vec2x2& GEpa::getNearestPair() const {
 			AssertP(Trap, !getResult())
-			AssertP(Trap, !IsNaN(_nvec.first))
-			AssertP(Trap, !IsNaN(_nvec.second))
+			AssertP(Trap, !IsNaN(_nvec.first) && !IsNaN(_nvec.second))
 			return _nvec;
 		}
-		const Vec2& GEpa::getPVector() const {
+		const Vec2x2& GEpa::getPVector() const {
 			AssertP(Trap, getResult())
-			AssertP(Trap, !IsNaN(_pvec))
+			AssertP(Trap, !IsNaN(_pvec.first) && !IsNaN(_pvec.second))
 			return _pvec;
 		}
 		/*! 算出不能なケースは考えない */

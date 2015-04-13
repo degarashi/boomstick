@@ -603,7 +603,7 @@ namespace boom {
 			void _printASV(std::ostream& os) const;
 
 			union {
-				Vec2	_pvec;
+				Vec2x2	_pvec;
 				Vec2x2	_nvec;
 			};
 			//! v0.firstとv1.firstからなる線分候補をリストに追加
@@ -634,9 +634,10 @@ namespace boom {
 				~GEpa();
 				/*! 非衝突時に有効
 					\return A側の最近傍点, B側の最近傍点 */
-				Vec2x2 getNearestPair() const;
-				//! 衝突を回避するための最短移動ベクトル(A側)
-				const Vec2& getPVector() const;
+				const Vec2x2& getNearestPair() const;
+				/*! 衝突時にそれを回避するための最短移動ベクトル(A側)
+					\return first=B側の最深点 second=A側の回避ベクトル */
+				const Vec2x2& getPVector() const;
 		};
 		//! ミンコフスキー差を求める
 		Vec2 MinkowskiSub(const IModel& m0, const IModel& m1, const Vec2& dir);
