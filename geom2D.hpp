@@ -552,7 +552,7 @@ namespace boom {
 			protected:
 				const IModel	&_m0, &_m1;
 				Poly	_poly;			//!< 凸包を構成するポリゴン
-				Vec2	_posB[3],		//!< vtxを求める時に使ったB側のインデックス
+				Vec2	_posA[3],		//!< vtx(A-B)を求める時に使ったA側の座標
 						_inner;			//!< 内部点
 				bool	_bHit;			//!< 衝突の有無
 				int		_nVtx;			//!< 使用された頂点の数(min=1, max=3)
@@ -636,7 +636,7 @@ namespace boom {
 					\return A側の最近傍点, B側の最近傍点 */
 				const Vec2x2& getNearestPair() const;
 				/*! 衝突時にそれを回避するための最短移動ベクトル(A側)
-					\return first=B側の最深点 second=A側の回避ベクトル */
+					\return first=A側の最深点 second=A側の回避ベクトル */
 				const Vec2x2& getPVector() const;
 		};
 		//! ミンコフスキー差を求める

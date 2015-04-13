@@ -19,8 +19,8 @@ namespace boom {
 			}
 		}
 		void GSimplex::_minkowskiSub(const Vec2& dir, int n) {
-			_posB[n] = _m1.im_support(-dir);
-			_poly.point[n] = (_m0.im_support(dir) - _posB[n]);
+			_posA[n] = _m0.im_support(dir);
+			_poly.point[n] = _posA[n] - _m1.im_support(-dir);
 		}
 		void GSimplex::_setAsHit(int nv, const Vec2& inner) {
 			_nVtx = nv;
@@ -47,7 +47,7 @@ namespace boom {
 			// 原点と重なっていたら終了 = 内部点
 			lens = _poly.point[0].len_sq();
 			if(lens < NEAR_THRESHOLD_SQ)
-				return _setAsHit(1, _posB[0]);
+				return _setAsHit(1, _posA[0]);
 
 			dir = _poly.point[0] * spn::RSqrt(lens) * -1.f;
 			_minkowskiSub(dir, 1);
@@ -64,7 +64,7 @@ namespace boom {
 			lens = tmp.len_sq();
 			if(lens < NEAR_THRESHOLD_SQ) {
 				// ライン上に原点がある
-				return _setAsHit(2, _posB[0].l_intp(_posB[1], r * spn::Rcp22Bit(tmpLen)));
+				return _setAsHit(2, _posA[0].l_intp(_posA[1], r * spn::Rcp22Bit(tmpLen)));
 			}
 
 			LNear res(tmp, LinePos::OnLine);
@@ -102,7 +102,7 @@ namespace boom {
 					// 交差領域の1点を算出
 					float cf[3];
 					spn::BarycentricCoord(cf, _poly.point[0], _poly.point[1], _poly.point[2], ori);
-					auto v = spn::MixVector(cf, _posB[0], _posB[1], _posB[2]);
+					auto v = spn::MixVector(cf, _posA[0], _posA[1], _posA[2]);
 					return _setAsHit(3, v);
 				}
 				float dist = std::numeric_limits<float>::max();
@@ -112,7 +112,7 @@ namespace boom {
 					float td = res.first.len_sq();
 					if(td < 1e-5f) {
 						float r = GetRatio(rV0, rV1, res.first);
-						auto in = _posB[ts[0]]*r + _posB[ts[1]]*(1-r);
+						auto in = _posA[ts[0]]*r + _posA[ts[1]]*(1-r);
 						return _setAsHit(3, in);
 					} else if(dist > td) {
 						dist = td;
@@ -126,7 +126,7 @@ namespace boom {
 						float td = res2.first.len_sq();
 						if(td < 1e-5f) {
 							float r = GetRatio(rV1, rV2, res.first);
-							auto in = _posB[ts[1]]*r + _posB[ts[2]]*(1-r);
+							auto in = _posA[ts[1]]*r + _posA[ts[2]]*(1-r);
 							return _setAsHit(3, in);
 						}
 						if(dist > td) {
@@ -183,8 +183,8 @@ namespace boom {
 		}
 		const Vec2x2& GEpa::_minkowskiSub(const Vec2& dir, int n) {
 			Vec2x2* vp = _allocVert(n);
-			vp->second = _m1.im_support(-dir);
-			vp->first = _m0.im_support(dir) - vp->second;
+			vp->second = _m0.im_support(dir);
+			vp->first = vp->second - _m1.im_support(-dir);
 			return *vp;
 		}
 		// デバッグ用Print関数
@@ -269,11 +269,6 @@ namespace boom {
 			AssertP(Trap, false)
 		}
 		void GEpa::_epaMethodNoHit(float threshold) {
-			auto fnSetVec = [&nvec = _nvec](const Vec2& v, const LmLen& lm){
-				nvec.first = v + lm.dir * lm.dist;
-				nvec.second = v;
-			};
-
 			float minDist = std::numeric_limits<float>::max();
 			LmLen minFr;
 			const float threshold_sq = threshold * SQUARE_RATIO;
@@ -283,7 +278,9 @@ namespace boom {
 				// 線分ではなく点候補の時はここで探索を終了
 				if(!fr.vtx[1]) {
 					auto& p = *fr.vtx[0];
-					return fnSetVec(p.second, fr);
+					_nvec.first = p.second;
+					_nvec.second = _nvec.first - p.first;
+					return;
 				}
 				// 原点と候補の線分がほぼ重なっている時はゼロ距離とみなす
 				if(fr.dist < NEAR_THRESHOLD || IsNaN(fr.dir)) {
@@ -293,7 +290,10 @@ namespace boom {
 
 				if(minDist < fr.dist) {
 					auto ln = Segment(minFr.vtx[0]->first, minFr.vtx[1]->first).nearest(Vec2(0,0));
-					return fnSetVec(ln.first, minFr);
+					float r = GetRatio(minFr.vtx[0]->first, minFr.vtx[1]->first, ln.first);
+					_nvec.first = minFr.vtx[0]->second*(1-r) + minFr.vtx[1]->second*r;
+					_nvec.second = _nvec.first - fr.dir * fr.dist;
+					return;
 				}
 				minDist = fr.dist;
 				minFr = fr;
@@ -313,17 +313,24 @@ namespace boom {
 						d1 >= fr.dist - threshold)
 				{
 					auto ln = seg.nearest(Vec2(0,0));
-					return fnSetVec(ln.first, fr);
+					float r = GetRatio(fr.vtx[0]->first, fr.vtx[1]->first, ln.first);
+					_nvec.first = fr.vtx[0]->second*(1-r) + fr.vtx[1]->second*r;
+					_nvec.second = _nvec.first - fr.dir*fr.dist;
+					return;
 				}
 				// 新しく追加された頂点を交えて線分候補を作成
 				int flag = _addAsv(v0, v1) | _addAsv(v1, v2);
 				if(flag == 0x00) {
 					// どちらの線分上にも原点が存在しない = 点(v1)が一番近い
-					return fnSetVec(v1.second, fr);
+					float len = v1.first.length();
+					auto tv = v1.first / len;
+					_asv.insert(LmLen{len, tv, {&v1,nullptr}});
 				}
 				if(flag == 0x02) {
 					float r = GetRatio(fr.vtx[0]->first, fr.vtx[1]->first, v1.first);
-					return fnSetVec(fr.vtx[0]->second*r + fr.vtx[1]->second*(1-r), fr);
+					_nvec.first = fr.vtx[0]->second*(1-r) + fr.vtx[1]->second*r;
+					_nvec.second = _nvec.first - fr.dir*fr.dist;
+					return;
 				}
 			}
 			AssertP(Trap, false)
@@ -405,13 +412,13 @@ namespace boom {
 			for(int i=0 ; i<nV ; i++) {
 				auto res = _vl[i] = tls_vPool.malloc();
 				res->first = _poly.point[i];
-				res->second = _posB[i];
+				res->second = _posA[i];
 			}
 
 			do {
 				if(getResult()) {
 					if(nV == 1) {
-						_pvec.first = _posB[0];
+						_pvec.first = _posA[0];
 						_pvec.second = Vec2(0,0);
 						break;
 					} else if(nV == 2)
@@ -430,9 +437,8 @@ namespace boom {
 							_asv.insert(LmLen{len, res.first*spn::Rcp22Bit(len), {_vl[0],_vl[1]}});
 						}
 						else {
-							const auto& p = *_vl[0];
-							_nvec.second = p.second;
-							_nvec.first = _nvec.second + p.first;
+							_nvec.first = _vl[1]->second;
+							_nvec.second = _nvec.first - _vl[1]->first;
 							break;
 						}
 					} else if(nV == 2)

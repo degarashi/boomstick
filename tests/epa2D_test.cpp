@@ -46,8 +46,8 @@ namespace boom {
 			if(gepa.getResult()) {
 				// pv = (first=最深点, second=回避ベクトル)
 				auto& pv = gepa.getPVector();
-				// 回避ベクトルは物体Bの内部にある筈
-				EXPECT_TRUE(c1.im_hitPoint(pv.first, HitPoint_Dist));
+				// 回避ベクトル始点は物体Aの内部にある筈
+				EXPECT_TRUE(c0.im_hitPoint(pv.first, HitPoint_Dist));
 				// 左辺に指定した物体を衝突回避ベクトル分移動させたら衝突回避出来る筈
 				c0 += pv.second;
 				c0.distend(-ErrorAdjust, MinDist);
@@ -58,6 +58,11 @@ namespace boom {
 				}
 			} else {
 				auto np = gepa.getNearestPair();
+				// 最近傍点Aは物体Aの内部にある筈
+				EXPECT_TRUE(c0.im_hitPoint(np.first, HitPoint_Dist));
+				// 最近傍点Bは物体Bの内部にある筈
+				EXPECT_TRUE(c1.im_hitPoint(np.second, HitPoint_Dist));
+
 				// 左辺の物体を最近傍対ベクトル分(p1 - p0)移動させたら衝突する筈
 				auto pv = (np.second - np.first);
 				c0 += pv;
