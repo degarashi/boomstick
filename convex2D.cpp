@@ -443,21 +443,16 @@ namespace boom {
 			int nV = point.size();
 			AssertP(Trap, nV >= 3)
 			Circle c;
-			c.fRadius = -1;
+			c.vCenter = (point[0] +  point[1])/2;
+			c.fRadius = point[0].distance(point[1])/2;
 			for(int i=0 ; i<nV-2 ; i++) {
 				for(int j=i+1 ; j<nV-1 ; j++) {
 					for(int k=j+1 ; k<nV ; k++) {
-						Poly p(point[i], point[j], point[k]);
-						auto tc = p.bs_getBVolume();
-						if(c.fRadius < tc.fRadius)
-							c = tc;
+						PolyM p(point[i], point[j], point[k]);
+						c.appendBoundary(&p);
 					}
 				}
 			}
-
-			// 念の為チェック
-			for(int i=0 ; i<nV ; i++)
-				AssertP(Trap, c.vCenter.distance(point[i]) <= c.fRadius)
 			return c;
 		}
 		std::tuple<bool,Vec2,Vec2> Convex::checkCrossingLine(const Line& ls) const {

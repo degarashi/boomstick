@@ -21,7 +21,7 @@ namespace boom {
 			int id = getObtuseCorner();
 			if(id >= 0) {
 				// 鈍角を持っていれば直径を使う
-				const Vec2 &v0 = point[id],
+				const Vec2 &v0 = point[spn::CndAdd(id-1, 3)],
 							&v1 = point[spn::CndSub(id+1, 3)];
 				return Circle((v0+v1)*0.5f, v0.distance(v1));
 			} else {
