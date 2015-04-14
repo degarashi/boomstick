@@ -13,8 +13,20 @@ namespace boom {
 		using geo2d::ConvexM;
 		using geo2d::GSimplex;
 		using geo2d::Poly;
+		using geo2d::Circle;
 
 		class Convex2D : public spn::test::RandomTestInitializer {};
+		TEST_F(Convex2D, BVolume) {
+			auto rd = getRand();
+			int np = rd.template getUniform<int>({3, 64});
+			ConvexM cv = GenRConvex(rd, defval::convex_pos, np);
+
+			Circle c = cv.bs_getBVolume();
+			// 全ての点が円の中に入ってるかチェック
+			for(auto& p : cv.point) {
+				ASSERT_LE(c.vCenter.distance(p), c.fRadius + NEAR_THRESHOLD);
+			}
+		}
 		TEST_F(Convex2D, CheckPosition) {
 			auto rd = getRand();
 			auto rcf = [&](){ return rd.template getUniform<float>({0, 1.f}); };

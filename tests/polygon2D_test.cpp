@@ -8,15 +8,23 @@ namespace boom {
 		using namespace spn::test;
 		using spn::Vec2;
 		using geo2d::PolyM;
+		using geo2d::Circle;
+
 		class Poly2D : public spn::test::RandomTestInitializer {};
+		TEST_F(Poly2D, BVolume) {
+			auto rd = getRand();
+			PolyM p(GenRPoly(rd, {-1e2f, 1e2f}));
+			Circle c = p.bs_getBVolume();
+
+			for(auto& p2 : p.point) {
+				ASSERT_LE(c.vCenter.distance(p2), c.fRadius+1e-3f);
+			}
+		}
 		TEST_F(Poly2D, Triangle) {
 			auto rd = getRand();
 			spn::RangeF rV{0,1};
 
 			PolyM p(GenRPoly(rd, rV));
-			if(!p.isCW())
-				p.invert();
-
 			auto rc = [&](){ return rd.template getUniform<float>(rV); };
 			// 3頂点を合計1になるような係数で合成した座標は必ず三角形の中に入る
 			float c[3];
