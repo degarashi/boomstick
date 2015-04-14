@@ -112,7 +112,7 @@ namespace boom {
 					float td = res.first.len_sq();
 					if(td < 1e-5f) {
 						float r = GetRatio(rV0, rV1, res.first);
-						auto in = _posA[ts[0]]*r + _posA[ts[1]]*(1-r);
+						auto in = _posA[ts[0]]*(1-r) + _posA[ts[1]]*r;
 						return _setAsHit(3, in);
 					} else if(dist > td) {
 						dist = td;
@@ -126,7 +126,7 @@ namespace boom {
 						float td = res2.first.len_sq();
 						if(td < 1e-5f) {
 							float r = GetRatio(rV1, rV2, res.first);
-							auto in = _posA[ts[1]]*r + _posA[ts[2]]*(1-r);
+							auto in = _posA[ts[1]]*(1-r) + _posA[ts[2]]*r;
 							return _setAsHit(3, in);
 						}
 						if(dist > td) {
@@ -255,13 +255,14 @@ namespace boom {
 					}
 					float r = std::max(0.f, fr.dist);
 					r = GetRatio(v0.first, v2.first, fr.dir * r);
-					_pvec.first = v0.second*r + v2.second*(1-r);
+					_pvec.first = v0.second*(1-r) + v2.second*r;
 					return;
 				}
 				// 新しく追加された頂点を交えて線分候補を作成
 				int flag = _addAsv(v0, v1) | _addAsv(v1, v2);
 				if(flag & 0x02) {
-					_pvec.first = v1.second;
+					float r = GetRatio(fr.vtx[0]->first, fr.vtx[1]->first, v1.first);
+					_pvec.first = fr.vtx[0]->second*(1-r) + fr.vtx[1]->second*r;
 					_pvec.second = Vec2(0,0);
 					return;
 				}
