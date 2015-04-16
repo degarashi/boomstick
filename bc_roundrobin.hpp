@@ -7,9 +7,8 @@ namespace boom {
 	/*!	属性フラグが0x80000000の時はBへ、それ以外はAに登録
 		A->A, A->Bでは判定が行われるが B->Bはされない
 		\tparam BV	バウンディングボリューム
-		\tparam IM	Modelインタフェース
 	*/
-	template <class BV, class IM>
+	template <class BV>
 	class BroadC_RoundRobin {
 		public:
 			enum Type {
@@ -18,18 +17,17 @@ namespace boom {
 				NumType
 			};
 			struct IDType {
-				uint32_t	id;
-				Type		typ;
+				CMask	id;
+				Type	typ;
 			};
 		private:
-			using IModel = IM;
 			using BVolume = BV;
 			struct Node {
-				uint32_t		mask;	//!< 登録時に渡されたマスク値
+				CMask			mask;	//!< 登録時に渡されたマスク値
 				spn::SHandle	hCol;	//!< コリジョンマネージャで使われるリソースハンドル
 				BVolume			volume;
 			};
-			using Nodes = spn::noseq_list<Node, std::allocator, uint32_t>;
+			using Nodes = spn::noseq_list<Node, std::allocator, CMask>;
 			Nodes			_node[NumType];
 			using FGetBV = std::function<BVolume (spn::SHandle)>;
 			const FGetBV 	_fGetBV;
@@ -53,18 +51,44 @@ namespace boom {
 				}
 				return 0;
 			}
+			static Type _DetectType(CMask m) {
+				return (m & 0x80000000) ? TypeB : TypeA;
+			}
 		public:
 			BroadC_RoundRobin(FGetBV cb): _fGetBV(cb) {}
-			IDType add(spn::SHandle sh, uint32_t mask) {
-				Type typ = (mask & 0x80000000) ? TypeB : TypeA;
+			IDType add(spn::SHandle sh, CMask mask) {
+				Type typ = _DetectType(mask);
 				return IDType{_node[typ].add(Node{mask, sh}), typ};
 			}
 			void rem(const IDType& idt) {
 				_node[idt.typ].rem(idt.id);
 			}
+			//! リストに登録してある全ての物体に対して衝突判定
+			/*!	\param[in] mask		コリジョンマスク値
+				\param[in] bv		判定対象のバウンディングボリューム
+				\param[in] cb		コールバック関数(spn::SHandle) */
+			template <class CB>
+			void checkCollision(CMask mask, const BVolume& bv, CB&& cb) {
+				_refreshBV();
+				auto fnChk = [mask, &bv, cb=std::forward<CB>(cb)](auto& nd) {
+					for(auto& obj : nd) {
+						if(mask & obj.mask) {
+							if(bv.hit(obj.volume))
+								cb(obj.hCol);
+						}
+					}
+				};
+				if(_DetectType(mask) == TypeA) {
+					// TypeBと判定
+					fnChk(_node[TypeB]);
+				}
+				// TypeAと判定
+				fnChk(_node[TypeA]);
+			}
 			//! リストに溜め込まずに直接コールバックを呼ぶ
 			/*!	\param[in] ac_t		累積時間
-				\param[in] cb		コールバック関数(SHandle,SHandle) */
+				\param[in] cb		コールバック関数(SHandle,SHandle)
+				\return 衝突したペア数 */
 			template <class CB>
 			int broadCollision(CB&& cb) {
 				_refreshBV();
@@ -72,8 +96,7 @@ namespace boom {
 				int count = 0;
 				auto itrB_a = _node[TypeA].begin(),
 					itrE_a = _node[TypeA].end(),
-					itrE_a1 = itrE_a;
-				--itrE_a1;
+					itrE_a1 = std::prev(itrE_a, 1);
 
 				int nA = _node[TypeA].size();
 				if(nA > 0) {

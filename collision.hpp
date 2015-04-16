@@ -146,14 +146,12 @@ namespace boom {
 		\tparam	Types	geom2d::Types or geom3d::Types
 		\tparam UD		userdata type
 	*/
-	template <template <class,class> class BC,
+	template <template <class> class BC,
 				class Types,
 				class UD>
 	class ColMgr : public spn::ResMgrA<ColMem<ColMgr<BC,Types,UD>,
 											typename Types::MMgr::LHdl,
-											typename BC<decltype(std::declval<typename Types::IModel>().im_getBVolume()),
-														typename Types::IModel>
-													  ::IDType,
+											typename BC<decltype(std::declval<typename Types::IModel>().im_getBVolume())>::IDType,
 											UD>,
 										ColMgr<BC,Types,UD>>,
 					public Types::Narrow
@@ -164,7 +162,7 @@ namespace boom {
 			using user_t = UD;														//!< Userdata
 			using BVolume = decltype(std::declval<IModel>().im_getBVolume());		//!< Bounding-volume
 			using this_t = ColMgr<BC, Types, user_t>;
-			using BroadC = BC<BVolume, IModel>;										//!< BroadCollision class
+			using BroadC = BC<BVolume>;												//!< BroadCollision class
 			using BCID = typename BroadC::IDType;									//!< BroadCollision dependant Id
 			// ---- model handle type ----
 			using HMdl = typename MMgr::SHdl;
@@ -296,6 +294,25 @@ namespace boom {
 					_broadC.rem(hCol.cref().getBCID());
 				}
 				base::release(hCol);
+			}
+			/*!	\param[in] mask		コリジョンマスク値
+				\param[in] hm		判定対象のモデルハンドル
+				\param[in] cb		コールバック関数(HCol) */
+			template <class CB>
+			void checkCollision(CMask ms, HMdl hm, CB&& cb) {
+				auto& spMdl = hm.ref();
+				auto bv = spMdl->im_getBVolume();
+				_broadC.checkCollision(ms, bv,
+					[ac=_accum,
+						pMdl=spMdl.get(),
+						cb=std::forward<CB>(cb)](spn::SHandle sh)
+					{
+						auto hc = HCol::FromHandle(sh);
+						// 詳細判定
+						if(Narrow::Hit(pMdl, hc->getModel(), ac))
+							cb(hc);
+					}
+				);
 			}
 			//! 時間を1進め、衝突履歴の更新
 			void update() {
