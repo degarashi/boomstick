@@ -3,6 +3,7 @@
 #endif
 #include "test2D.hpp"
 #include "bc_roundrobin.hpp"
+#include <unordered_set>
 
 namespace boom {
 	namespace test {
@@ -12,7 +13,7 @@ namespace boom {
 		using geo2d::AABB;
 		using geo2d::AABBM;
 		using geo2d::ModelMgr;
-		class RoundRobin : public test2d::Narrow {
+		class RoundRobin_Dim2 : public test2d::Narrow {
 			private:
 				using base_t = test2d::Narrow;
 				ModelMgr	_mmgr;
@@ -22,6 +23,8 @@ namespace boom {
 				using HCol = typename ColMgr::SHdl;
 				using HLCol = typename ColMgr::LHdl;
 				using HLCol_V = std::vector<HLCol>;
+				using MMgr = typename ColMgr::MMgr;
+				using HLMdl = typename ColMgr::HLMdl;
 				auto& getColMgr() {
 					return _cmgr;
 				}
@@ -47,28 +50,75 @@ namespace boom {
 					}
 				}
 			}
+			//! ランダムな階層構造の形状定義
+			template <class CT, class RD, class CM>
+			auto AddRandomTree(RD& rd, CM& cm, int n, CMask mask, typename CM::user_t ud) {
+				std::vector<typename CM::HLCol> v(n);
+				for(int i=0 ; i<n ; i++) {
+					auto sp = test2d::MakeRandomTree<CT,CT>(rd, 4, 1);
+					v[i] = cm.addCol(mask, mgr_model2d.emplace(sp), ud++);
+				}
+				return std::move(v);
+			}
 		}
-		TEST_F(RoundRobin, Dim2) {
+		TEST_F(RoundRobin_Dim2, CheckCollision) {
+			auto rd = getRand();
+			auto& cm = getColMgr();
+			auto fnN = [&](const spn::RangeI& r){ return rd.template getUniform<int>(r); };
+			using CT = spn::CType<geo2d::Circle, geo2d::AABB>;
+
+			// TypeAを適当に追加
+			auto vA = AddRandomTree<CT>(rd, cm, fnN({0,32}), 0x00000001, 0);
+			// TypeBも適当に追加
+			auto vB = AddRandomTree<CT>(rd, cm, fnN({0,32}), 0x80000001, 1000);
+
+			HLMdl hlMdl = MMgr::_ref().emplace(test2d::MakeRandomTree<CT,CT>(rd, 4, 1));
+			// RoundRobinクラスによる判定
+			// -> TypeA and TypeBと判定
+			using HCSet = std::unordered_set<HCol>;
+			HCSet result_rb[2];
+			auto bv = hlMdl->get()->im_getBVolume();
+			cm.checkCollision(0x00000001, hlMdl, [&](HCol hc){
+				result_rb[0].insert(hc);
+			});
+			// -> TypeAと判定
+			cm.checkCollision(0x80000001, hlMdl, [&](HCol hc){
+				result_rb[1].insert(hc);
+			});
+
+			// 自前で判定
+			HCSet result_diy[2];
+			for(auto& a : vA) {
+				if(Narrow_t::Hit(hlMdl->get(), a->getModel(), 0)) {
+					result_diy[0].insert(a);
+					result_diy[1].insert(a);
+				}
+			}
+			for(auto& b : vB) {
+				auto bv = b->getModel()->im_getBVolume();
+				if(bv.hit(b->getModel()->im_getBVolume())) {
+					if(Narrow_t::Hit(hlMdl->get(), b->getModel(), 0)) {
+						result_diy[0].insert(b);
+					}
+				}
+			}
+
+			// 2つの結果を比較
+			for(int i=0 ; i<2 ; i++)
+				ASSERT_EQ(result_rb[i], result_diy[i]);
+		}
+		TEST_F(RoundRobin_Dim2, BroadCollision) {
 			auto rd = getRand();
 			auto& cm = getColMgr();
 
 			auto fnN = [&](const spn::RangeI& r){ return rd.template getUniform<int>(r); };
 			using CT = spn::CType<geo2d::Circle, geo2d::AABB>;
-			// ランダムな階層構造の形状定義
-			auto fnInit = [&rd, &cm](int n, auto mask, auto ud) {
-				HLCol_V v(n);
-				for(int i=0 ; i<n ; i++) {
-					auto sp = test2d::MakeRandomTree<CT,CT>(rd, 4, 1);
-					v[i] = cm.addCol(mask, mgr_model2d.emplace(sp), ud);
-				}
-				return std::move(v);
-			};
 			// MSBが0ならTypeA
 			// 目印としてUserData=0x00
-			auto v0 = fnInit(fnN({0,32}), 0x00000001, 0x00);
+			auto v0 = AddRandomTree<CT>(rd, cm, fnN({0,32}), 0x00000001, 0x0000);
 			// MSBが1ならTypeB
 			// 目印としてUserData=0x01
-			auto v1 = fnInit(fnN({0,32}), 0x80000001, 0x01);
+			auto v1 = AddRandomTree<CT>(rd, cm, fnN({0,32}), 0x80000001, 0x1000);
 
 			auto fnCollect = [](auto& vleaf, auto* mdl) {
 				auto v = dynamic_cast<geo2d::TfBase*>(mdl)->shared_from_this();
