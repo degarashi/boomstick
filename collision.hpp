@@ -163,11 +163,12 @@ namespace boom {
 			using BVolume = decltype(std::declval<IModel>().im_getBVolume());		//!< Bounding-volume
 			using this_t = ColMgr<BC, Types, user_t>;
 			using BroadC = BC<BVolume>;												//!< BroadCollision class
-			using BCID = typename BroadC::IDType;									//!< BroadCollision dependant Id
+			using BCId = typename BroadC::IDType;									//!< BroadCollision dependant Id
+			using BCIdV = typename BroadC::IDTypeV;
 			// ---- model handle type ----
 			using HMdl = typename MMgr::SHdl;
 			using HLMdl = typename MMgr::LHdl;
-			using CMem = ColMem<this_t, HLMdl, BCID, user_t>;						//!< Collision information structure
+			using CMem = ColMem<this_t, HLMdl, BCId, user_t>;						//!< Collision information structure
 
 			using base = spn::ResMgrA<CMem, this_t>;
 			// --- collision handle type ----
@@ -252,6 +253,23 @@ namespace boom {
 				if(bBoth)
 					_getCurRM().clear();
 			}
+			void _makeHist(HCol hc0, HCol hc1) {
+				auto& hist = _getCurHist();
+				auto fn = [this, &hist](HCol hc0, HCol hc1) {
+					auto &c0 = hc0.ref();
+					// 前のフレームでの継続フレームリストを探索
+					int nf = 0;
+					if(auto hist = _hasPrevCollision(hc0, hc1))
+						nf = hist->nFrame + 1;
+					int nextID = hist.size();
+					Int_OP lastID = c0.setLastIndex(_accum, nextID);
+					if(lastID)
+						hist[*lastID].nextOffset = (nextID - *lastID) * sizeof(Hist);
+					hist.push_back(Hist(hc1, nf));
+				};
+				fn(hc0, hc1);
+				fn(hc1, hc0);
+			}
 			bool release(spn::SHandle sh) override {
 				release(HCol::FromHandle(sh));
 				return false;
@@ -314,12 +332,18 @@ namespace boom {
 					}
 				);
 			}
-			//! 時間を1進め、衝突履歴の更新
-			void update() {
-				auto& hist = _switchHist();
-
-				++_accum;
-				_broadC.broadCollision([this, &hist](spn::SHandle sh0, spn::SHandle sh1){
+			//! 全てのオブジェクトを相互に当たり判定
+			/*!	A->Bの組み合わせでコールバックを呼び、B->Aは呼ばない
+				\param[in] cb		コールバック関数(HCol, HCol)
+				\param[in] bAdvance	trueの時に時刻を進め、新旧の履歴を切り替える
+				\param[in] idv		非nullptrの時はリストに登録してあるオブジェクトのみ更新 */
+			template <class CB>
+			void update(CB&& cb, bool bAdvance, const BCIdV* idv=nullptr) {
+				if(bAdvance) {
+					_switchHist();
+					++_accum;
+				}
+				_broadC.broadCollision([bAdvance, this, cb=std::forward<CB>(cb)](spn::SHandle sh0, spn::SHandle sh1){
 					// 同じハンドルという事はあり得ない筈
 					AssertP(Trap, sh0!=sh1)
 
@@ -327,23 +351,16 @@ namespace boom {
 						hc1(HCol::FromHandle(sh1));
 					// 詳細判定
 					// 毎フレームヒットリストを再構築
-					if(Narrow::Hit(hc0.ref().getModel(), hc1.ref().getModel(), _accum)) {
-						auto fn = [this, &hist](HCol hc0, HCol hc1) {
-							auto &c0 = hc0.ref();
-							// 前のフレームでの継続フレームリストを探索
-							int nf = 0;
-							if(auto hist = _hasPrevCollision(hc0, hc1))
-								nf = hist->nFrame + 1;
-							int nextID = hist.size();
-							Int_OP lastID = c0.setLastIndex(_accum, nextID);
-							if(lastID)
-								hist[*lastID].nextOffset = (nextID - *lastID) * sizeof(Hist);
-							hist.push_back(Hist(hc1, nf));
-						};
-						fn(hc0, hc1);
-						fn(hc1, hc0);
+					if(Narrow::Hit(hc0->getModel(), hc1->getModel(), _accum)) {
+						if(bAdvance)
+							_makeHist(hc0, hc1);
+						cb(hc0, hc1);
 					}
-				});
+				}, idv);
+			}
+			//! 時間を1進め、衝突履歴の更新
+			void update() {
+				update([](auto,auto){}, true);
 			}
 	};
 }

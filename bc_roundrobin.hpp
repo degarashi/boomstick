@@ -16,10 +16,12 @@ namespace boom {
 				TypeB,
 				NumType
 			};
+			using NS_id = uint32_t;
 			struct IDType {
-				CMask	id;
+				NS_id	id;
 				Type	typ;
 			};
+			using IDTypeV = std::vector<IDType>;
 		private:
 			using BVolume = BV;
 			struct Node {
@@ -27,16 +29,26 @@ namespace boom {
 				spn::SHandle	hCol;	//!< コリジョンマネージャで使われるリソースハンドル
 				BVolume			volume;
 			};
-			using Nodes = spn::noseq_list<Node, std::allocator, CMask>;
+			using Nodes = spn::noseq_list<Node, std::allocator, NS_id>;
 			Nodes			_node[NumType];
 			using FGetBV = std::function<BVolume (spn::SHandle)>;
 			const FGetBV 	_fGetBV;
 
 			//! バウンディングボリュームの更新
-			void _refreshBV() {
-				for(int i=0 ; i<NumType ; i++) {
-					for(auto& nd : _node[i])
-						nd.volume = _fGetBV(nd.hCol);
+			/*! \param[in] idv 非nullptrならリストに指定したオブジェクトのみの更新 */
+			void _refreshBV(const IDTypeV* idv) {
+				if(idv) {
+					// 指定したオブジェクトのみを対象
+					for(auto& idt : *idv) {
+						Node& node = _node[idt.typ].get(idt.id);
+						node.volume = _fGetBV(node.hCol);
+					}
+				} else {
+					// 全てのオブジェクトが対象
+					for(int i=0 ; i<NumType ; i++) {
+						for(auto& nd : _node[i])
+							nd.volume = _fGetBV(nd.hCol);
+					}
 				}
 			}
 			template <class CB>
@@ -69,7 +81,7 @@ namespace boom {
 				\param[in] cb		コールバック関数(spn::SHandle) */
 			template <class CB>
 			void checkCollision(CMask mask, const BVolume& bv, CB&& cb) {
-				_refreshBV();
+				_refreshBV(nullptr);
 				auto fnChk = [mask, &bv, cb=std::forward<CB>(cb)](auto& nd) {
 					for(auto& obj : nd) {
 						if(mask & obj.mask) {
@@ -88,10 +100,11 @@ namespace boom {
 			//! リストに溜め込まずに直接コールバックを呼ぶ
 			/*!	\param[in] ac_t		累積時間
 				\param[in] cb		コールバック関数(SHandle,SHandle)
+				\param[in] idv		非nullptr時はリストに登録してあるオブジェクトのみBVの更新を行う
 				\return 衝突したペア数 */
 			template <class CB>
-			int broadCollision(CB&& cb) {
-				_refreshBV();
+			int broadCollision(CB&& cb, const IDTypeV* idv=nullptr) {
+				_refreshBV(idv);
 
 				int count = 0;
 				auto itrB_a = _node[TypeA].begin(),
