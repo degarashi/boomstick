@@ -149,6 +149,8 @@ namespace boom {
 				bool hasInner() const override;
 				virtual bool isLeaf() const { return false; }
 				virtual typename base_t::SP clone() const = 0;
+				virtual spn::Pose2D& tf_refPose[[noreturn]]();
+				virtual const spn::Pose2D& tf_getPose() const;
 		};
 		template <class Boundary, class Ud>
 		class TfNode_base : public TfBase,

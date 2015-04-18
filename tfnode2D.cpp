@@ -20,5 +20,12 @@ namespace boom {
 		bool TfBase::hasInner() const {
 			return static_cast<bool>(getChild());
 		}
+		spn::Pose2D& TfBase::tf_refPose() {
+			Assert(Trap, false, "invalid function call")
+			throw 0;
+		}
+		const spn::Pose2D& TfBase::tf_getPose() const {
+			return const_cast<TfBase*>(this)->tf_getPose();
+		}
 	}
 }

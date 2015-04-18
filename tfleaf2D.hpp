@@ -77,6 +77,12 @@ namespace boom {
 				spn::Optional<const AMat32&> getToWorld() const override {
 					return getGlobal();
 				}
+				spn::Pose2D& tf_refPose() override {
+					return refPose();
+				}
+				const spn::Pose2D& tf_getPose() const override {
+					return getPose();
+				}
 				friend std::ostream& operator << (std::ostream&, const TfLeafBase&);
 		};
 		template <class Shape, class Ud>
