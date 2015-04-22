@@ -168,6 +168,8 @@ namespace boom {
 			// ---- model handle type ----
 			using HMdl = typename MMgr::SHdl;
 			using HLMdl = typename MMgr::LHdl;
+			using MdlRef = decltype(std::declval<HMdl>().ref());
+			using MdlP = decltype(std::declval<MdlRef>().get());
 			using CMem = ColMem<this_t, HLMdl, BCId, user_t>;						//!< Collision information structure
 
 			using base = spn::ResMgrA<CMem, this_t>;
@@ -314,15 +316,14 @@ namespace boom {
 				base::release(hCol);
 			}
 			/*!	\param[in] mask		コリジョンマスク値
-				\param[in] hm		判定対象のモデルハンドル
+				\param[in] mp		判定対象のモデルポインタ
 				\param[in] cb		コールバック関数(HCol) */
 			template <class CB>
-			void checkCollision(CMask ms, HMdl hm, CB&& cb) {
-				auto& spMdl = hm.ref();
-				auto bv = spMdl->im_getBVolume();
+			void checkCollision(CMask ms, MdlP mp, CB&& cb) {
+				auto bv = mp->im_getBVolume();
 				_broadC.checkCollision(ms, bv,
 					[ac=_accum,
-						pMdl=spMdl.get(),
+						pMdl=mp,
 						cb=std::forward<CB>(cb)](spn::SHandle sh)
 					{
 						auto hc = HCol::FromHandle(sh);
@@ -331,6 +332,10 @@ namespace boom {
 							cb(hc);
 					}
 				);
+			}
+			template <class CB>
+			void checkCollision(CMask ms, HMdl hMdl, CB&& cb) {
+				checkCollision(ms, hMdl->get(), std::forward<CB>(cb));
 			}
 			//! 全てのオブジェクトを相互に当たり判定
 			/*!	A->Bの組み合わせでコールバックを呼び、B->Aは呼ばない
