@@ -114,7 +114,7 @@ namespace boom {
 		}
 		template <class T, class A>
 		TfSP MakeAsLeaf(const A& s) {
-			return std::make_shared<geo2d::TfLeaf<T>>(s);
+			return std::make_shared<geo2d::TfLeaf<T>>(std::make_shared<A>(s));
 		}
 		template <class T>
 		TfSP MakeAsNode() {

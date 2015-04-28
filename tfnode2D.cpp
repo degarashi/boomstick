@@ -27,5 +27,8 @@ namespace boom {
 		const spn::Pose2D& TfBase::tf_getPose() const {
 			return const_cast<TfBase*>(this)->tf_getPose();
 		}
+		Model_SP TfBase::im_clone() const {
+			return clone();
+		}
 	}
 }

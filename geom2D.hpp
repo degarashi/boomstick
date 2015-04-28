@@ -37,7 +37,9 @@ namespace boom {
 
 			Circle() = default;
 			Circle(const Vec2& c, float r);
-			// ---- cacheable functions ----
+
+			constexpr static bool CanCacheShape = true;
+			// -----------------------------
 			float bs_getArea() const;
 			float bs_getInertia() const;
 			const Vec2& bs_getCenter() const;
@@ -79,12 +81,13 @@ namespace boom {
 			const TfBase* get() const;
 		};
 		struct IModel : ::boom::IModelNode {
-			// ---- cacheable functions ----
+			// -----------------------------
 			virtual Vec2 im_getCenter() const = 0;
 			virtual float im_getArea() const = 0;
 			virtual float im_getInertia() const = 0;
 			virtual Circle im_getBVolume() const = 0;
 			// -----------------------------
+			virtual void im_transform[[noreturn]](void* dst, const AMat32& m) const = 0;
 			//! サポート射像
 			/*! 均等でないスケーリングは対応しない、移動は後でオフセット、回転はdirを逆にすれば代用可
 				・・との理由で行列変換後の物体に対する射像は無し */
@@ -93,6 +96,7 @@ namespace boom {
 			virtual bool im_hitPoint(const Vec2& p, float t=NEAR_THRESHOLD) const = 0;
 			virtual uint32_t getCID() const = 0;
 			virtual MdlItr getInner() const;
+			virtual Model_SP im_clone() const = 0;
 
 			virtual Vec2 toLocal(const Vec2& v) const { return v; }
 			virtual Vec2 toLocalDir(const Vec2& v) const { return v; }
@@ -117,6 +121,11 @@ namespace boom {
 			Model(const T& t): base_t(t) {}
 			Model(T&& t): base_t(std::move(t)) {}
 			// 各種ルーチンの中継
+			bool canCacheShape() const override { return T::CanCacheShape; }
+			Model_SP im_clone() const override {
+				return std::make_shared<Model<T>>(static_cast<const T&>(*this));
+			}
+			void im_transform(void* dst, const AMat32& m) const override { *reinterpret_cast<T*>(dst) = *this * m; }
 			Circle im_getBVolume() const override { return T::bs_getBVolume(); }
 			float im_getInertia() const override { return T::bs_getInertia(); }
 			float im_getArea() const override { return T::bs_getArea(); }
@@ -148,9 +157,10 @@ namespace boom {
 				MdlItr getInner() const override;
 				bool hasInner() const override;
 				virtual bool isLeaf() const { return false; }
-				virtual typename base_t::SP clone() const = 0;
 				virtual spn::Pose2D& tf_refPose[[noreturn]]();
 				virtual const spn::Pose2D& tf_getPose() const;
+				Model_SP im_clone() const override;
+				virtual TfBase_SP clone() const = 0;
 		};
 		template <class Boundary, class Ud>
 		class TfNode_base : public TfBase,
@@ -161,6 +171,9 @@ namespace boom {
 				Ud					_udata;
 			public:
 				using model_t::model_t;
+				Model_SP im_clone() const override {
+					return TfBase::im_clone();
+				}
 				/*! ユーザーデータがvoidの時は親ノードのデータを返す */
 				void* getUserData() override {
 					return _getUserData(&_udata, std::is_same<spn::none_t, Ud>());
@@ -263,7 +276,8 @@ namespace boom {
 
 		using LNear = std::pair<Vec2, LinePos>;
 		struct Point : Vec2, ITagP<Point> {
-			// ---- cacheable functions ----
+			constexpr static bool CanCacheShape = true;
+			// -----------------------------
 			const float& bs_getArea() const;
 			const float& bs_getInertia() const;
 			const Vec2& bs_getCenter() const;
@@ -294,10 +308,13 @@ namespace boom {
 			Line() = default;
 			Line(const Vec2& p, const Vec2& d);
 
+			constexpr static bool CanCacheShape = true;
+			// -----------------------------
 			float bs_getArea() const;
 			float bs_getInertia() const;
 			const Vec2& bs_getCenter() const;
 			const Circle& bs_getBVolume() const;
+			// -----------------------------
 
 			Vec2x2 nearest(const Line& st) const;
 			Vec2 nearest(const Vec2& p) const;
@@ -322,10 +339,13 @@ namespace boom {
 			Ray() = default;
 			Ray(const Vec2& p, const Vec2& d);
 
+			constexpr static bool CanCacheShape = true;
+			// -----------------------------
 			float bs_getArea() const;
 			float bs_getInertia() const;
 			const Vec2& bs_getCenter() const;
 			const Circle& bs_getBVolume() const;
+			// -----------------------------
 
 			const Line& asLine() const;
 			Vec2x2 nearest(const Ray& r) const;
@@ -344,7 +364,8 @@ namespace boom {
 
 			Segment() = default;
 			Segment(const Vec2& v0, const Vec2& v1);
-			// ---- cacheable functions ----
+			constexpr static bool CanCacheShape = true;
+			// -----------------------------
 			const float& bs_getArea() const {INVOKE_ERROR}
 			const float& bs_getInertia() const {INVOKE_ERROR}
 			Vec2 bs_getCenter() const;
@@ -389,7 +410,8 @@ namespace boom {
 
 			AABB() = default;
 			AABB(const Vec2& min_v, const Vec2& max_v);
-			// ---- cacheable functions ----
+			constexpr static bool CanCacheShape = true;
+			// -----------------------------
 			float bs_getArea() const;
 			float bs_getInertia() const;
 			Vec2 bs_getCenter() const;
@@ -419,7 +441,8 @@ namespace boom {
 
 			Poly() = default;
 			Poly(const Vec2& p0, const Vec2& p1, const Vec2& p2);
-			// ---- cacheable functions ----
+			constexpr static bool CanCacheShape = true;
+			// -----------------------------
 			float bs_getArea() const;
 			float bs_getInertia() const;
 			Vec2 bs_getCenter() const;
@@ -490,7 +513,8 @@ namespace boom {
 			Convex& operator = (Convex&& c);
 
 			static Convex FromConcave(const PointL& src);
-			// ---- cacheable functions ----
+			constexpr static bool CanCacheShape = false;
+			// -----------------------------
 			float bs_getArea() const;
 			Circle bs_getBVolume() const;
 			Vec2 bs_getCenter() const;

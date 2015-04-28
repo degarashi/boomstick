@@ -76,8 +76,8 @@ namespace boom {
 			spn::Pose2D ps(GenR2Vec(rd, {-1e3f, 1e3f}),
 							spn::DegF(rd.template getUniform<float>({-180.f, 180.f})),
 							Vec2(rd.template getUniform<float>({1e-2f, 1e2f})));
-			auto spA = std::make_shared<geo2d::TfLeaf<Shape>>(s * ps.getToWorld()),
-				 spB = std::make_shared<geo2d::TfLeaf<Shape>>(s);
+			auto spA = std::make_shared<geo2d::TfLeaf<Shape>>(std::make_shared<ShapeM>(s * ps.getToWorld())),
+				 spB = std::make_shared<geo2d::TfLeaf<Shape>>(std::make_shared<ShapeM>(s));
 			spB->setPose(ps);
 
 			// サポート写像が一致するか確認
@@ -122,7 +122,8 @@ namespace boom {
 			auto& toWorld = ps.getToWorld();
 			for(auto& vs : vB) {
 				auto* vsp = static_cast<geo2d::TfLeaf<geo2d::Circle>*>(vs);
-				static_cast<geo2d::Circle&>(*vsp) = *vsp * toWorld;
+				auto& mdl = *static_cast<geo2d::Circle*>(vsp->getModelSource()->getCore());
+				mdl = mdl * toWorld;
 			}
 
 			constexpr int nCheck = 5;
