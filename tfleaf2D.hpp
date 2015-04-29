@@ -32,7 +32,6 @@ namespace boom {
 				TfLeafBase(const Model_SP& m);
 
 				bool isLeaf() const override;
-				bool canCacheShape() const override;
 				void im_transform(void* dst, const AMat32& m) const override;
 				Circle im_getBVolume() const override;
 				float im_getInertia() const override;
@@ -54,14 +53,41 @@ namespace boom {
 				uint32_t getCID() const override;
 				friend std::ostream& operator << (std::ostream&, const TfLeafBase&);
 		};
-
-		// Convex以外
-		template <class Shape, class Ud=spn::none_t>
-		class TfLeaf : public spn::CheckAlign<16, TfLeaf<Shape,Ud>>,
-						public TfLeafBase
-		{
+		//! 座標変換ありのモデル基底
+		template <class Ud=spn::none_t>
+		class TfLeaf : public TfLeafBase {
 			private:
 				using base_t = TfLeafBase;
+				Ud	_udata;
+			public:
+				using base_t::base_t;
+				bool canCacheShape() const override {
+					return false;
+				}
+				/*! ユーザーデータがvoidの時は親ノードのデータを返す */
+				void* getUserData() override {
+					return _getUserData(&_udata, std::is_same<spn::none_t, Ud>());
+				}
+				const void* getCore[[noreturn]]() const override {
+					// canCacheShapeがfalseのオブジェクトに対して呼んではいけない
+					AssertT(Trap, false, (std::domain_error)(const char*), "calling getCore() is not valid for TfLeaf")
+					throw 0;
+				}
+				void* getCore[[noreturn]]() override {
+					static_cast<const TfLeaf*>(this)->getCore();
+				}
+				TfBase_SP clone() const override {
+					auto sp = std::make_shared<TfLeaf>(*this);
+					// ModelSpのクローン
+					sp->setModelSource(this->getModelSource()->im_clone());
+					return std::move(sp);
+				}
+		};
+		//! キャッシュ有りのTfLeaf
+		template <class Shape, class Ud=spn::none_t>
+		class TfLeafC : public TfLeaf<Ud> {
+			private:
+				using base_t = TfLeaf<Ud>;
 				using ModelAccum = typename base_t::ModelAccum;
 				using Global = typename base_t::Global;
 
@@ -78,9 +104,8 @@ namespace boom {
 				Ud	_udata;
 			public:
 				using base_t::base_t;
-				/*! ユーザーデータがvoidの時は親ノードのデータを返す */
-				void* getUserData() override {
-					return _getUserData(&_udata, std::is_same<spn::none_t, Ud>());
+				bool canCacheShape() const override {
+					return true;
 				}
 				Vec2 im_support(const Vec2& dir) const override {
 					// 予め変換しておいた形状でサポート写像
@@ -97,35 +122,9 @@ namespace boom {
 					return &_tfShape;
 				}
 				TfBase_SP clone() const override {
-					auto sp = std::make_shared<TfLeaf>(*this);
+					auto sp = std::make_shared<TfLeafC>(*this);
 					// ModelSpのクローン
-					sp->setModelSource(getModelSource()->im_clone());
-					return std::move(sp);
-				}
-		};
-		//! 座標変換ありのモデル基底
-		template <class Ud>
-		class TfLeaf<Convex, Ud> : public TfLeafBase {
-			private:
-				using base_t = TfLeafBase;
-				Ud	_udata;
-			public:
-				using base_t::base_t;
-				/*! ユーザーデータがvoidの時は親ノードのデータを返す */
-				void* getUserData() override {
-					return _getUserData(&_udata, std::is_same<spn::none_t, Ud>());
-				}
-				const void* getCore[[noreturn]]() const override {
-					// canCacheShapeがfalseのオブジェクトに対して呼んではいけない
-					throw std::domain_error("calling getCore() is not valid for TfLeaf<Convex>");
-				}
-				void* getCore[[noreturn]]() override {
-					throw std::domain_error("calling getCore() is not valid for TfLeaf<Convex>");
-				}
-				TfBase_SP clone() const override {
-					auto sp = std::make_shared<TfLeaf>(*this);
-					// ModelSpのクローン
-					sp->setModelSource(getModelSource()->im_clone());
+					sp->setModelSource(this->getModelSource()->im_clone());
 					return std::move(sp);
 				}
 		};

@@ -55,10 +55,7 @@ namespace boom {
 		};
 		using TfNodeTypeList = ::testing::Types<geo2d::Circle,
 												geo2d::Segment,
-												geo2d::Line,
-												geo2d::Ray,
 												geo2d::Poly,
-												geo2d::AABB,
 												geo2d::Convex>;
 		TYPED_TEST_CASE(TfNode, TfNodeTypeList);
 
@@ -72,12 +69,12 @@ namespace boom {
 			// 基本の形状に姿勢変換を掛けた物(=A)と
 			// 変換後の座標で直接生成した物(=B)の2種類を用意
 			ShapeM s;
-			test2d::GenRShape(s, rd);
-			spn::Pose2D ps(GenR2Vec(rd, {-1e3f, 1e3f}),
+			test2d::GenRShape(s, rd, spn::RangeF{-1e2f, 1e2f});
+			spn::Pose2D ps(GenR2Vec(rd, {-1e2f, 1e2f}),
 							spn::DegF(rd.template getUniform<float>({-180.f, 180.f})),
-							Vec2(rd.template getUniform<float>({1e-2f, 1e2f})));
-			auto spA = std::make_shared<geo2d::TfLeaf<Shape>>(std::make_shared<ShapeM>(s * ps.getToWorld())),
-				 spB = std::make_shared<geo2d::TfLeaf<Shape>>(std::make_shared<ShapeM>(s));
+							Vec2(rd.template getUniform<float>({1e-1f, 1e1f})));
+			auto spA = std::make_shared<geo2d::TfLeaf<>>(std::make_shared<ShapeM>(s * ps.getToWorld())),
+				 spB = std::make_shared<geo2d::TfLeaf<>>(std::make_shared<ShapeM>(s));
 			spB->setPose(ps);
 
 			// サポート写像が一致するか確認
@@ -86,7 +83,7 @@ namespace boom {
 				auto dir = spn::test::GenR2Dir(rd);
 				auto p0 = spA->im_support(dir);
 				auto p1 = spB->im_support(dir);
-				ASSERT_LE(p0.distance(p1), 1e-3f);
+				ASSERT_LE(p0.distance(p1), 5e-3f);
 			}
 			for(int i=0 ; i<nCheck ; i++) {
 				// 衝突試験用の形状を1つ用意
@@ -116,12 +113,12 @@ namespace boom {
 							spn::DegF(rd.template getUniform<float>({-180.f, 180.f})),
 							Vec2(rd.template getUniform<float>({1e-2f, 1e2f})));
 			for(auto& vs : vA) {
-				auto* vsp = static_cast<geo2d::TfLeaf<geo2d::Circle>*>(vs);
+				auto* vsp = static_cast<geo2d::TfLeaf<>*>(vs);
 				vsp->setPose(ps);
 			}
 			auto& toWorld = ps.getToWorld();
 			for(auto& vs : vB) {
-				auto* vsp = static_cast<geo2d::TfLeaf<geo2d::Circle>*>(vs);
+				auto* vsp = static_cast<geo2d::TfLeaf<>*>(vs);
 				auto& mdl = *static_cast<geo2d::Circle*>(vsp->getModelSource()->getCore());
 				mdl = mdl * toWorld;
 			}

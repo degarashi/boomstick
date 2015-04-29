@@ -33,16 +33,17 @@ namespace boom {
 			//! 形状をランダムに動かす
 			/*! 動かすかどうかもランダム */
 			template <class RD>
-			void MoveShape(RD& rd, geo2d::TfBase* p) {
+			void MoveShape(RD& rd, geo2d::TfLeafBase* p) {
 				// 50%の確率で動かす = 新たに形状を作成
 				if(rd.template getUniform<int>({0,1}) == 0) {
+					void* ms = p->getModelSource()->getCore();
 					switch(p->getCID()) {
 						case CircleM::GetCID(): {
-							auto* pt = reinterpret_cast<Circle*>(p->getCore());
+							auto* pt = reinterpret_cast<Circle*>(ms);
 							*pt = test2d::GenRCircle(rd);
 							break; }
 						case AABBM::GetCID(): {
-							auto* pt = reinterpret_cast<AABB*>(p->getCore());
+							auto* pt = reinterpret_cast<AABB*>(ms);
 							*pt = test2d::GenRAABB(rd);
 							break; }
 						default:
@@ -122,11 +123,11 @@ namespace boom {
 
 			auto fnCollect = [](auto& vleaf, auto* mdl) {
 				auto v = dynamic_cast<geo2d::TfBase*>(mdl)->shared_from_this();
-				auto res = test2d::CollectLeaf(v);
+				auto res = test2d::CollectLeaf(v, (geo2d::TfLeafBase*)nullptr);
 				for(auto* r : res)
 					vleaf.push_back(r);
 			};
-			test2d::TfBase2DPtr_V	leaf0,
+			test2d::TfLeaf2DPtr_V	leaf0,
 									leaf1;
 			for(auto& h : v0)
 				fnCollect(leaf0, h->getModel());

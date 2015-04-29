@@ -16,15 +16,11 @@ namespace boom {
 		bool TfLeafBase::isLeaf() const {
 			return true;
 		}
-		bool TfLeafBase::canCacheShape() const {
-			return _model->canCacheShape();
-		}
 		void TfLeafBase::im_transform(void* dst, const AMat32& m) const {
 			auto m2 = getPose().getToWorld().convertA33() * m;
 			_model->im_transform(dst, m2);
 		}
 		Circle TfLeafBase::im_getBVolume() const {
-			const_cast<TfLeafBase*>(this)->_init();
 			return getBVolume();
 		}
 		float TfLeafBase::im_getInertia() const {
