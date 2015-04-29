@@ -64,9 +64,6 @@ namespace boom {
 
 			friend std::ostream& operator << (std::ostream& os, const Circle& c);
 		};
-
-		class TfBase;
-		using TfBase_SP = std::shared_ptr<TfBase>;
 		//! IModelインタフェースの子ノードイテレータ
 		struct MdlItr {
 			TfBase_SP	_sp;

@@ -3,6 +3,10 @@
 
 namespace boom {
 	namespace geo2d {
+		class TfBase;
+		using TfBase_SP = std::shared_ptr<TfBase>;
+		class TfLeafBase;
+		using TfLeaf_SP = std::shared_ptr<TfLeafBase>;
 		class TfNode;
 		class TfMgr;
 		using TfNode_SP = std::shared_ptr<TfNode>;
