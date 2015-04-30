@@ -438,21 +438,19 @@ namespace boom {
 			split(l);
 		}
 		Circle Convex::bs_getBVolume() const {
+			Assert(Trap, !point.empty())
 			// 多分遅いアルゴリズムだが、今はこれで我慢
 			// 全ての3点の組み合わせを調べる
-			int nV = point.size();
-			AssertP(Trap, nV >= 3)
-			Circle c;
-			c.vCenter = (point[0] +  point[1])/2;
-			c.fRadius = point[0].distance(point[1])/2;
-			for(int i=0 ; i<nV-2 ; i++) {
-				for(int j=i+1 ; j<nV-1 ; j++) {
-					for(int k=j+1 ; k<nV ; k++) {
-						PolyM p(point[i], point[j], point[k]);
-						c.appendBoundary(&p);
-					}
-				}
+			constexpr float fmin = std::numeric_limits<float>::lowest();
+			constexpr float fmax = std::numeric_limits<float>::max();
+			AABBM ab(Vec2(fmax, fmax),
+					Vec2(fmin, fmin));
+			for(auto& p : point) {
+				ab.minV.selectMin(p);
+				ab.maxV.selectMax(p);
 			}
+			Circle c;
+			c.setBoundary(&ab);
 			return c;
 		}
 		std::tuple<bool,Vec2,Vec2> Convex::checkCrossingLine(const Line& ls) const {
