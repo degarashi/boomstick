@@ -6,7 +6,10 @@ namespace boom {
 		const Line& Ray::asLine() const { return *reinterpret_cast<const Line*>(this); }
 		Vec2x2 Ray::nearest(const Ray& r) const {
 			auto fn = [](float f) { return std::max(0.f, f); };
-			return NearestPoint(asLine(), r.asLine(), fn, fn);
+			if(auto v2 = NearestPoint(asLine(), r.asLine(), fn, fn))
+				return *v2;
+			auto p = nearest(r.pos);
+			return {p, r.pos};
 		}
 		Vec2 Ray::nearest(const Vec2& p) const {
 			return NearestPoint(asLine(), p, [](float f){ return std::max(0.f,f); });

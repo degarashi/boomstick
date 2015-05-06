@@ -14,6 +14,8 @@ namespace boom {
 								ray_pos{-1e3f, 1e3f},
 								line_pos(ray_pos),
 								segment_pos(ray_pos),
+								capsule_pos(ray_pos),
+								capsule_radius(circle_radius),
 								poly_pos(ray_pos),
 								convex_pos(ray_pos),
 								aabb_pos(ray_pos);
@@ -42,6 +44,13 @@ namespace boom {
 		geo2d::SegmentM GenRSegment(RD& rd, const spn::RangeF& rV=defval::segment_pos) {
 			auto rv = [&](){ return spn::test::GenR2Vec(rd, rV); };
 			return geo2d::SegmentM(rv(), rv());
+		}
+		template <class RD>
+		geo2d::CapsuleM GenRCapsule(RD& rd, const spn::RangeF& rV=defval::capsule_pos,
+											const spn::RangeF& rR=defval::capsule_radius) {
+			auto rv = [&](){ return spn::test::GenR2Vec(rd, rV); };
+			return geo2d::CapsuleM(rv(), rv(),
+								rd.template getUniform<float>(rR));
 		}
 		template <class RD>
 		geo2d::PolyM GenRPoly(RD& rd, const spn::RangeF& rV=defval::poly_pos) {
@@ -81,6 +90,8 @@ namespace boom {
 		void GenRShape(geo2d::RayM& p, Args&&... args) { p = GenRRay(std::forward<Args>(args)...); }
 		template <class... Args>
 		void GenRShape(geo2d::LineM& p, Args&&... args) { p = GenRLine(std::forward<Args>(args)...); }
+		template <class... Args>
+		void GenRShape(geo2d::CapsuleM& p, Args&&... args) { p = GenRCapsule(std::forward<Args>(args)...); }
 		template <class... Args>
 		void GenRShape(geo2d::SegmentM& p, Args&&... args) { p = GenRSegment(std::forward<Args>(args)...); }
 		template <class... Args>

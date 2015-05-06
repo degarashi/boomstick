@@ -380,20 +380,20 @@ namespace boom {
 					case 0x02: {	// Left -> Right
 						auto res = Segment(pPrev, pCur).crossPoint(ls);
 						*pDst[1]++ = pPrev;
-						if(res.second != LinePos::OnLine)
-							res.first = pCur;
-						if(pPrev.dist_sq(res.first) >= 1e-6f)
-							*pDst[1]++ = res.first;
-						*pDst[0]++ = res.first;
+						if(!res)
+							*res = pCur;
+						if(pPrev.dist_sq(*res) >= 1e-6f)
+							*pDst[1]++ = *res;
+						*pDst[0]++ = *res;
 						break; }
 					case 0x01: {	// Right -> Left
 						auto res = Segment(pPrev, pCur).crossPoint(ls);
-						if(res.second != LinePos::OnLine)
-							res.first = pCur;
+						if(!res)
+							*res = pCur;
 						*pDst[0]++ = pPrev;
-						if(pPrev.dist_sq(res.first) >= 1e-6f)
-							*pDst[0]++ = res.first;
-						*pDst[1]++ = res.first;
+						if(pPrev.dist_sq(*res) >= 1e-6f)
+							*pDst[0]++ = *res;
+						*pDst[1]++ = *res;
 						break; }
 					case 0x00:		// Right -> Right
 						*pDst[0]++ = pPrev;
@@ -470,8 +470,8 @@ namespace boom {
 			int nV = point.size();
 			for(int i=0 ; i<nV ; i++) {
 				auto res = Segment(point[i], point[spn::CndSub(i+1, nV)]).crossPoint(ls);
-				if(res.second != LinePos::NotHit) {
-					*ppt++ = res.first;
+				if(res) {
+					*ppt++ = *res;
 					if(ppt == pt+2)
 						break;
 				}

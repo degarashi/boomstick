@@ -12,15 +12,16 @@
 namespace boom {
 	namespace geo2d {
 		using Int_OP = spn::Optional<int>;
-		struct Point;
-		struct Segment;
-		struct AABB;
-		struct Poly;
-		struct Circle;
 		struct Convex;
+		struct Poly;
+		struct Capsule;
+		struct Circle;
+		struct AABB;
+		struct Segment;
 		struct Ray;
 		struct Line;
-		using CTGeo = spn::CType<Convex, Circle, Poly, AABB, Segment, Ray, Line, Point>;
+		struct Point;
+		using CTGeo = spn::CType<Convex, Poly, Capsule, Circle, AABB, Segment, Ray, Line, Point>;
 		template <class T>
 		using ITagP = ITagP_base<T, CTGeo>;
 
@@ -29,7 +30,6 @@ namespace boom {
 		using Convex2 = std::pair<Convex, Convex>;
 		struct Line;
 		struct Ray;
-
 		struct IModel;
 		struct Circle : ITagP<Circle> {
 			Vec2	vCenter;
@@ -416,8 +416,8 @@ namespace boom {
 			//! 線分が交差する位置を調べる
 			/*! \return first: 交差座標
 						second: 交差しているライン位置 (ONLINE or NOHIT) */
-			LNear crossPoint(const Segment& l) const;
-			LNear crossPoint(const Line& l) const;
+			Vec2_OP crossPoint(const Segment& l) const;
+			Vec2_OP crossPoint(const Line& l) const;
 			float ratio(const Vec2& p) const;
 			Vec2 getDir() const;
 			Line asLine() const;
@@ -428,6 +428,34 @@ namespace boom {
 		};
 		using SegmentM = Model<Segment>;
 		using AABBM = Model<AABB>;
+
+		struct Capsule : ITagP<Capsule> {
+			Vec2	from, to;
+			float	radius;
+
+			Capsule() = default;
+			Capsule(const Vec2& f, const Vec2& t, float r);
+			// -----------------------------
+			float bs_getArea() const;
+			float bs_getInertia() const;
+			Vec2 bs_getCenter() const;
+			Circle bs_getBVolume() const;
+			AABB bs_getBBox() const;
+			// -----------------------------
+			Vec2 support(const Vec2& dir) const;
+
+			Capsule operator * (const AMat32& m) const;
+			Capsule& operator += (const Vec2& ofs);
+
+			spn::none_t hit(...) const;
+			bool hit(const Vec2& p , float t=NEAR_THRESHOLD) const;
+			bool hit(const Segment& s, float t=NEAR_THRESHOLD) const;
+			bool hit(const Capsule& c, float t=NEAR_THRESHOLD) const;
+
+			friend std::ostream& operator << (std::ostream& os, const Capsule& c);
+		};
+		using CapsuleM = Model<Capsule>;
+
 		struct Poly : ITagP<Poly> {
 			Vec2		point[3];
 			bool _isInTriangle(const Vec2& p, float threshold) const;
@@ -678,14 +706,14 @@ namespace boom {
 		}
 		bool IsCrossing(const Line& ls0, const Line& ls1, float len0, float len1, float t=NEAR_THRESHOLD);
 		template <class CLIP0, class CLIP1>
-		inline Vec2x2 NearestPoint(const Line& ls0, const Line& ls1, CLIP0 clip0, CLIP1 clip1) {
+		inline Vec2x2_OP NearestPoint(const Line& ls0, const Line& ls1, CLIP0 clip0, CLIP1 clip1) {
 			float st0d = ls0.dir.len_sq(),
 					st1d = ls1.dir.len_sq(),
 					st01d = ls0.dir.dot(ls1.dir);
 			float d = st0d * st1d - spn::Square(st01d);
 			if(std::fabs(d) < 1e-5f) {
 				// 2つの直線は平行
-				return Vec2x2(ls0.pos, NearestPoint(ls1, ls0.pos, [](float f){return f;}));
+				return spn::none;
 			}
 			Mat22 m0(st1d, st01d,
 					st01d, st0d);

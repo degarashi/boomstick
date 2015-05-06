@@ -5,7 +5,9 @@ namespace boom {
 		Line::Line(const Vec2& p, const Vec2& d): pos(p), dir(d) {}
 		Vec2x2 Line::nearest(const Line& st) const {
 			auto fn = [](float f) { return f; };
-			return NearestPoint(*this, st, fn, fn);
+			if(auto np = NearestPoint(*this, st, fn, fn))
+				return *np;
+			return {st.pos, nearest(st.pos)};
 		}
 		Vec2 Line::nearest(const Vec2& p) const {
 			return pos + dir * (p-pos).dot(dir);

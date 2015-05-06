@@ -35,6 +35,10 @@ namespace boom {
 	using Uint2 = std::pair<uint32_t, uint32_t>;
 	using Vec2x2 = std::pair<Vec2, Vec2>;
 	using Vec3x2 = std::pair<Vec3, Vec3>;
+	using Vec2x2_OP = spn::Optional<Vec2x2>;
+	using Vec3x2_OP = spn::Optional<Vec3x2>;
+	using Vec2_OP = spn::Optional<Vec2>;
+	using Vec2List = std::vector<Vec2>;
 	using Vec3List = std::vector<Vec3>;
 	using PlaneList = std::vector<Plane>;
 	using IndexList = std::vector<uint16_t>;

@@ -4,13 +4,18 @@ namespace boom {
 	namespace geo2d {
 		Segment::Segment(const Vec2& v0, const Vec2& v1): from(v0), to(v1) {}
 		float Segment::distance(const Segment& ls) const {
-			float len0 = length(),
-				  len1 = ls.length();
-			auto fn0 = [len0](float f) { return spn::Saturate(f, 0.f, len0); };
-			auto fn1 = [len1](float f) { return spn::Saturate(f, 0.f, len1); };
-			// 係数が範囲を超えたら交差していないとみなす
-			Vec2x2 vp = NearestPoint(asLine(), ls.asLine(), fn0, fn1);
-			return vp.first.distance(vp.second);
+			if(hit(ls))
+				return 0;
+
+			auto ln = nearest(ls.from);
+			float distsq = ls.from.dist_sq(ln.first);
+			ln = nearest(ls.to);
+			distsq = std::min(distsq, ls.to.dist_sq(ln.first));
+			ln = ls.nearest(from);
+			distsq = std::min(distsq, from.dist_sq(ln.first));
+			ln = ls.nearest(to);
+			distsq = std::min(distsq, to.dist_sq(ln.first));
+			return spn::Sqrt(distsq);
 		}
 		float Segment::length() const {
 			return from.distance(to);
@@ -70,24 +75,32 @@ namespace boom {
 		bool Segment::online(const Vec2& p) const {
 			Vec2 toV1(to-from),
 				toP(p-from);
-			toV1.normalize();
-			return spn::EqAbs(toV1.dot(toP), toP.length(), 1e-5f);
+			float len = toV1.normalize();
+			float d = toV1.dot(toP);
+			return spn::IsInRange(d, 0.f, len+1e-5f);
 		}
-		LNear Segment::crossPoint(const Segment& ls) const {
-			auto fn = [](float f){ return f; };
-			Vec2x2 v2 = NearestPoint(asLine(), ls.asLine(), fn, fn);
-			return LNear(v2.first, online(v2.first) ? LinePos::OnLine : LinePos::NotHit);
+		Vec2_OP Segment::crossPoint(const Segment& s) const {
+			if(auto cp = crossPoint(s.asLine())) {
+				if(s.online(*cp))
+					return cp;
+			}
+			if(auto cp = s.crossPoint(asLine())) {
+				if(online(*cp))
+					return cp;
+			}
+			return spn::none;
 		}
-		LNear Segment::crossPoint(const Line& l) const {
-			float c0 = l.dir.ccw(from-l.pos),
-				c1 = l.dir.ccw(to-l.pos);
+		Vec2_OP Segment::crossPoint(const Line& l) const {
+			float c0 = l.dir.dot(from - l.pos),
+					c1 = l.dir.dot(to - l.pos);
 			if(c0*c1 <= 0) {
 				Vec2 diff(to-from);
-				c0 = std::fabs(c0);
-				float d = c0 / (c0+std::fabs(c1));
-				return LNear(from + diff*d, LinePos::OnLine);
+				c0 = std::abs(c0);
+				c1 = std::abs(c1);
+				float d = c0 / (c0+c1);
+				return from + diff*d;
 			}
-			return LNear(Vec2(), LinePos::NotHit);
+			return spn::none;
 		}
 		Segment Segment::operator * (const AMat32& m) const {
 			return Segment{from.asVec3(1)*m, to.asVec3(1)*m};
