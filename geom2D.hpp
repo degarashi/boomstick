@@ -43,6 +43,7 @@ namespace boom {
 			float bs_getInertia() const;
 			const Vec2& bs_getCenter() const;
 			const Circle& bs_getBVolume() const;
+			AABB bs_getBBox() const;
 			// -----------------------------
 			Vec2 support(const Vec2& dir) const;
 
@@ -63,6 +64,44 @@ namespace boom {
 
 			friend std::ostream& operator << (std::ostream& os, const Circle& c);
 		};
+		//! AxisAlignedBox
+		struct AABB : ITagP<AABB> {
+			Vec2	minV, maxV;
+
+			int _getAreaNumX(float p) const;
+			int _getAreaNumY(float p) const;
+			void _makeSegmentX(Segment& s, int num) const;
+			void _makeSegmentY(Segment& s, int num) const;
+			bool _checkHitX(const Segment& s0, int from, int to) const;
+			bool _checkHitY(const Segment& s0, int from, int to) const;
+			std::pair<int,int> _getAreaNum(const Vec2& p) const;
+
+			AABB() = default;
+			AABB(const Vec2& min_v, const Vec2& max_v);
+			// -----------------------------
+			float bs_getArea() const;
+			float bs_getInertia() const;
+			Vec2 bs_getCenter() const;
+			Circle bs_getBVolume() const;
+			const AABB& bs_getBBox() const;
+			// -----------------------------
+			Vec2 support(const Vec2& dir) const;
+			Vec2 nearest(const Vec2& pos) const;
+
+			spn::none_t hit(...) const;
+			bool hit(const Vec2& p, float t=NEAR_THRESHOLD) const;
+			bool hit(const Segment& l, float t=NEAR_THRESHOLD) const;
+			bool hit(const AABB& ab, float t=NEAR_THRESHOLD) const;
+			AABB operator * (const AMat32& m) const;
+			AABB& operator += (const Vec2& ofs);
+			void distend(float width, float mindist);
+
+			// ---- for MakeBoundary ----
+			void setBoundary(const IModel* p);
+			void appendBoundary(const IModel* p);
+
+			friend std::ostream& operator << (std::ostream& os, const AABB& a);
+		};
 		//! IModelインタフェースの子ノードイテレータ
 		struct MdlItr {
 			TfBase_SP	_sp;
@@ -82,6 +121,7 @@ namespace boom {
 			virtual float im_getArea() const = 0;
 			virtual float im_getInertia() const = 0;
 			virtual Circle im_getBVolume() const = 0;
+			virtual AABB im_getBBox() const = 0;
 			// -----------------------------
 			virtual void im_transform[[noreturn]](void* dst, const AMat32& m) const = 0;
 			//! サポート射像
@@ -122,6 +162,7 @@ namespace boom {
 			}
 			void im_transform(void* dst, const AMat32& m) const override { *reinterpret_cast<T*>(dst) = *this * m; }
 			Circle im_getBVolume() const override { return T::bs_getBVolume(); }
+			AABB im_getBBox() const override { return T::bs_getBBox(); }
 			float im_getInertia() const override { return T::bs_getInertia(); }
 			float im_getArea() const override { return T::bs_getArea(); }
 			Vec2 im_getCenter() const override { return T::bs_getCenter(); }
@@ -276,6 +317,7 @@ namespace boom {
 			const float& bs_getInertia() const;
 			const Vec2& bs_getCenter() const;
 			Circle bs_getBVolume() const;
+			AABB bs_getBBox() const;
 			// -----------------------------
 			using Vec2::Vec2;
 			using Vec2::distance;
@@ -290,11 +332,6 @@ namespace boom {
 		};
 		using PointM = Model<Point>;
 
-		#define DEF_INVALID_BSFUNCS \
-			const float& bs_getArea() const {INVOKE_ERROR} \
-			const float& bs_getInertia() const {INVOKE_ERROR} \
-			const Vec2& bs_getCenter() const {INVOKE_ERROR} \
-			const Circle& bs_getBVolume() const {INVOKE_ERROR}
 		//! 直線
 		struct Line : ITagP<Line> {
 			Vec2	pos, dir;
@@ -307,6 +344,7 @@ namespace boom {
 			float bs_getInertia() const;
 			const Vec2& bs_getCenter() const;
 			const Circle& bs_getBVolume() const;
+			const AABB& bs_getBBox() const;
 			// -----------------------------
 
 			Vec2x2 nearest(const Line& st) const;
@@ -337,6 +375,7 @@ namespace boom {
 			float bs_getInertia() const;
 			const Vec2& bs_getCenter() const;
 			const Circle& bs_getBVolume() const;
+			const AABB& bs_getBBox() const;
 			// -----------------------------
 
 			const Line& asLine() const;
@@ -361,6 +400,7 @@ namespace boom {
 			const float& bs_getInertia() const {INVOKE_ERROR}
 			Vec2 bs_getCenter() const;
 			Circle bs_getBVolume() const;
+			AABB bs_getBBox() const;
 			// -----------------------------
 			Vec2 support(const Vec2& dir) const;
 
@@ -387,43 +427,6 @@ namespace boom {
 			friend std::ostream& operator << (std::ostream& os, const Segment& s);
 		};
 		using SegmentM = Model<Segment>;
-		//! AxisAlignedBox
-		struct AABB : ITagP<AABB> {
-			Vec2	minV, maxV;
-
-			int _getAreaNumX(float p) const;
-			int _getAreaNumY(float p) const;
-			void _makeSegmentX(Segment& s, int num) const;
-			void _makeSegmentY(Segment& s, int num) const;
-			bool _checkHitX(const Segment& s0, int from, int to) const;
-			bool _checkHitY(const Segment& s0, int from, int to) const;
-			std::pair<int,int> _getAreaNum(const Vec2& p) const;
-
-			AABB() = default;
-			AABB(const Vec2& min_v, const Vec2& max_v);
-			// -----------------------------
-			float bs_getArea() const;
-			float bs_getInertia() const;
-			Vec2 bs_getCenter() const;
-			Circle bs_getBVolume() const;
-			// -----------------------------
-			Vec2 support(const Vec2& dir) const;
-			Vec2 nearest(const Vec2& pos) const;
-
-			spn::none_t hit(...) const;
-			bool hit(const Vec2& p, float t=NEAR_THRESHOLD) const;
-			bool hit(const Segment& l, float t=NEAR_THRESHOLD) const;
-			bool hit(const AABB& ab, float t=NEAR_THRESHOLD) const;
-			AABB operator * (const AMat32& m) const;
-			AABB& operator += (const Vec2& ofs);
-			void distend(float width, float mindist);
-
-			// ---- for MakeBoundary ----
-			void setBoundary(const IModel* p);
-			void appendBoundary(const IModel* p);
-
-			friend std::ostream& operator << (std::ostream& os, const AABB& a);
-		};
 		using AABBM = Model<AABB>;
 		struct Poly : ITagP<Poly> {
 			Vec2		point[3];
@@ -436,6 +439,7 @@ namespace boom {
 			float bs_getInertia() const;
 			Vec2 bs_getCenter() const;
 			Circle bs_getBVolume() const;
+			AABB bs_getBBox() const;
 			// -----------------------------
 			//! 座標が三角形の内部に含まれるかを判定
 			/*! ポリゴンは時計回りを想定
@@ -507,6 +511,7 @@ namespace boom {
 			Circle bs_getBVolume() const;
 			Vec2 bs_getCenter() const;
 			float bs_getInertia() const;
+			AABB bs_getBBox() const;
 			// -----------------------------
 			/*! 同時に求めると少し効率が良い為 */
 			std::tuple<float,float,Vec2> area_inertia_center() const;
@@ -691,7 +696,6 @@ namespace boom {
 			return Vec2x2(ls0.pos + ls0.dir * clip0(m1.x),
 							ls1.pos + ls1.dir * clip1(m1.y));
 		}
-		#undef DEF_INVALID_BSFUNCS
 
 		struct Types {
 			using CTGeo = ::boom::geo2d::CTGeo;

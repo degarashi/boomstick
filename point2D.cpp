@@ -18,6 +18,11 @@ namespace boom {
 			// 円の半径が0だと点同士の時にヒットしないので微量含める
 			return Circle(*this, NEAR_THRESHOLD);
 		}
+		AABB Point::bs_getBBox() const {
+			const Vec2 tmp(NEAR_THRESHOLD);
+			return AABB(*this - tmp,
+						*this + tmp);
+		}
 		const float& Point::bs_getInertia() const { INVOKE_ERROR }
 		Point Point::operator * (const AMat32& m) const {
 			return Point(asVec3(1) * m);

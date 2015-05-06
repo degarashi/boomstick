@@ -35,6 +35,14 @@ namespace boom {
 							vp.first.distance(point[0]));
 			}
 		}
+		AABB Poly::bs_getBBox() const {
+			AABB ab(point[0], point[0]);
+			for(int i=1 ; i<3 ; i++) {
+				ab.minV.selectMin(point[i]);
+				ab.maxV.selectMax(point[i]);
+			}
+			return ab;
+		}
 		float Poly::CalcArea(const Vec2& p0, const Vec2& p1, const Vec2& p2) {
 			return  (p1-p0).cw(p2-p0) * 0.5f;
 		}

@@ -453,6 +453,16 @@ namespace boom {
 			c.setBoundary(&ab);
 			return c;
 		}
+		AABB Convex::bs_getBBox() const {
+			Assert(Trap, !point.empty())
+			AABB ab(point[0], point[0]);
+			int nV = point.size();
+			for(int i=1 ; i<nV ; i++) {
+				ab.minV.selectMin(point[i]);
+				ab.maxV.selectMax(point[i]);
+			}
+			return ab;
+		}
 		std::tuple<bool,Vec2,Vec2> Convex::checkCrossingLine(const Line& ls) const {
 			//TODO: 効率の良い算出方法を探す
 			Vec2 pt[2];

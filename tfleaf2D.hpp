@@ -20,6 +20,7 @@ namespace boom {
 					((Area)(float)(ModelAccum)(Determinant)) \
 					((Center)(spn::Vec2)(ModelAccum)(Global)) \
 					((BVolume)(Circle)(ModelAccum)(Pose)) \
+					((BBox)(AABB)(ModelAccum)(Pose)) \
 					((ShapeAccum)(uint32_t)(ModelAccum)(Pose))
 				RFLAG_S(TfLeafBase, SEQ_TFLEAF)
 			private:
@@ -34,6 +35,7 @@ namespace boom {
 				bool isLeaf() const override;
 				void im_transform(void* dst, const AMat32& m) const override;
 				Circle im_getBVolume() const override;
+				AABB im_getBBox() const override;
 				float im_getInertia() const override;
 				float im_getArea() const override;
 				Vec2 im_getCenter() const override;
@@ -110,6 +112,12 @@ namespace boom {
 				Vec2 im_support(const Vec2& dir) const override {
 					// 予め変換しておいた形状でサポート写像
 					return getTfShape().support(dir);
+				}
+				Circle im_getBVolume() const override {
+					return getTfShape().bs_getBVolume();
+				}
+				AABB im_getBBox() const override {
+					return getTfShape().bs_getBBox();
 				}
 				const void* getCore() const override {
 					getTfShape();

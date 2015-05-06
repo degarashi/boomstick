@@ -16,6 +16,7 @@ namespace boom {
 			return pos;
 		}
 		const Circle& Line::bs_getBVolume() const { INVOKE_ERROR }
+		const AABB& Line::bs_getBBox() const { INVOKE_ERROR }
 
 		float Line::distance(const Vec2& p) const {
 			return std::fabs(dir.ccw(p - pos));

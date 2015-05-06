@@ -23,6 +23,9 @@ namespace boom {
 		Circle TfLeafBase::im_getBVolume() const {
 			return getBVolume();
 		}
+		AABB TfLeafBase::im_getBBox() const {
+			return getBBox();
+		}
 		float TfLeafBase::im_getInertia() const {
 			return getInertia();
 		}
@@ -122,6 +125,16 @@ namespace boom {
 			getModelAccum();
 			c = _model->im_getBVolume();
 			c = c * getPose().getToWorld();
+			return 0;
+		}
+		uint32_t TfLeafBase::_refresh(AABB& a, BBox*) const {
+			getModelAccum();
+			auto m = getPose().getToLocal();
+			auto& scale = getPose().getScale();
+			a.maxV.x = toWorld(_model->im_support(toLocalDir({1,0}))).x;
+			a.maxV.y = toWorld(_model->im_support(toLocalDir({0,1}))).y;
+			a.minV.x = toWorld(_model->im_support(toLocalDir({-1,0}))).x;
+			a.minV.y = toWorld(_model->im_support(toLocalDir({0,-1}))).y;
 			return 0;
 		}
 	}

@@ -60,10 +60,55 @@ namespace boom {
 		TYPED_TEST_CASE(TfNode, TfNodeTypeList);
 
 		using namespace spn::test;
+
+		template <class T>
+		using BVolume2D = TfNode<T>;
+		using BVolume2DTL = ::testing::Types<geo2d::Point,
+											geo2d::Segment,
+											geo2d::AABB,
+											geo2d::Poly,
+											geo2d::Convex>;
+		TYPED_TEST_CASE(BVolume2D, BVolume2DTL);
+		// BVolume, BBoxのテスト
+		TYPED_TEST(BVolume2D, Test) {
+			auto rd = this->getRand();
+			using Shape = TypeParam;
+			using ShapeM = geo2d::Model<Shape>;
+
+			constexpr spn::RangeF c_range{-1e2f, 1e2f};
+			ShapeM s;
+			test2d::GenRShape(s, rd, c_range);
+			geo2d::CircleM bv = s.im_getBVolume();
+			geo2d::AABBM ab = s.im_getBBox();
+
+			// 元形状とBVolume, BBox形状の衝突判定比較
+			using this_t = TfNode<TypeParam>;
+			constexpr int nCheck = 100;
+			for(int i=0 ; i<nCheck ; i++) {
+				// 比較対象はPolygon
+				auto rp = test2d::GenRPoly(rd, c_range);
+
+				bool b_base = this_t::Narrow_t::Hit(&s, &rp, 0),
+					 b_bv = this_t::Narrow_t::Hit(&bv, &rp, 0),
+					 b_ab = this_t::Narrow_t::Hit(&ab, &rp, 0);
+				// 元形状が衝突しているならBVolume, BBoxも衝突している
+				if(b_base) {
+					ASSERT_TRUE(b_bv);
+					ASSERT_TRUE(b_ab);
+				}
+				// BVolumeが衝突していないなら元形状もなし
+				if(!b_bv) {
+					ASSERT_FALSE(b_base);
+				}
+				// BBoxが衝突していないなら元形状もなし
+				if(!b_ab) {
+					ASSERT_FALSE(b_base);
+				}
+			}
+		}
 		// 単一ノードによる姿勢変換テスト
 		TYPED_TEST(TfNode, TFNode2D) {
 			auto rd = this->getRand();
-
 			using Shape = TypeParam;
 			using ShapeM = geo2d::Model<Shape>;
 			// 基本の形状に姿勢変換を掛けた物(=A)と

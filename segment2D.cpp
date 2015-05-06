@@ -95,8 +95,14 @@ namespace boom {
 		Vec2 Segment::bs_getCenter() const {
 			return (from + to) * 0.5f;
 		}
+		AABB Segment::bs_getBBox() const {
+			AABB ab(from, from);
+			ab.minV.selectMin(to);
+			ab.maxV.selectMax(to);
+			return ab;
+		}
 		Circle Segment::bs_getBVolume() const {
-			return Circle(from + to * 0.5f,
+			return Circle((from + to) * 0.5f,
 							from.distance(to));
 		}
 		Vec2 Segment::getDir() const {

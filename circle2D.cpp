@@ -15,6 +15,11 @@ namespace boom {
 		const Circle& Circle::bs_getBVolume() const {
 			return *this;
 		}
+		AABB Circle::bs_getBBox() const {
+			Vec2 tmp(fRadius);
+			return AABB(vCenter - tmp,
+						vCenter + tmp);
+		}
 		Vec2 Circle::support(const Vec2& dir) const {
 			return dir * fRadius + vCenter;
 		}

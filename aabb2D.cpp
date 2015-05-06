@@ -113,6 +113,9 @@ namespace boom {
 			return Circle((minV + maxV) * .5f,
 							minV.distance(maxV) * .5f);
 		}
+		const AABB& AABB::bs_getBBox() const {
+			return *this;
+		}
 
 		void AABB::setBoundary(const IModel* p) {
 			minV.x = p->im_support(Vec2(-1,0)).x;
