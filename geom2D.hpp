@@ -38,7 +38,6 @@ namespace boom {
 			Circle() = default;
 			Circle(const Vec2& c, float r);
 
-			constexpr static bool CanCacheShape = true;
 			// -----------------------------
 			float bs_getArea() const;
 			float bs_getInertia() const;
@@ -118,7 +117,6 @@ namespace boom {
 			Model(const T& t): base_t(t) {}
 			Model(T&& t): base_t(std::move(t)) {}
 			// 各種ルーチンの中継
-			bool canCacheShape() const override { return T::CanCacheShape; }
 			Model_SP im_clone() const override {
 				return std::make_shared<Model<T>>(static_cast<const T&>(*this));
 			}
@@ -273,7 +271,6 @@ namespace boom {
 
 		using LNear = std::pair<Vec2, LinePos>;
 		struct Point : Vec2, ITagP<Point> {
-			constexpr static bool CanCacheShape = true;
 			// -----------------------------
 			const float& bs_getArea() const;
 			const float& bs_getInertia() const;
@@ -305,7 +302,6 @@ namespace boom {
 			Line() = default;
 			Line(const Vec2& p, const Vec2& d);
 
-			constexpr static bool CanCacheShape = true;
 			// -----------------------------
 			float bs_getArea() const;
 			float bs_getInertia() const;
@@ -336,7 +332,6 @@ namespace boom {
 			Ray() = default;
 			Ray(const Vec2& p, const Vec2& d);
 
-			constexpr static bool CanCacheShape = true;
 			// -----------------------------
 			float bs_getArea() const;
 			float bs_getInertia() const;
@@ -361,7 +356,6 @@ namespace boom {
 
 			Segment() = default;
 			Segment(const Vec2& v0, const Vec2& v1);
-			constexpr static bool CanCacheShape = true;
 			// -----------------------------
 			const float& bs_getArea() const {INVOKE_ERROR}
 			const float& bs_getInertia() const {INVOKE_ERROR}
@@ -407,7 +401,6 @@ namespace boom {
 
 			AABB() = default;
 			AABB(const Vec2& min_v, const Vec2& max_v);
-			constexpr static bool CanCacheShape = true;
 			// -----------------------------
 			float bs_getArea() const;
 			float bs_getInertia() const;
@@ -438,7 +431,6 @@ namespace boom {
 
 			Poly() = default;
 			Poly(const Vec2& p0, const Vec2& p1, const Vec2& p2);
-			constexpr static bool CanCacheShape = true;
 			// -----------------------------
 			float bs_getArea() const;
 			float bs_getInertia() const;
@@ -510,7 +502,6 @@ namespace boom {
 			Convex& operator = (Convex&& c);
 
 			static Convex FromConcave(const PointL& src);
-			constexpr static bool CanCacheShape = false;
 			// -----------------------------
 			float bs_getArea() const;
 			Circle bs_getBVolume() const;
