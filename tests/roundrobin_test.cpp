@@ -49,6 +49,8 @@ namespace boom {
 						default:
 							Assert(Trap, "unknown shape Id")
 					}
+					// 動かしたらsetAsChangedを呼ぶ
+					p->setAsChanged();
 				}
 			}
 			//! ランダムな階層構造の形状定義

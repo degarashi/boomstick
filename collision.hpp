@@ -59,9 +59,11 @@ namespace boom {
 			const BCID& getBCID() const {
 				return _bcid;
 			}
-			BV getBVolume() const {
+			BV getBVolume(CTime t) const {
 				BV bv;
-				_hlMdl.cref()->im_getBVolume(bv);
+				auto& r = _hlMdl.cref();
+				r->imn_refresh(t);
+				r->im_getBVolume(bv);
 				return bv;
 			}
 			decltype(_hlMdl.get()) getModelHandle() const {
@@ -280,9 +282,15 @@ namespace boom {
 				release(HCol::FromHandle(sh));
 				return false;
 			}
+			auto _makeGetBV() {
+				return [this](spn::SHandle sh) {
+					auto& r = HCol::FromHandle(sh).cref();
+					return r.getBVolume(_accum);
+				};
+			}
 		public:
-			ColMgr(): _broadC([this](spn::SHandle sh){
-								return HCol::FromHandle(sh).cref().getBVolume(); })
+			ColMgr():
+				_broadC(_makeGetBV())
 			{
 				Narrow::Initialize();
 			}
