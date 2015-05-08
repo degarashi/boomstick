@@ -188,10 +188,13 @@ namespace boom {
 				virtual void onChildAdded(const SP& node);
 				virtual void onChildRemove(const SP& node);
 				virtual void onParentChange(const SP& from, const SP& to);
+				virtual void _setAsChanged();
 			public:
 				//! 子ノードの取得
 				MdlItr getInner() const override;
 				bool hasInner() const override;
+				//! 下層オブジェクトの形状を変更した時に手動で呼ぶ
+				virtual void setAsChanged();
 				virtual bool isLeaf() const { return false; }
 				virtual spn::Pose2D& tf_refPose[[noreturn]]();
 				virtual const spn::Pose2D& tf_getPose() const;
@@ -232,11 +235,15 @@ namespace boom {
 					_bChanged = true;
 					base_t::onChildRemove(node);
 				}
+				void _setAsChanged() override {
+					_bChanged = true;
+				}
 			public:
 				SP clone() const override {
 					return std::make_shared<TfNode_Static>(*this);
 				}
 				bool imn_refresh(Time_t t) const override {
+					// 更新条件はフラグ
 					if(_bChanged) {
 						_bChanged = false;
 						std::vector<const IModel*> pm;
