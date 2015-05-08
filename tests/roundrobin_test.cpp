@@ -17,7 +17,7 @@ namespace boom {
 			private:
 				using base_t = test2d::Narrow;
 				ModelMgr	_mmgr;
-				using ColMgr = ColMgr<BroadC_RoundRobin, geo2d::Types, uint32_t>;
+				using ColMgr = ColMgr<BroadC_RoundRobin<Circle>, geo2d::Types, uint32_t>;
 				ColMgr		_cmgr;
 			public:
 				using HCol = typename ColMgr::SHdl;
@@ -78,7 +78,6 @@ namespace boom {
 			// -> TypeA and TypeBと判定
 			using HCSet = std::unordered_set<HCol>;
 			HCSet result_rb[2];
-			auto bv = hlMdl->get()->im_getBVolume();
 			cm.checkCollision(0x00000001, hlMdl, [&](HCol hc){
 				result_rb[0].insert(hc);
 			});
@@ -96,11 +95,8 @@ namespace boom {
 				}
 			}
 			for(auto& b : vB) {
-				auto bv = b->getModel()->im_getBVolume();
-				if(bv.hit(b->getModel()->im_getBVolume())) {
-					if(Narrow_t::Hit(hlMdl->get(), b->getModel(), 0)) {
-						result_diy[0].insert(b);
-					}
+				if(Narrow_t::Hit(hlMdl->get(), b->getModel(), 0)) {
+					result_diy[0].insert(b);
 				}
 			}
 

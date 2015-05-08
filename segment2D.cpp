@@ -114,7 +114,7 @@ namespace boom {
 			ab.maxV.selectMax(to);
 			return ab;
 		}
-		Circle Segment::bs_getBVolume() const {
+		Circle Segment::bs_getBCircle() const {
 			return Circle((from + to) * 0.5f,
 							from.distance(to));
 		}

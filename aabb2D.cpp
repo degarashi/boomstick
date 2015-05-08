@@ -108,7 +108,7 @@ namespace boom {
 			Vec2 sz = maxV - minV;
 			return sz.x * sz.y;
 		}
-		Circle AABB::bs_getBVolume() const {
+		Circle AABB::bs_getBCircle() const {
 			// 対角線 = 直径
 			return Circle((minV + maxV) * .5f,
 							minV.distance(maxV) * .5f);

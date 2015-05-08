@@ -78,8 +78,10 @@ namespace boom {
 			constexpr spn::RangeF c_range{-1e2f, 1e2f};
 			ShapeM s;
 			test2d::GenRShape(s, rd, c_range);
-			geo2d::CircleM bv = s.im_getBVolume();
-			geo2d::AABBM ab = s.im_getBBox();
+			geo2d::CircleM bv;
+			s.im_getBVolume(bv);
+			geo2d::AABBM ab;
+			s.im_getBVolume(ab);
 
 			// 元形状とBVolume, BBox形状の衝突判定比較
 			using this_t = TfNode<TypeParam>;

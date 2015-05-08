@@ -437,7 +437,7 @@ namespace boom {
 		void Convex::splitThis(const Line& l) {
 			split(l);
 		}
-		Circle Convex::bs_getBVolume() const {
+		Circle Convex::bs_getBCircle() const {
 			Assert(Trap, !point.empty())
 			// 多分遅いアルゴリズムだが、今はこれで我慢
 			// 全ての3点の組み合わせを調べる

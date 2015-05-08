@@ -11,7 +11,7 @@ namespace boom {
 		Vec2 Capsule::bs_getCenter() const {
 			return (from+to) * 0.5f;
 		}
-		Circle Capsule::bs_getBVolume() const {
+		Circle Capsule::bs_getBCircle() const {
 			return Circle(bs_getCenter(),
 							from.distance(to) + radius*2);
 		}

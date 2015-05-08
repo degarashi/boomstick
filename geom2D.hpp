@@ -42,7 +42,7 @@ namespace boom {
 			float bs_getArea() const;
 			float bs_getInertia() const;
 			const Vec2& bs_getCenter() const;
-			const Circle& bs_getBVolume() const;
+			const Circle& bs_getBCircle() const;
 			AABB bs_getBBox() const;
 			// -----------------------------
 			Vec2 support(const Vec2& dir) const;
@@ -82,7 +82,7 @@ namespace boom {
 			float bs_getArea() const;
 			float bs_getInertia() const;
 			Vec2 bs_getCenter() const;
-			Circle bs_getBVolume() const;
+			Circle bs_getBCircle() const;
 			const AABB& bs_getBBox() const;
 			// -----------------------------
 			Vec2 support(const Vec2& dir) const;
@@ -120,8 +120,8 @@ namespace boom {
 			virtual Vec2 im_getCenter() const = 0;
 			virtual float im_getArea() const = 0;
 			virtual float im_getInertia() const = 0;
-			virtual Circle im_getBVolume() const = 0;
-			virtual AABB im_getBBox() const = 0;
+			virtual void im_getBVolume(Circle& c) const = 0;
+			virtual void im_getBVolume(AABB& a) const = 0;
 			// -----------------------------
 			virtual void im_transform[[noreturn]](void* dst, const AMat32& m) const = 0;
 			//! サポート射像
@@ -161,8 +161,8 @@ namespace boom {
 				return std::make_shared<Model<T>>(static_cast<const T&>(*this));
 			}
 			void im_transform(void* dst, const AMat32& m) const override { *reinterpret_cast<T*>(dst) = *this * m; }
-			Circle im_getBVolume() const override { return T::bs_getBVolume(); }
-			AABB im_getBBox() const override { return T::bs_getBBox(); }
+			void im_getBVolume(Circle& c) const override { c = T::bs_getBCircle(); }
+			void im_getBVolume(AABB& a) const override { a = T::bs_getBBox(); }
 			float im_getInertia() const override { return T::bs_getInertia(); }
 			float im_getArea() const override { return T::bs_getArea(); }
 			Vec2 im_getCenter() const override { return T::bs_getCenter(); }
@@ -316,7 +316,7 @@ namespace boom {
 			const float& bs_getArea() const;
 			const float& bs_getInertia() const;
 			const Vec2& bs_getCenter() const;
-			Circle bs_getBVolume() const;
+			Circle bs_getBCircle() const;
 			AABB bs_getBBox() const;
 			// -----------------------------
 			using Vec2::Vec2;
@@ -343,7 +343,7 @@ namespace boom {
 			float bs_getArea() const;
 			float bs_getInertia() const;
 			const Vec2& bs_getCenter() const;
-			const Circle& bs_getBVolume() const;
+			const Circle& bs_getBCircle() const;
 			const AABB& bs_getBBox() const;
 			// -----------------------------
 
@@ -374,7 +374,7 @@ namespace boom {
 			float bs_getArea() const;
 			float bs_getInertia() const;
 			const Vec2& bs_getCenter() const;
-			const Circle& bs_getBVolume() const;
+			const Circle& bs_getBCircle() const;
 			const AABB& bs_getBBox() const;
 			// -----------------------------
 
@@ -399,7 +399,7 @@ namespace boom {
 			const float& bs_getArea() const {INVOKE_ERROR}
 			const float& bs_getInertia() const {INVOKE_ERROR}
 			Vec2 bs_getCenter() const;
-			Circle bs_getBVolume() const;
+			Circle bs_getBCircle() const;
 			AABB bs_getBBox() const;
 			// -----------------------------
 			Vec2 support(const Vec2& dir) const;
@@ -439,7 +439,7 @@ namespace boom {
 			float bs_getArea() const;
 			float bs_getInertia() const;
 			Vec2 bs_getCenter() const;
-			Circle bs_getBVolume() const;
+			Circle bs_getBCircle() const;
 			AABB bs_getBBox() const;
 			// -----------------------------
 			Vec2 support(const Vec2& dir) const;
@@ -466,7 +466,7 @@ namespace boom {
 			float bs_getArea() const;
 			float bs_getInertia() const;
 			Vec2 bs_getCenter() const;
-			Circle bs_getBVolume() const;
+			Circle bs_getBCircle() const;
 			AABB bs_getBBox() const;
 			// -----------------------------
 			//! 座標が三角形の内部に含まれるかを判定
@@ -536,7 +536,7 @@ namespace boom {
 			static Convex FromConcave(const PointL& src);
 			// -----------------------------
 			float bs_getArea() const;
-			Circle bs_getBVolume() const;
+			Circle bs_getBCircle() const;
 			Vec2 bs_getCenter() const;
 			float bs_getInertia() const;
 			AABB bs_getBBox() const;

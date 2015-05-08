@@ -12,7 +12,7 @@ namespace boom {
 		const Vec2& Circle::bs_getCenter() const {
 			return vCenter;
 		}
-		const Circle& Circle::bs_getBVolume() const {
+		const Circle& Circle::bs_getBCircle() const {
 			return *this;
 		}
 		AABB Circle::bs_getBBox() const {
@@ -49,10 +49,11 @@ namespace boom {
 			return *this;
 		}
 		void Circle::setBoundary(const IModel* p) {
-			*this = p->im_getBVolume();
+			p->im_getBVolume(*this);
 		}
 		void Circle::appendBoundary(const IModel* p) {
-			Circle c2 = p->im_getBVolume();
+			Circle c2;
+			p->im_getBVolume(c2);
 			Vec2 toC2 = c2.vCenter - vCenter;
 			float lensq = toC2.len_sq();
 			if(lensq >= ZEROVEC_LENGTH_SQ) {

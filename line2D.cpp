@@ -17,7 +17,7 @@ namespace boom {
 		const Vec2& Line::bs_getCenter() const {
 			return pos;
 		}
-		const Circle& Line::bs_getBVolume() const { INVOKE_ERROR }
+		const Circle& Line::bs_getBCircle() const { INVOKE_ERROR }
 		const AABB& Line::bs_getBBox() const { INVOKE_ERROR }
 
 		float Line::distance(const Vec2& p) const {

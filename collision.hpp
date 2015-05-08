@@ -9,11 +9,12 @@ namespace boom {
 
 	/*! コリジョン情報を纏めた構造体
 		\tparam CMGR	コリジョンマネージャ
+		\tparam BV		BoundingVolume Type
 		\tparam HLMDL	モデルハンドル(Locked)
 		\tparam BCID	BroadCollisionクラスのオブジェクトを特定できるようなデータ型
 		\tparam UD		任意のユーザーデータ型
 	*/
-	template <class CMGR, class HLMDL, class BCID, class UD>
+	template <class CMGR, class BV, class HLMDL, class BCID, class UD>
 	class ColMem {
 		private:
 			CMask	_mask;	//!< 当たり判定対象フラグ
@@ -58,8 +59,10 @@ namespace boom {
 			const BCID& getBCID() const {
 				return _bcid;
 			}
-			auto getBVolume() const -> decltype(_hlMdl.cref()->im_getBVolume()) {
-				return _hlMdl.cref()->im_getBVolume();
+			BV getBVolume() const {
+				BV bv;
+				_hlMdl.cref()->im_getBVolume(bv);
+				return bv;
 			}
 			decltype(_hlMdl.get()) getModelHandle() const {
 				return _hlMdl.get();
@@ -142,16 +145,17 @@ namespace boom {
 				return _cur->setLastIndex(idx);
 			}
 	};
-	/*!	\tparam	BC		BroadCollision class template<BVolume, IModel>
+	/*!	\tparam	BC		BroadCollision class
 		\tparam	Types	geom2d::Types or geom3d::Types
 		\tparam UD		userdata type
 	*/
-	template <template <class> class BC,
+	template <class BC,
 				class Types,
 				class UD>
 	class ColMgr : public spn::ResMgrA<ColMem<ColMgr<BC,Types,UD>,
+											typename BC::BVolume,
 											typename Types::MMgr::LHdl,
-											typename BC<decltype(std::declval<typename Types::IModel>().im_getBVolume())>::IDType,
+											typename BC::IDType,
 											UD>,
 										ColMgr<BC,Types,UD>>,
 					public Types::Narrow
@@ -160,9 +164,9 @@ namespace boom {
 			using IModel = typename Types::IModel;									//!< IModel interface
 			using MMgr = typename Types::MMgr;										//!< ModelManager
 			using user_t = UD;														//!< Userdata
-			using BVolume = decltype(std::declval<IModel>().im_getBVolume());		//!< Bounding-volume
+			using BVolume = typename BC::BVolume;									//!< Bounding-volume
 			using this_t = ColMgr<BC, Types, user_t>;
-			using BroadC = BC<BVolume>;												//!< BroadCollision class
+			using BroadC = BC;														//!< BroadCollision class
 			using BCId = typename BroadC::IDType;									//!< BroadCollision dependant Id
 			using BCIdV = typename BroadC::IDTypeV;
 			// ---- model handle type ----
@@ -170,7 +174,7 @@ namespace boom {
 			using HLMdl = typename MMgr::LHdl;
 			using MdlRef = decltype(std::declval<HMdl>().ref());
 			using MdlP = decltype(std::declval<MdlRef>().get());
-			using CMem = ColMem<this_t, HLMdl, BCId, user_t>;						//!< Collision information structure
+			using CMem = ColMem<this_t, BVolume, HLMdl, BCId, user_t>;						//!< Collision information structure
 
 			using base = spn::ResMgrA<CMem, this_t>;
 			// --- collision handle type ----
@@ -320,7 +324,8 @@ namespace boom {
 				\param[in] cb		コールバック関数(HCol) */
 			template <class CB>
 			void checkCollision(CMask ms, MdlP mp, CB&& cb) {
-				auto bv = mp->im_getBVolume();
+				BVolume bv;
+				mp->im_getBVolume(bv);
 				_broadC.checkCollision(ms, bv,
 					[ac=_accum,
 						pMdl=mp,

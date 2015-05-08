@@ -21,7 +21,7 @@ namespace boom {
 			int np = rd.template getUniform<int>({3, 64});
 			ConvexM cv = GenRConvex(rd, defval::convex_pos, np);
 
-			Circle c = cv.bs_getBVolume();
+			Circle c = cv.bs_getBCircle();
 			// 全ての点が円の中に入ってるかチェック
 			for(auto& p : cv.point) {
 				ASSERT_LE(c.vCenter.distance(p), c.fRadius + NEAR_THRESHOLD);

@@ -14,7 +14,7 @@ namespace boom {
 		TEST_F(Poly2D, BVolume) {
 			auto rd = getRand();
 			PolyM p(GenRPoly(rd, {-1e2f, 1e2f}));
-			Circle c = p.bs_getBVolume();
+			Circle c = p.bs_getBCircle();
 
 			for(auto& p2 : p.point) {
 				ASSERT_LE(c.vCenter.distance(p2), c.fRadius+1e-3f);

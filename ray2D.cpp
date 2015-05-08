@@ -22,7 +22,7 @@ namespace boom {
 		const Vec2& Ray::bs_getCenter() const {
 			return pos;
 		}
-		const Circle& Ray::bs_getBVolume() const { INVOKE_ERROR }
+		const Circle& Ray::bs_getBCircle() const { INVOKE_ERROR }
 		const AABB& Ray::bs_getBBox() const { INVOKE_ERROR }
 		std::ostream& operator << (std::ostream& os, const Ray& r) {
 			return os << "Ray [ pos: " << r.pos << std::endl

@@ -22,8 +22,8 @@ namespace boom {
 				Type	typ;
 			};
 			using IDTypeV = std::vector<IDType>;
-		private:
 			using BVolume = BV;
+		private:
 			struct Node {
 				CMask			mask;	//!< 登録時に渡されたマスク値
 				spn::SHandle	hCol;	//!< コリジョンマネージャで使われるリソースハンドル
