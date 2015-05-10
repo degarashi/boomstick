@@ -5,6 +5,17 @@ namespace boom {
 		TfLeafBase::TfLeafBase(const Model_SP& m): _model(m) {
 			_init();
 		}
+		void* TfLeafBase::getCore() {
+			++refModelAccum();
+			return TfBase::getCore();
+		}
+		const void* TfLeafBase::getCore() const {
+			return TfBase::getCore();
+		}
+		void TfLeafBase::setAsChanged() {
+			++refModelAccum();
+			TfBase::setAsChanged();
+		}
 		void TfLeafBase::setModelSource(const Model_SP& m) {
 			_model = m;
 			_init();

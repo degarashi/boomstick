@@ -32,6 +32,9 @@ namespace boom {
 				#undef SEQ_TFLEAF
 				TfLeafBase(const Model_SP& m);
 
+				void* getCore() override;
+				const void* getCore() const override;
+				void setAsChanged() override;
 				bool isLeaf() const override;
 				void im_transform(void* dst, const AMat32& m) const override;
 				void im_getBVolume(Circle& c) const override;
