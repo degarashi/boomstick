@@ -1,6 +1,5 @@
 #pragma once
 #include "collision.hpp"
-#include "spinner/resmgr.hpp"
 
 namespace boom {
 	//! broad-phase collision manager (round robin)
@@ -17,6 +16,7 @@ namespace boom {
 				NumType
 			};
 			using NS_id = uint32_t;
+			//! 外部(CollisionMgr)から内部Nodeを区別するId
 			struct IDType {
 				NS_id	id;
 				Type	typ;

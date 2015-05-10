@@ -25,6 +25,7 @@ namespace boom {
 				using HLCol_V = std::vector<HLCol>;
 				using MMgr = typename ColMgr::MMgr;
 				using HLMdl = typename ColMgr::HLMdl;
+				RoundRobin_Dim2(): _cmgr(1.f) {}
 				auto& getColMgr() {
 					return _cmgr;
 				}

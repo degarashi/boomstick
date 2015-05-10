@@ -1,12 +1,8 @@
 #pragma once
 #include "spinner/resmgr.hpp"
+#include "common.hpp"
 
 namespace boom {
-	//! 当たり判定属性マスク
-	using CMask = uint32_t;
-	using CTime = uint32_t;
-	using Int_OP = spn::Optional<int>;
-
 	/*! コリジョン情報を纏めた構造体
 		\tparam CMGR	コリジョンマネージャ
 		\tparam BV		BoundingVolume Type
@@ -147,7 +143,7 @@ namespace boom {
 				return _cur->setLastIndex(idx);
 			}
 	};
-	/*!	\tparam	BC		BroadCollision class
+	/*!	\tparam	BC		BroadCollision
 		\tparam	Types	geom2d::Types or geom3d::Types
 		\tparam UD		userdata type
 	*/
@@ -289,8 +285,8 @@ namespace boom {
 				};
 			}
 		public:
-			ColMgr():
-				_broadC(_makeGetBV())
+			ColMgr(float fieldSize):
+				_broadC(_makeGetBV(), fieldSize)
 			{
 				Narrow::Initialize();
 			}
