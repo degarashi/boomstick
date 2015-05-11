@@ -13,11 +13,14 @@ namespace boom {
 		using geo2d::AABB;
 		using geo2d::AABBM;
 		using geo2d::ModelMgr;
-		class RoundRobin_Dim2 : public test2d::Narrow {
-			private:
+		template <class T>
+		class BroadC_Dim2 : public test2d::Narrow {
+			public:
 				using base_t = test2d::Narrow;
+				using ColMgr = typename std::tuple_element<0, T>::type;
+				constexpr static int N_AObj = std::tuple_element<1, T>::type::value,
+									N_BObj = std::tuple_element<2, T>::type::value;
 				ModelMgr	_mmgr;
-				using ColMgr = ColMgr<BroadC_RoundRobin<Circle>, geo2d::Types, uint32_t>;
 				ColMgr		_cmgr;
 			public:
 				using HCol = typename ColMgr::SHdl;
@@ -25,11 +28,19 @@ namespace boom {
 				using HLCol_V = std::vector<HLCol>;
 				using MMgr = typename ColMgr::MMgr;
 				using HLMdl = typename ColMgr::HLMdl;
-				RoundRobin_Dim2(): _cmgr(1.f) {}
+				BroadC_Dim2(): _cmgr(1.f) {}
 				auto& getColMgr() {
 					return _cmgr;
 				}
 		};
+		using ColMgr_RR = ::boom::ColMgr<BroadC_RoundRobin<Circle>,
+											geo2d::Types, uint32_t>;
+		template <int N>
+		using IConst = std::integral_constant<int, N>;
+		using BC_RR_t = std::tuple<ColMgr_RR, IConst<32>, IConst<32>>;
+		using BroadCTypeList2D = ::testing::Types<BC_RR_t>;
+		TYPED_TEST_CASE(BroadC_Dim2, BroadCTypeList2D);
+
 		namespace {
 			//! 形状をランダムに動かす
 			/*! 動かすかどうかもランダム */
@@ -65,17 +76,23 @@ namespace boom {
 				return std::move(v);
 			}
 		}
-		TEST_F(RoundRobin_Dim2, CheckCollision) {
-			auto rd = getRand();
-			auto& cm = getColMgr();
+		TYPED_TEST(BroadC_Dim2, CheckCollision) {
+			auto rd = this->getRand();
+			auto& cm = this->getColMgr();
 			auto fnN = [&](const spn::RangeI& r){ return rd.template getUniform<int>(r); };
 			using CT = spn::CType<geo2d::Circle, geo2d::AABB>;
+			using this_t = BroadC_Dim2<TypeParam>;
 
 			// TypeAを適当に追加
-			auto vA = AddRandomTree<CT>(rd, cm, fnN({0,32}), 0x00000001, 0);
+			auto vA = AddRandomTree<CT>(rd, cm, fnN({0,this_t::N_AObj}), 0x00000001, 0);
 			// TypeBも適当に追加
-			auto vB = AddRandomTree<CT>(rd, cm, fnN({0,32}), 0x80000001, 1000);
+			auto vB = AddRandomTree<CT>(rd, cm, fnN({0,this_t::N_BObj}), 0x80000001, 1000);
 
+			using HCol = typename this_t::HCol;
+			using Narrow_t = typename this_t::Narrow_t;
+			using ColMgr = typename this_t::ColMgr;
+			using MMgr = typename ColMgr::MMgr;
+			using HLMdl = typename ColMgr::HLMdl;
 			HLMdl hlMdl = MMgr::_ref().emplace(test2d::MakeRandomTree<CT,CT>(rd, 4, 1));
 			// RoundRobinクラスによる判定
 			// -> TypeA and TypeBと判定
@@ -107,18 +124,21 @@ namespace boom {
 			for(int i=0 ; i<2 ; i++)
 				ASSERT_EQ(result_rb[i], result_diy[i]);
 		}
-		TEST_F(RoundRobin_Dim2, BroadCollision) {
-			auto rd = getRand();
-			auto& cm = getColMgr();
+		TYPED_TEST(BroadC_Dim2, BroadCollision) {
+			auto rd = this->getRand();
+			auto& cm = this->getColMgr();
+			using this_t = BroadC_Dim2<TypeParam>;
+			using HCol = typename this_t::HCol;
+			using Narrow_t = typename this_t::Narrow_t;
 
 			auto fnN = [&](const spn::RangeI& r){ return rd.template getUniform<int>(r); };
 			using CT = spn::CType<geo2d::Circle, geo2d::AABB>;
 			// MSBが0ならTypeA
 			// 目印としてUserData=0x00
-			auto v0 = AddRandomTree<CT>(rd, cm, fnN({0,32}), 0x00000001, 0x0000);
+			auto v0 = AddRandomTree<CT>(rd, cm, fnN({0,this_t::N_AObj}), 0x00000001, 0x0000);
 			// MSBが1ならTypeB
 			// 目印としてUserData=0x01
-			auto v1 = AddRandomTree<CT>(rd, cm, fnN({0,32}), 0x80000001, 0x1000);
+			auto v1 = AddRandomTree<CT>(rd, cm, fnN({0,this_t::N_BObj}), 0x80000001, 0x1000);
 
 			auto fnCollect = [](auto& vleaf, auto* mdl) {
 				auto v = dynamic_cast<geo2d::TfBase*>(mdl)->shared_from_this();
