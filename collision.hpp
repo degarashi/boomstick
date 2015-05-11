@@ -62,7 +62,7 @@ namespace boom {
 			BV getBVolume(CTime t) const {
 				BV bv;
 				auto& r = _hlMdl.cref();
-				r->imn_refresh(t);
+				AssertP(Trap, r->imn_refresh(t))
 				r->im_getBVolume(bv);
 				return bv;
 			}
@@ -315,6 +315,7 @@ namespace boom {
 			HLCol addCol(CMask ms, HMdl hm, UD2&& ud=UD()) {
 				HLCol hlC = base::emplace(ms, hm, std::forward<UD2>(ud));
 				hlC.ref().setBCID(_broadC.add(hlC, ms));
+				AssertP(Trap, hm->get()->imn_refresh(_accum), "empty object detected")
 				return std::move(hlC);
 			}
 			//! ハンドル解放処理を一時的に遅延させる (デストラクタ時以外)
@@ -332,6 +333,8 @@ namespace boom {
 				\param[in] cb		コールバック関数(HCol) */
 			template <class CB>
 			void checkCollision(CMask ms, MdlP mp, CB&& cb) {
+				if(!mp->imn_refresh(_accum))
+					return;
 				BVolume bv;
 				mp->im_getBVolume(bv);
 				_broadC.checkCollision(ms, bv,

@@ -160,54 +160,58 @@ namespace boom {
 		}
 		template <class CTNode, class CTLeaf, class RD>
 		TfSP MakeRandomTree(RD& rd, int nIteration, int maxDepth) {
-			using geo2d::Circle;
-			using geo2d::AABB;
-			using test2d::GenRCircle;
-			using test2d::GenRAABB;
-			enum Manipulation {
-				MNP_Add,			//!< 現在の階層にリーフノードを加える
-				MNP_Up,				//!< 階層を上がる
-				MNP_MakeChild,		//!< 子ノードを作ってそこにカーソルを移動
-				N_Manipulation
-			};
-			auto fnI = [&rd](const spn::RangeI& r){ return rd.template getUniform<int>(r); };
-			constexpr int NLeaf = CTLeaf::size,
-							NNode = CTNode::size;
-			int CidId_Leaf[NLeaf],
-				CidId_Node[NNode];
-			SetCid(CidId_Leaf, (CTLeaf*)nullptr);
-			SetCid(CidId_Node, (CTNode*)nullptr);
+			Assert(Trap, nIteration>0)
+			TfSP spRoot;
+			do {
+				using geo2d::Circle;
+				using geo2d::AABB;
+				using test2d::GenRCircle;
+				using test2d::GenRAABB;
+				enum Manipulation {
+					MNP_Add,			//!< 現在の階層にリーフノードを加える
+					MNP_Up,				//!< 階層を上がる
+					MNP_MakeChild,		//!< 子ノードを作ってそこにカーソルを移動
+					N_Manipulation
+				};
+				auto fnI = [&rd](const spn::RangeI& r){ return rd.template getUniform<int>(r); };
+				constexpr int NLeaf = CTLeaf::size,
+								NNode = CTNode::size;
+				int CidId_Leaf[NLeaf],
+					CidId_Node[NNode];
+				SetCid(CidId_Leaf, (CTLeaf*)nullptr);
+				SetCid(CidId_Node, (CTNode*)nullptr);
 
-			TfSP spRoot = GenRNode(CidId_Node[fnI({0,NNode-1})]);
-			auto spCursor = spRoot;
-			int cursorDepth = 0;
-			int nIter = fnI({0, nIteration});
-			for(int i=0 ; i<nIter ; i++) {
-				int m = fnI({0, N_Manipulation-1});
-				switch(m) {
-					case MNP_Add: {
-						spCursor->addChild(GenRLeaf(rd, CidId_Leaf[fnI({0,NLeaf-1})]));
-						break; }
-					case MNP_Up:
-						// 深度が0の時は何もしない
-						if(cursorDepth > 0) {
-							spCursor = spCursor->getParent();
-							--cursorDepth;
-						}
-						break;
-					case MNP_MakeChild:
-						// 最大深度を超えている時は何もしない
-						if(cursorDepth < maxDepth) {
-							auto c = GenRNode(CidId_Node[fnI({0,NNode-1})]);
-							spCursor->addChild(c);
-							spCursor = c;
-							++cursorDepth;
-						}
-						break;
+				spRoot = GenRNode(CidId_Node[fnI({0,NNode-1})]);
+				auto spCursor = spRoot;
+				int cursorDepth = 0;
+				int nIter = fnI({0, nIteration});
+				for(int i=0 ; i<nIter ; i++) {
+					int m = fnI({0, N_Manipulation-1});
+					switch(m) {
+						case MNP_Add: {
+							spCursor->addChild(GenRLeaf(rd, CidId_Leaf[fnI({0,NLeaf-1})]));
+							break; }
+						case MNP_Up:
+							// 深度が0の時は何もしない
+							if(cursorDepth > 0) {
+								spCursor = spCursor->getParent();
+								--cursorDepth;
+							}
+							break;
+						case MNP_MakeChild:
+							// 最大深度を超えている時は何もしない
+							if(cursorDepth < maxDepth) {
+								auto c = GenRNode(CidId_Node[fnI({0,NNode-1})]);
+								spCursor->addChild(c);
+								spCursor = c;
+								++cursorDepth;
+							}
+							break;
+					}
+					Assert(Trap, cursorDepth <= maxDepth)
 				}
-				Assert(Trap, cursorDepth <= maxDepth)
-			}
-			return spRoot;
+			} while(!spRoot->imn_refresh(0));
+			return std::move(spRoot);
 		}
 	}
 }
