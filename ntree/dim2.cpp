@@ -45,44 +45,48 @@ namespace boom {
 			return Id(ComposeBits1(id & 0x55555555),
 						ComposeBits1((id & 0xaaaaaaaa) >> 1));
 		}
+		int CTDim_2D::Classify(const VolEntry& ve, Id centerId, const CBClassify& cb) {
+			const uint32_t cx = centerId.v0,
+							cy = centerId.v1;
+			Id pmin = *reinterpret_cast<const Id*>(&ve.posMin),
+				pmax = *reinterpret_cast<const Id*>(&ve.posMax);
+			AssertP(Trap, pmin.v0 <= pmax.v0 && pmin.v1 <= pmax.v1)
+			int count = 0;
+			if(pmin.v0 < cx) {
+				// 左リストに登録
+				if(pmin.v1 < cy) {
+					// 左上
+					cb(ve, 0);
+					++count;
+				}
+				if(pmax.v1 >= cy) {
+					// 左下
+					cb(ve, 2);
+					++count;
+				}
+			}
+			if(pmax.v0 >= cx) {
+				// 右リストに登録
+				if(pmin.v1 < cy) {
+					// 右上
+					cb(ve, 1);
+					++count;
+				}
+				if(pmax.v1 >= cy) {
+					// 右下
+					cb(ve, 3);
+					++count;
+				}
+			}
+			return count;
+		}
 		void CTDim_2D::Classify(const VolEntry** (&dst)[N_LayerSize], const VolEntry* src, int nSrc, Id centerId) {
+			auto cb =[&dst](const VolEntry& ve, int idx){
+							*dst[idx]++ = &ve;
+						};
 			// オブジェクト振り分け
-			uint32_t cx = centerId.v0,
-					cy = centerId.v1;
 			for(int i=0 ; i<nSrc ; i++) {
-				auto& obj = src[i];
-
-				int count = 0;
-				Id pmin = *reinterpret_cast<const Id*>(&obj.posMin),
-					pmax = *reinterpret_cast<const Id*>(&obj.posMax);
-				AssertP(Trap, pmin.v0 <= pmax.v0 && pmin.v1 <= pmax.v1)
-
-				if(pmin.v0 < cx) {
-					// 左リストに登録
-					if(pmin.v1 < cy) {
-						// 左上
-						*dst[0]++ = &obj;
-						++count;
-					}
-					if(pmax.v1 >= cy) {
-						// 左下
-						*dst[2]++ = &obj;
-						++count;
-					}
-				}
-				if(pmax.v0 >= cx) {
-					// 右リストに登録
-					if(pmin.v1 < cy) {
-						// 右上
-						*dst[1]++  = &obj;
-						++count;
-					}
-					if(pmax.v1 >= cy) {
-						// 右下
-						*dst[3]++ = &obj;
-						++count;
-					}
-				}
+				int count = Classify(src[i], centerId, cb);
 				AssertP(Trap, count > 0)
 			}
 		}

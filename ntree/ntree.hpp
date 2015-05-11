@@ -49,19 +49,7 @@ namespace boom {
 			public:
 				CTreeObjStack();
 				void addBlock(const CTreeEntry& ent, bool bAdd);
-				template <class T>
-				void addBlock(const T& ol, bool bAdd) {
-					int nAdd = ol.size();
-					if(bAdd)
-						_nstk.top().nPop += nAdd;
-					else
-						_nstk.push(Ent(nAdd, _obj.size()));
-
-					int cur = _obj.size();
-					_obj.resize(cur + nAdd);
-					for(auto& obj : ol)
-						_obj[cur++] = obj;
-				}
+				void addBlock(const VolVec& ol, bool bAdd);
 
 				template <class DIM>
 				void _classify(VolVec& dat, const bool (&bWrite)[DIM::N_LayerSize], typename DIM::Id centerId) {
@@ -180,6 +168,77 @@ namespace boom {
 				using MortonCache = std::unordered_map<spn::SHandle, MCEnt>;
 				MortonCache		_mmap;
 
+				template <class Notify>
+				int iterateChk(CMask cmask, const BVolume& bv, Notify&& ntf) const {
+					if(getEntry(0).isEmpty())
+						return 0;
+
+					using Id = typename NTree::CTDim_t::Id;
+					auto mid = CTDim_t::ToMortonId(bv, CTEnt_t::N_Width, _unitSizeInv);
+					VolEntry ve{spn::SHandle(),
+								std::get<2>(mid).value,
+								std::get<3>(mid).value};
+
+					int count = 0;
+					struct Pair {
+						int toProc;
+						Id	center;
+					};
+					std::stack<Pair> stkId;
+					// ルートノードをプッシュ
+					int curWidth = NTree::CTEnt_t::N_Width/2;		// 現在の走査幅 (常に2の乗数)
+					stkId.push(Pair{0, Id(curWidth)});
+					while(!stkId.empty()) {
+						auto p = stkId.top();
+						stkId.pop();
+						if(p.toProc < 0) {
+							if(p.toProc == -2) {
+								curWidth *= 2;
+								if(curWidth == 0)
+									curWidth = 1;
+							}
+							continue;
+						}
+						const auto& curEnt = getEntry(p.toProc);
+						// 判定を行うかの判断 (assert含む)
+						if(!curEnt.isNodeEmpty()) {
+							for(auto& obj : curEnt.olist) {
+								if(bv.hit(_fGetBV(obj.hObj))) {
+									std::forward<Notify>(ntf)(obj.hObj);
+									++count;
+								}
+							}
+						} else {
+							AssertP(Trap, curEnt.nLower > 0)
+						}
+						// 下に枝があればそれを処理
+						if(curEnt.nLower > 0) {
+							stkId.push(Pair{-2, 0});
+							curWidth /= 2;
+
+							// 手持ちリストをOctave個のリストに分類(重複あり)にしてスタックに積む
+							Id			lowerCenterId[NTree::N_LayerSize];
+							NTree::CTDim_t::CalcLowerCenterId(lowerCenterId, p.center, curWidth);
+							// 先に枝が有効かどうか確認
+							int tcount = 0;
+							for(int i=0 ; i<NTree::N_LayerSize ; i++) {
+								int idx = p.toProc*NTree::N_LayerSize+1+i;		// 子ノードのインデックス
+								if(hasEntry(idx)) {
+									auto& ent = getEntry(idx);
+									if(!ent.isEmpty()) {
+										NTree::CTDim_t::Classify(ve, lowerCenterId[i], [i, idx2=idx, &lowerCenterId, &p, &stkId](const VolEntry& ve, int idx){
+											stkId.push(Pair{idx2, lowerCenterId[i]});
+										});
+										++tcount;
+										continue;
+									}
+								}
+							}
+							AssertP(Trap, tcount>0)
+						}
+					}
+					return count;
+				}
 				//! コリジョン判定の為に木を巡る
 				//! オブジェクト分類してaddBlockする
 				/*! @param[out] dst 要素数はエントリに対応した数を用意
@@ -402,15 +461,17 @@ namespace boom {
 				template <class CB>
 				void checkCollision(CMask mask, const BVolume& bv, CB&& cb) {
 					_refreshBV(nullptr);
+					iterateChk(mask, bv, std::forward<CB>(cb));
 				}
 				template <class CB>
 				int broadCollision(CB&& cb, const IDTypeV* idv=nullptr) {
 					_refreshBV(idv);
-					return iterate([this](const IDType& id0, const IDType& id1){
-						auto bv0 = _fGetBV(id0);
-						auto bv1 = _fGetBV(id1);
-						return bv0.hit(bv1);
-					}, std::forward<CB>(cb));
+					return iterate([&getbv = _fGetBV](const IDType& id0, const IDType& id1){
+									auto bv0 = getbv(id0);
+									auto bv1 = getbv(id1);
+									return bv0.hit(bv1);
+								},
+								std::forward<CB>(cb));
 				}
 
 				//! モートンIDとレベルから配列インデックスを計算

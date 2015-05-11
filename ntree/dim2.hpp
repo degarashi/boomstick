@@ -47,6 +47,8 @@ namespace boom {
 					\param[in] nSrc			srcの要素数
 					\param[in] centerId		振り分け中心点(軸別のマス目インデックス) */
 				static void Classify(const VolEntry** (&dst)[N_LayerSize], const VolEntry* src, int nSrc, Id centerId);
+				using CBClassify = std::function<void (const VolEntry&, int)>;
+				static int Classify(const VolEntry& ve, Id centerId, const CBClassify& cb);
 				//! 1つ下の階層の中心インデックス値を算出
 				/*! \param[out] idDst	1つ下の階層の中心座標インデックス
 					\param[in] id		現在の階層の中心座標インデックス

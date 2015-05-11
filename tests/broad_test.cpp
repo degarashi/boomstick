@@ -47,7 +47,7 @@ namespace boom {
 		template <int N>
 		using IConst = std::integral_constant<int, N>;
 		using BC_RR_t = std::tuple<ColMgr_RR, IConst<32>, IConst<32>, std::true_type>;
-		using BC_NT_t = std::tuple<ColMgr_NTree, IConst<32>, IConst<0>, std::false_type>;
+		using BC_NT_t = std::tuple<ColMgr_NTree, IConst<32>, IConst<0>, std::true_type>;
 		using BroadCTypeList2D = ::testing::Types<BC_RR_t,
 												BC_NT_t>;
 		TYPED_TEST_CASE(BroadC_Dim2, BroadCTypeList2D);

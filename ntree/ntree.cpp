@@ -42,6 +42,18 @@ namespace boom {
 		void CTreeObjStack::addBlock(const CTreeEntry& ent, bool bAdd) {
 			addBlock(ent.olist, bAdd);
 		}
+		void CTreeObjStack::addBlock(const VolVec& ol, bool bAdd) {
+			int nAdd = ol.size();
+			if(bAdd)
+				_nstk.top().nPop += nAdd;
+			else
+				_nstk.push(Ent(nAdd, _obj.size()));
+
+			int cur = _obj.size();
+			_obj.resize(cur + nAdd);
+			for(auto& obj : ol)
+				_obj[cur++] = obj;
+		}
 		void CTreeObjStack::popBlock() {
 			auto top = _nstk.top();
 			_nstk.pop();
