@@ -7,6 +7,7 @@
 #include "../ntree/ntree.hpp"
 #include "../ntree/dim2.hpp"
 #include "../ntree/arrayentry.hpp"
+#include "../ntree/hashentry.hpp"
 
 namespace boom {
 	namespace test {
@@ -32,24 +33,26 @@ namespace boom {
 				using HLCol_V = std::vector<HLCol>;
 				using MMgr = typename ColMgr::MMgr;
 				using HLMdl = typename ColMgr::HLMdl;
-				BroadC_Dim2(): _cmgr(1.f) {}
+				BroadC_Dim2(): _cmgr(10000.f) {}
 				auto& getColMgr() {
 					return _cmgr;
 				}
 		};
-		using ColMgr_NTree = ::boom::ColMgr<::boom::ntree::NTree<
-												::boom::ntree::CTDim_2D,
-												::boom::ntree::CTEnt_Array,
-											1>
-											, geo2d::Types, uint32_t>;
+		template <template<class,int,int> class E>
+		using ColMgr_NTree = ::boom::ColMgr<::boom::ntree::NTree<::boom::ntree::CTDim_2D, E, 4>,
+											geo2d::Types, uint32_t>;
 		using ColMgr_RR = ::boom::ColMgr<BroadC_RoundRobin<Circle>,
 											geo2d::Types, uint32_t>;
 		template <int N>
 		using IConst = std::integral_constant<int, N>;
 		using BC_RR_t = std::tuple<ColMgr_RR, IConst<32>, IConst<32>, std::true_type>;
-		using BC_NT_t = std::tuple<ColMgr_NTree, IConst<32>, IConst<0>, std::true_type>;
+		using BC_NTreeA_t = std::tuple<ColMgr_NTree<::boom::ntree::CTEnt_Array>,
+										IConst<32>, IConst<0>, std::true_type>;
+		using BC_NTreeH_t = std::tuple<ColMgr_NTree<::boom::ntree::CTEnt_Hash>,
+										IConst<32>, IConst<0>, std::true_type>;
 		using BroadCTypeList2D = ::testing::Types<BC_RR_t,
-												BC_NT_t>;
+												BC_NTreeA_t,
+												BC_NTreeH_t>;
 		TYPED_TEST_CASE(BroadC_Dim2, BroadCTypeList2D);
 
 		namespace {

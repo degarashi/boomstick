@@ -331,6 +331,7 @@ namespace boom {
 				void _decrementUpper(MortonId num) {
 					while(num != 0) {
 						num = (num-1)>>(CTDim::N_Dim);
+						AssertP(Trap, _ent.refEntry(num).nLower > 0)
 						_ent.decrement(num);
 					}
 				}
