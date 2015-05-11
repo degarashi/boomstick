@@ -4,6 +4,9 @@
 #include "test2D.hpp"
 #include "bc_roundrobin.hpp"
 #include <unordered_set>
+#include "../ntree/ntree.hpp"
+#include "../ntree/dim2.hpp"
+#include "../ntree/arrayentry.hpp"
 
 namespace boom {
 	namespace test {
@@ -20,6 +23,7 @@ namespace boom {
 				using ColMgr = typename std::tuple_element<0, T>::type;
 				constexpr static int N_AObj = std::tuple_element<1, T>::type::value,
 									N_BObj = std::tuple_element<2, T>::type::value;
+				constexpr static bool B_CheckCollision = std::tuple_element<3, T>::type::value;
 				ModelMgr	_mmgr;
 				ColMgr		_cmgr;
 			public:
@@ -33,12 +37,19 @@ namespace boom {
 					return _cmgr;
 				}
 		};
+		using ColMgr_NTree = ::boom::ColMgr<::boom::ntree::NTree<
+												::boom::ntree::CTDim_2D,
+												::boom::ntree::CTEnt_Array,
+											1>
+											, geo2d::Types, uint32_t>;
 		using ColMgr_RR = ::boom::ColMgr<BroadC_RoundRobin<Circle>,
 											geo2d::Types, uint32_t>;
 		template <int N>
 		using IConst = std::integral_constant<int, N>;
-		using BC_RR_t = std::tuple<ColMgr_RR, IConst<32>, IConst<32>>;
-		using BroadCTypeList2D = ::testing::Types<BC_RR_t>;
+		using BC_RR_t = std::tuple<ColMgr_RR, IConst<32>, IConst<32>, std::true_type>;
+		using BC_NT_t = std::tuple<ColMgr_NTree, IConst<32>, IConst<0>, std::false_type>;
+		using BroadCTypeList2D = ::testing::Types<BC_RR_t,
+												BC_NT_t>;
 		TYPED_TEST_CASE(BroadC_Dim2, BroadCTypeList2D);
 
 		namespace {
@@ -82,6 +93,9 @@ namespace boom {
 			auto fnN = [&](const spn::RangeI& r){ return rd.template getUniform<int>(r); };
 			using CT = spn::CType<geo2d::Circle, geo2d::AABB>;
 			using this_t = BroadC_Dim2<TypeParam>;
+			// (NTreeのルーチンがまだ用意出来てない為)
+			if(!this_t::B_CheckCollision)
+				return;
 
 			// TypeAを適当に追加
 			auto vA = AddRandomTree<CT>(rd, cm, fnN({0,this_t::N_AObj}), 0x00000001, 0);
