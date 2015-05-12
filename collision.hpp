@@ -285,8 +285,8 @@ namespace boom {
 				};
 			}
 		public:
-			ColMgr(float fieldSize):
-				_broadC(_makeGetBV(), fieldSize)
+			ColMgr(float fieldSize, float fieldOfs):
+				_broadC(_makeGetBV(), fieldSize, fieldOfs)
 			{
 				Narrow::Initialize();
 			}

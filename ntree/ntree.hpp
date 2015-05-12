@@ -155,7 +155,8 @@ namespace boom {
 				};
 				CTDim_t			_dim;
 				CTEnt_t			_ent;
-				const float		_unitSizeInv;
+				const float				_unitSizeInv,
+										_fieldOffset;
 
 				using FGetBV = std::function<BVolume (spn::SHandle)>;
 				const FGetBV	_fGetBV;
@@ -168,7 +169,7 @@ namespace boom {
 						return 0;
 
 					using Id = typename NTree::CTDim_t::Id;
-					auto mid = CTDim_t::ToMortonId(bv, CTEnt_t::N_Width, _unitSizeInv);
+					auto mid = CTDim_t::ToMortonId(bv, CTEnt_t::N_Width, _unitSizeInv, _fieldOffset);
 					VolEntry ve{spn::SHandle(),
 								std::get<2>(mid).value,
 								std::get<3>(mid).value};
@@ -374,7 +375,7 @@ namespace boom {
 							auto& cache = itr->second;
 							auto bv = _fGetBV(itr->first);
 							cache.bvolume = bv;
-							auto mid = CTDim_t::ToMortonId(bv, CTEnt_t::N_Width, _unitSizeInv);
+							auto mid = CTDim_t::ToMortonId(bv, CTEnt_t::N_Width, _unitSizeInv, _fieldOffset);
 							if(std::get<2>(mid).value != cache.posMin ||
 								std::get<3>(mid).value != cache.posMax)
 							{
@@ -388,7 +389,7 @@ namespace boom {
 					} else {
 						for(auto& m : _mmap) {
 							auto bv = _fGetBV(m.first);
-							auto mid = CTDim_t::ToMortonId(bv, CTEnt_t::N_Width, _unitSizeInv);
+							auto mid = CTDim_t::ToMortonId(bv, CTEnt_t::N_Width, _unitSizeInv, _fieldOffset);
 							auto& cache = m.second;
 							cache.bvolume = bv;
 							if(std::get<2>(mid).value != cache.posMin ||
@@ -410,7 +411,7 @@ namespace boom {
 				MortonId _addObject(spn::SHandle hObj, bool bAddMM) {
 					AssertP(Trap, hObj.valid())
 					auto bv = _fGetBV(hObj);
-					auto mid = CTDim_t::ToMortonId(bv, CTEnt_t::N_Width, _unitSizeInv);
+					auto mid = CTDim_t::ToMortonId(bv, CTEnt_t::N_Width, _unitSizeInv, _fieldOffset);
 					MortonId num = ToMortonId(std::get<0>(mid), std::get<1>(mid));
 					if(bAddMM)
 						_mmap[hObj] = MCEnt{num, bv, std::get<2>(mid).value, std::get<3>(mid).value};
@@ -442,8 +443,9 @@ namespace boom {
 
 			public:
 				/*! \param[in] fieldSize	当たり判定対象の一片サイズ */
-				NTree(const FGetBV& f, float fsize):
+				NTree(const FGetBV& f, float fsize, float fofs):
 					_unitSizeInv(CTEnt_t::N_Width / fsize),
+					_fieldOffset(fofs),
 					_fGetBV(f)
 				{}
 				void clear() {

@@ -26,9 +26,9 @@ namespace boom {
 						v1 / s);
 		}
 		// ---------------------- CTDim_2D ----------------------
-		std::tuple<MortonId,MortonId,CTDim_2D::Id,CTDim_2D::Id> CTDim_2D::ToMortonId(const BVolume& objBox, int nwidth, float unit) {
-			auto sat = [nwidth,unit](float w) -> uint32_t {
-				return spn::Saturate(static_cast<int>(w*unit), 0, nwidth-1); };
+		std::tuple<MortonId,MortonId,CTDim_2D::Id,CTDim_2D::Id> CTDim_2D::ToMortonId(const BVolume& objBox, int nwidth, float unit, float ofs) {
+			auto sat = [nwidth,unit,ofs](float w) -> uint32_t {
+				return spn::Saturate(static_cast<int>((w+ofs)*unit), 0, nwidth-1); };
 
 			auto& ab = objBox;
 			uint32_t tmin[2] = {sat(ab.minV.x), sat(ab.minV.y)},

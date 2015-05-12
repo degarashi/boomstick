@@ -33,7 +33,7 @@ namespace boom {
 				using HLCol_V = std::vector<HLCol>;
 				using MMgr = typename ColMgr::MMgr;
 				using HLMdl = typename ColMgr::HLMdl;
-				BroadC_Dim2(): _cmgr(10000.f) {}
+				BroadC_Dim2(): _cmgr(1e4f*2, -1e4f) {}
 				auto& getColMgr() {
 					return _cmgr;
 				}

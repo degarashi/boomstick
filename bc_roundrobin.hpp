@@ -67,7 +67,7 @@ namespace boom {
 				return (m & 0x80000000) ? TypeB : TypeA;
 			}
 		public:
-			BroadC_RoundRobin(FGetBV cb, float /*fieldSize*/): _fGetBV(cb) {}
+			BroadC_RoundRobin(FGetBV cb, float /*fieldSize*/, float /*fieldOfs*/): _fGetBV(cb) {}
 			IDType add(spn::SHandle sh, CMask mask) {
 				Type typ = _DetectType(mask);
 				return IDType{_node[typ].add(Node{mask, sh}), typ};

@@ -36,7 +36,7 @@ namespace boom {
 							[1]=Max(XY)のモートンId
 							[2]=Min(XY)軸インデックス
 							[3]=Max(XY)軸インデックス */
-				static std::tuple<MortonId,MortonId,Id,Id> ToMortonId(const BVolume& objBox, int nwidth, float unit);
+				static std::tuple<MortonId,MortonId,Id,Id> ToMortonId(const BVolume& objBox, int nwidth, float unit, float ofs);
 				//! 軸別インデックス値からモートンIDに変換
 				static MortonId ToMortonId(uint32_t x, uint32_t y);
 				//! モートンIDから軸別インデックス値へ変換
