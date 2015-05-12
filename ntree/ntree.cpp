@@ -37,7 +37,7 @@ namespace boom {
 
 		// ---------------------- CTreeObjStack ----------------------
 		CTreeObjStack::CTreeObjStack() {
-			_nstk.push(Ent(0,0));
+			_nstk.push(Ent{0,0});
 		}
 		void CTreeObjStack::addBlock(const CTreeEntry& ent, bool bAdd) {
 			addBlock(ent.olist, bAdd);
@@ -47,7 +47,7 @@ namespace boom {
 			if(bAdd)
 				_nstk.top().nPop += nAdd;
 			else
-				_nstk.push(Ent(nAdd, _obj.size()));
+				_nstk.push(Ent{nAdd, int(_obj.size())});
 
 			int cur = _obj.size();
 			_obj.resize(cur + nAdd);
