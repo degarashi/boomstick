@@ -10,14 +10,14 @@ namespace boom {
 		using MortonId = uint32_t;
 		using MortonId_OP = spn::Optional<MortonId>;
 		using PositionId = uint32_t;
+		using CacheId = uint32_t;
 		struct VolEntry {
-			spn::SHandle	hObj;
+			CacheId			cacheId;
 			//! 各軸の数値をビットフィールドで記録 (Dim依存)
 			PositionId		posMin,
 							posMax;
 		};
-		using VolList = spn::noseq_vec<VolEntry>;
-		using VolVec = std::vector<VolEntry>;
+		using VolVec = spn::noseq_vec<VolEntry>;
 
 		class CTreeObjStack;
 		//! シングルラインCTreeエントリ
@@ -25,12 +25,12 @@ namespace boom {
 			//! 巡回時にはこのスタックを使う
 			using ItrStack = CTreeObjStack;
 
-			VolList		olist;			//!< セルに内包されたオブジェクトリスト
+			VolVec		olist;			//!< セルに内包されたオブジェクトリスト
 			int			nLower;			//!< このセルより下に幾つオブジェクトが存在するか
 
 			CTreeEntry();
 			void clear();
-			bool remObj(spn::SHandle obj);
+			bool remObj(CacheId cid);
 			bool isNodeEmpty() const;	//!< このノード単体が空か？
 			bool isEmpty() const;		//!< 下位ノードを含めて空か？
 		};
@@ -78,10 +78,8 @@ namespace boom {
 							// daPに幾つオブジェクトが割り振られたか
 							int nObj = daP[i] - base;
 							_nstk.push(Ent{nObj, wcur});
-							for(int j=0 ; j<nObj ; j++) {
-								AssertP(Trap, (*base)->hObj.valid())
+							for(int j=0 ; j<nObj ; j++)
 								_obj[wcur++] = *(*base++);
-							}
 						}
 					}
 					// 本来の配列の長さに設定
@@ -98,7 +96,7 @@ namespace boom {
 		//! マップ用オブジェクトを含むCTreeエントリ
 		struct CTreeEntryM : CTreeEntry {
 			using ItrStack = CTreeObjStackM;
-			VolList		mlist;
+			VolVec	mlist;
 
 			void clear();
 			bool isNodeEmpty() const;
@@ -147,20 +145,27 @@ namespace boom {
 				}
 
 			private:
-				struct MCEnt {
-					MortonId	mortonId;
-					BVolume		bvolume;
-					uint32_t	posMin,
-								posMax;
+				struct Cache {
+					spn::SHandle	hObj;
+					BVolume			bvolume;
+					MortonId		mortonId;
+					PositionId		posMin,
+									posMax;
 				};
+
 				CTDim_t			_dim;
 				CTEnt_t			_ent;
 				const float				_unitSizeInv,
 										_fieldOffset;
 
 				using FGetBV = std::function<BVolume (spn::SHandle)>;
+				//! BVolumeをSHandleから計算する為にCtorで与えられるファンクタ
 				const FGetBV	_fGetBV;
-				using MortonCache = std::unordered_map<spn::SHandle, MCEnt>;
+				using CacheNS = spn::noseq_list<Cache, std::allocator, CacheId>;
+				CacheNS			_cache;
+
+				using MortonCache = std::unordered_map<spn::SHandle, CacheId>;
+				//! オブジェクト削除でCacheIdを検索するのに使用
 				MortonCache		_mmap;
 
 				template <class Notify>
@@ -170,7 +175,7 @@ namespace boom {
 
 					using Id = typename NTree::CTDim_t::Id;
 					auto mid = CTDim_t::ToMortonId(bv, CTEnt_t::N_Width, _unitSizeInv, _fieldOffset);
-					VolEntry ve{spn::SHandle(),
+					VolEntry ve{CacheId(0),
 								std::get<2>(mid).value,
 								std::get<3>(mid).value};
 
@@ -198,8 +203,8 @@ namespace boom {
 						// 判定を行うかの判断 (assert含む)
 						if(!curEnt.isNodeEmpty()) {
 							for(auto& obj : curEnt.olist) {
-								if(bv.hit(_mmap.at(obj.hObj).bvolume)) {
-									std::forward<Notify>(ntf)(obj.hObj);
+								if(bv.hit(_cache.get(obj.cacheId).bvolume)) {
+									std::forward<Notify>(ntf)(obj);
 									++count;
 								}
 							}
@@ -235,11 +240,9 @@ namespace boom {
 					return count;
 				}
 				//! コリジョン判定の為に木を巡る
-				//! オブジェクト分類してaddBlockする
-				/*! @param[out] dst 要素数はエントリに対応した数を用意
-					@return コリジョン判定が実施された回数 */
-				template <class Chk, class Notify>
-				int iterate(Chk&& chk, Notify&& ntf) const {
+				/*! \return コリジョンと判定された回数 */
+				template <class Notify>
+				int iterate(Notify&& ntf) const {
 					if(getEntry(0).isEmpty())
 						return 0;
 
@@ -276,8 +279,7 @@ namespace boom {
 						const auto& curEnt = getEntry(p.toProc);
 						// 判定を行うかの判断 (assert含む)
 						if(!curEnt.isNodeEmpty()) {
-							count += _doCollision(stk, curEnt,
-									std::forward<Chk>(chk), std::forward<Notify>(ntf));
+							count += _doCollision(stk, curEnt, std::forward<Notify>(ntf));
 							// オブジェクト集合を加える
 							stk.addBlock(curEnt, true);
 						} else {
@@ -337,9 +339,9 @@ namespace boom {
 					while(itr0 != itrE0) {
 						auto& o0 = *itr0;
 						for(auto& o1 : oL1) {
-							if(std::forward<Chk>(chk)(o0.hObj, o1.hObj)) {
+							if(std::forward<Chk>(chk)(o0, o1)) {
 								// 通知など
-								std::forward<Notify>(ntf)(o0.hObj, o1.hObj);
+								std::forward<Notify>(ntf)(o0, o1);
 							}
 						}
 						++itr0;
@@ -357,9 +359,9 @@ namespace boom {
 						++itr1;
 						for( ; itr1!=oL0.cend() ; ++itr1) {
 							++count;
-							if(std::forward<Chk>(chk)((*itr0).hObj, (*itr1).hObj)) {
+							if(std::forward<Chk>(chk)(*itr0, *itr1)) {
 								// 通知など
-								std::forward<Notify>(ntf)((*itr0).hObj, (*itr1).hObj);
+								std::forward<Notify>(ntf)(*itr0, *itr1);
 							}
 						}
 					}
@@ -372,7 +374,7 @@ namespace boom {
 						for(auto& idt : *idv) {
 							auto itr = _mmap.find(idt);
 							AssertP(Trap, itr!=_mmap.end())
-							auto& cache = itr->second;
+							auto& cache = _cache.get(itr->second);
 							auto bv = _fGetBV(itr->first);
 							cache.bvolume = bv;
 							auto mid = CTDim_t::ToMortonId(bv, CTEnt_t::N_Width, _unitSizeInv, _fieldOffset);
@@ -388,9 +390,10 @@ namespace boom {
 						}
 					} else {
 						for(auto& m : _mmap) {
+							// 新しくBVolumeを計算
 							auto bv = _fGetBV(m.first);
+							auto& cache = _cache.get(m.second);
 							auto mid = CTDim_t::ToMortonId(bv, CTEnt_t::N_Width, _unitSizeInv, _fieldOffset);
-							auto& cache = m.second;
 							cache.bvolume = bv;
 							if(std::get<2>(mid).value != cache.posMin ||
 								std::get<3>(mid).value != cache.posMax)
@@ -413,11 +416,15 @@ namespace boom {
 					auto bv = _fGetBV(hObj);
 					auto mid = CTDim_t::ToMortonId(bv, CTEnt_t::N_Width, _unitSizeInv, _fieldOffset);
 					MortonId num = ToMortonId(std::get<0>(mid), std::get<1>(mid));
-					if(bAddMM)
-						_mmap[hObj] = MCEnt{num, bv, std::get<2>(mid).value, std::get<3>(mid).value};
+					CacheId cid;
+					if(bAddMM) {
+						cid = _cache.add(Cache{hObj, bv, num, std::get<2>(mid).value, std::get<3>(mid).value});
+						_mmap[hObj] = cid;
+					} else
+						cid = _mmap.at(hObj);
 					// まだエントリがリストを持っていなければ自動的に作成
 					auto& entry = _ent.refEntry(num);
-					VolEntry ve{hObj, std::get<2>(mid).value, std::get<3>(mid).value};
+					VolEntry ve{cid, std::get<2>(mid).value, std::get<3>(mid).value};
 					entry.olist.emplace_back(std::move(ve));
 					_incrementUpper(num);
 // 					LogOutput("Add(%1%) %2%", hObj.getIndex(), num);
@@ -427,14 +434,18 @@ namespace boom {
 					AssertP(Trap, idt.valid())
 					auto itr = _mmap.find(idt);
 					AssertP(Trap, itr != _mmap.end())
-					MortonId num = itr->second.mortonId;
-					if(bRemMM)
+					CacheId cid = itr->second;
+					auto& cache = _cache.get(cid);
+					MortonId num = cache.mortonId;
+					if(bRemMM) {
+						_cache.rem(itr->second);
 						_mmap.erase(itr);
+					}
 					AssertP(Trap, _ent.hasEntry(num))
 
 					auto& e = _ent.refEntry(num);
 					// リストが空になったらエントリを削除
-					if(e.remObj(idt))
+					if(e.remObj(cid))
 						_ent.remEntry(num);
 					_decrementUpper(num);
 // 					LogOutput("Rem(%1%) %2%", idt.getIndex(), num);
@@ -462,17 +473,15 @@ namespace boom {
 				template <class CB>
 				void checkCollision(CMask mask, const BVolume& bv, CB&& cb) {
 					_refreshBV(nullptr);
-					iterateChk(mask, bv, std::forward<CB>(cb));
+					iterateChk(mask, bv, [this, cb=std::forward<CB>(cb)](const VolEntry& ve){
+						auto hObj = _cache.get(ve.cacheId).hObj;
+						cb(hObj);
+					});
 				}
 				template <class CB>
 				int broadCollision(CB&& cb, const IDTypeV* idv=nullptr) {
 					_refreshBV(idv);
-					return iterate([this](const IDType& id0, const IDType& id1){
-									auto& bv0 = _mmap.at(id0).bvolume;
-									auto& bv1 = _mmap.at(id1).bvolume;
-									return bv0.hit(bv1);
-								},
-								std::forward<CB>(cb));
+					return iterate(std::forward<CB>(cb));
 				}
 
 				//! モートンIDとレベルから配列インデックスを計算
@@ -498,16 +507,26 @@ namespace boom {
 				bool hasEntry(MortonId num) const {
 					return _ent.hasEntry(num);
 				}
-				template <class Chk, class Notify>
-				int _doCollision(const typename Entry_t::ItrStack& stk, const CTreeEntry& cur, Chk&& chk, Notify&& ntf) const {
-					const VolList& ol = cur.olist;
+				template <class Notify>
+				int _doCollision(const typename Entry_t::ItrStack& stk, const CTreeEntry& cur, Notify&& ntf) const {
+					const VolVec& ol = cur.olist;
 					// Objリストとブロック内Objとの判定
 					auto ret = stk.getObj();
 					auto* bgn = std::get<0>(ret);
 					auto nObj = std::get<1>(ret);
-					int count = _HitCheck(bgn, bgn+nObj, ol, chk, ntf);
+					auto fnNtf = [this, ntf=std::forward<Notify>(ntf)](const VolEntry& v0, const VolEntry& v1){
+						Cache &c0 = _cache.get(v0.cacheId),
+							&c1 = _cache.get(v1.cacheId);
+						ntf(c0.hObj, c1.hObj);
+					};
+					auto fnChk = [this](const VolEntry& v0, const VolEntry& v1){
+						Cache &c0 = _cache.get(v0.cacheId),
+							&c1 = _cache.get(v1.cacheId);
+						return c0.bvolume.hit(c1.bvolume);
+					};
+					int count = _HitCheck(bgn, bgn+nObj, ol, fnChk, fnNtf);
 					// ブロック内同士の判定
-					count += _HitCheck(ol, chk, ntf);
+					count += _HitCheck(ol, fnChk, fnNtf);
 					return count;
 				}
 		};

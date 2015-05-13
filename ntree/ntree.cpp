@@ -10,9 +10,9 @@ namespace boom {
 			olist.clear();
 			nLower = 0;
 		}
-		bool CTreeEntry::remObj(spn::SHandle obj) {
+		bool CTreeEntry::remObj(CacheId cid) {
 			auto itr = std::find_if(olist.cbegin(), olist.cend(),
-						[obj](const VolEntry& e){ return e.hObj == obj; });
+						[cid](const VolEntry& e){ return e.cacheId == cid; });
 			AssertP(Trap, itr != olist.cend())
 			olist.erase(itr);
 			return isEmpty();
