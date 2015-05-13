@@ -41,6 +41,9 @@ namespace boom {
 		template <template<class,int,int> class E>
 		using ColMgr_NTree = ::boom::ColMgr<::boom::ntree::NTree<::boom::ntree::CTDim_2D, E, 4>,
 											geo2d::Types, uint32_t>;
+		template <template<class,int,int> class E>
+		using ColMgr_NTreeMap = ::boom::ColMgr<::boom::ntree::NTreeMap<::boom::ntree::CTDim_2D, E, 4>,
+											geo2d::Types, uint32_t>;
 		using ColMgr_RR = ::boom::ColMgr<BroadC_RoundRobin<Circle>,
 											geo2d::Types, uint32_t>;
 		template <int N>
@@ -50,7 +53,13 @@ namespace boom {
 										IConst<32>, IConst<0>, std::true_type>;
 		using BC_NTreeH_t = std::tuple<ColMgr_NTree<::boom::ntree::CTEnt_Hash>,
 										IConst<32>, IConst<0>, std::true_type>;
-		using BroadCTypeList2D = ::testing::Types<BC_RR_t,
+		using BC_NTreeMA_t = std::tuple<ColMgr_NTreeMap<::boom::ntree::CTEnt_Array>,
+										IConst<32>, IConst<32>, std::true_type>;
+		using BC_NTreeMH_t = std::tuple<ColMgr_NTreeMap<::boom::ntree::CTEnt_Hash>,
+										IConst<32>, IConst<32>, std::true_type>;
+		using BroadCTypeList2D = ::testing::Types<BC_NTreeMA_t,
+												BC_NTreeMH_t,
+												BC_RR_t,
 												BC_NTreeA_t,
 												BC_NTreeH_t>;
 		TYPED_TEST_CASE(BroadC_Dim2, BroadCTypeList2D);
