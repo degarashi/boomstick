@@ -35,16 +35,16 @@ namespace boom {
 						_ent.erase(itr);
 				}
 				void increment(MortonId num) {
-					AssertP(Trap, _ent[num].nLower >= 0)
-					++_ent[num].nLower;
+					AssertP(Trap, _ent[num].getLowerCount() >= 0)
+					_ent[num].incrementLowerCount();
 				}
 				void decrement(MortonId num) {
 					// カウンタが0になったらエントリを削除 (ルートは消さない)
 					auto itr = _ent.find(num);
-					AssertP(Trap, itr!=_ent.end() && itr->second.nLower>0)
-					--itr->second.nLower;
+					AssertP(Trap, itr!=_ent.end() && itr->second.getLowerCount()>0)
+					itr->second.decrementLowerCount();
 					if(itr->second.isEmpty() && num!=0) {
-						AssertP(Trap, itr->second.olist.empty())
+						AssertP(Trap, itr->second.getObjList().empty())
 						_ent.erase(itr);
 					}
 				}

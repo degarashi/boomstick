@@ -4,43 +4,81 @@ namespace boom {
 	namespace ntree {
 		// ---------------------- CTreeEntry ----------------------
 		CTreeEntry::CTreeEntry():
-			nLower(0)
+			_nLower(0)
 		{}
 		void CTreeEntry::clear() {
-			olist.clear();
-			nLower = 0;
+			_olist.clear();
+			_nLower = 0;
 		}
-		bool CTreeEntry::remObj(CacheId cid) {
-			auto itr = std::find_if(olist.cbegin(), olist.cend(),
+		void CTreeEntry::addObj(CMask mask, const VolEntry& ve) {
+			_olist.emplace_back(ve);
+		}
+		void CTreeEntry::_remObj(VolVec& v, CacheId cid) {
+			auto itr = std::find_if(v.cbegin(), v.cend(),
 						[cid](const VolEntry& e){ return e.cacheId == cid; });
-			AssertP(Trap, itr != olist.cend())
-			olist.erase(itr);
+			AssertP(Trap, itr != v.cend())
+			v.erase(itr);
+		}
+		bool CTreeEntry::remObj(CMask mask, CacheId cid) {
+			_remObj(_olist, cid);
 			return isEmpty();
 		}
 		bool CTreeEntry::isNodeEmpty() const {
-			return olist.empty();
+			return _olist.empty();
 		}
 		bool CTreeEntry::isEmpty() const {
-			return isNodeEmpty() && nLower==0;
+			return isNodeEmpty() && _nLower==0;
+		}
+		const VolVec& CTreeEntry::getObjList() const {
+			return _olist;
+		}
+		int CTreeEntry::getLowerCount() const {
+			return _nLower;
+		}
+		void CTreeEntry::incrementLowerCount() {
+			++_nLower;
+			AssertP(Trap, _nLower > 0)
+		}
+		void CTreeEntry::decrementLowerCount() {
+			--_nLower;
+			AssertP(Trap, _nLower >= 0)
 		}
 		// ---------------------- CTreeEntryM ----------------------
+		bool CTreeEntryM::IsTypeB(CMask mask) {
+			return mask & 0x80000000;
+		}
+		void CTreeEntryM::addObj(CMask mask, const VolEntry& v) {
+			if(IsTypeB(mask))
+				_mlist.emplace_back(v);
+			else
+				base_t::addObj(mask, v);
+		}
+		bool CTreeEntryM::remObj(CMask mask, CacheId cid) {
+			if(IsTypeB(mask))
+				_remObj(_mlist, cid);
+			else
+				base_t::remObj(mask, cid);
+			return isEmpty();
+		}
 		void CTreeEntryM::clear() {
-			mlist.clear();
-			CTreeEntry::clear();
+			_mlist.clear();
+			base_t::clear();
 		}
 		bool CTreeEntryM::isNodeEmpty() const {
-			return olist.empty() && mlist.empty();
+			return base_t::isNodeEmpty() && _mlist.empty();
 		}
 		bool CTreeEntryM::isEmpty() const {
-			return CTreeEntry::isEmpty() && mlist.empty();
+			return base_t::isEmpty() && _mlist.empty();
 		}
-
+		const VolVec& CTreeEntryM::getMapList() const {
+			return _mlist;
+		}
 		// ---------------------- CTreeObjStack ----------------------
 		CTreeObjStack::CTreeObjStack() {
 			_nstk.push(Ent{0,0});
 		}
 		void CTreeObjStack::addBlock(const CTreeEntry& ent, bool bAdd) {
-			addBlock(ent.olist, bAdd);
+			addBlock(ent.getObjList(), bAdd);
 		}
 		void CTreeObjStack::addBlock(const VolVec& ol, bool bAdd) {
 			int nAdd = ol.size();
@@ -73,8 +111,8 @@ namespace boom {
 
 		// ---------------------- CTreeObjStackM ----------------------
 		void CTreeObjStackM::addBlock(const CTreeEntryM& ent, bool bAdd) {
-			_stk.addBlock(ent.olist, bAdd);
-			_stkM.addBlock(ent.mlist, bAdd);
+			_stk.addBlock(ent.getObjList(), bAdd);
+			_stkM.addBlock(ent.getMapList(), bAdd);
 		}
 		void CTreeObjStackM::popBlock() {
 			_stk.popBlock();

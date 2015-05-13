@@ -33,13 +33,13 @@ namespace boom {
 					AssertP(Trap, _ent[n].isEmpty())
 				}
 				void increment(MortonId num) {
-					AssertP(Trap, _ent[num].nLower >= 0)
-					++_ent[num].nLower;
+					AssertP(Trap, _ent[num].getLowerCount() >= 0)
+					_ent[num].incrementLowerCount();
 				}
 				void decrement(MortonId num) {
 					// カウンタが0になっても何もしない
-					AssertP(Trap, _ent[num].nLower > 0)
-					--_ent[num].nLower;
+					AssertP(Trap, _ent[num].getLowerCount() > 0)
+					_ent[num].decrementLowerCount();
 				}
 				void clear() {
 					for(auto& e : _ent)
