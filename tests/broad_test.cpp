@@ -4,7 +4,7 @@
 #include "test2D.hpp"
 #include "bc_roundrobin.hpp"
 #include <unordered_set>
-#include "../ntree/ntree.hpp"
+#include "../ntree/ntreemap.hpp"
 #include "../ntree/dim2.hpp"
 #include "../ntree/arrayentry.hpp"
 #include "../ntree/hashentry.hpp"
