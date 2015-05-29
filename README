@@ -8,7 +8,7 @@
 <spinnerと同じく開発途中なので実用性はありません>
 依存ライブラリ:
 Spinner
-Boost-1.55.0(boost_regex, boost_serialization, boost_system)
+Boost-1.58.0(boost_regex, boost_serialization, boost_system)
 
 Sphere
 SphereM(末尾のM付きは汎用モデルインタフェース継承)

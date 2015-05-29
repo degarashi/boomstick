@@ -250,9 +250,9 @@ namespace boom {
 						// 直下の子ノードをリストアップ
 						this->template iterateDepthFirst<false>([&pm](auto& node, int depth){
 							if(depth == 0)
-								return TfBase::Iterate::StepIn;
+								return spn::Iterate::StepIn;
 							pm.push_back(&node);
-							return TfBase::Iterate::Next;
+							return spn::Iterate::Next;
 						});
 						if((_bValid = !pm.empty())) {
 							// 境界ボリュームの更新
@@ -297,9 +297,9 @@ namespace boom {
 						// 子ノードをリストアップ
 						this->template iterateDepthFirst<false>([&pm](auto& node, int depth){
 							if(depth == 0)
-								return TfBase::Iterate::StepIn;
+								return spn::Iterate::StepIn;
 							pm.push_back(&node);
-							return TfBase::Iterate::Next;
+							return spn::Iterate::Next;
 						});
 						if((_bValid = !pm.empty())) {
 							// 境界ボリュームの更新

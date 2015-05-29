@@ -119,7 +119,7 @@ namespace boom {
 			spRoot->template iterateDepthFirst<false>([&v](auto& node, int depth){
 				if(node.isLeaf())
 					v.push_back(static_cast<D>(&node));
-				return geo2d::TfBase::Iterate::StepIn;
+				return spn::Iterate::StepIn;
 			});
 			return std::move(v);
 		}
