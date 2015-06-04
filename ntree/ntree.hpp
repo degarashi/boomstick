@@ -363,7 +363,6 @@ namespace boom {
 				template <class T0, class Chk, class Notify>
 				static int _HitCheck(const T0& oL0, const Chk& chk, const Notify& ntf) {
 					int count = 0;
-					int nL = oL0.size();
 					for(auto itr0=oL0.cbegin() ; itr0!=oL0.cend() ; ++itr0) {
 						auto itr1=itr0;
 						++itr1;
