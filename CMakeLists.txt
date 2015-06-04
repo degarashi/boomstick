@@ -10,8 +10,11 @@ aux_source_directory(ntree NTREE_SRC)
 set(LIB_SRC bits.cpp)
 add_library(boomstick STATIC ${MODEL2D} ${MODEL3D} ${NTREE_SRC} ${LIB_SRC} model.cpp)
 install(TARGETS boomstick ARCHIVE DESTINATION lib_${TOOL_PREFIX})
-file(GLOB HEADERS "./*.hpp")
-install(FILES ${HEADERS} DESTINATION include/boomstick)
+
+file(GLOB_RECURSE HEADERS "*.hpp")
+set(COPYHEADERS_EXCLUDE_DIR "spinner")		# ここに除外したいヘッダディレクトリを指定
+set(COPYHEADERS_MY_DIR "boomstick")
+include(crosscompile/CopyHeaders.cmake require)
 
 if(NOT DEFINED ARCHITECTURE)
 	# テストルーチンについては幾つかの警告を抑制する
