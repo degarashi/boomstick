@@ -228,8 +228,8 @@ namespace boom {
 						ASSERT_EQ(c.count(id2), 0);
 						c[id2] = hist.nFrame;
 					});
-					h->getEndCollision([&c, id](auto& hist){
-						auto id2 = id | hist.hCol.getIndex();
+					h->getEndCollision([&c, id](auto&& hist){
+						auto id2 = id | hist.wCol.getIndex();
 						ASSERT_EQ(c.count(id2), 0);
 						c[id2] = -1;
 					});

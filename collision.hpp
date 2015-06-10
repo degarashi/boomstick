@@ -109,8 +109,10 @@ namespace boom {
 									bFound = true;
 								}
 							});
-							if(!bFound)
-								std::forward<CB>(cb)(hPrev);
+							if(!bFound) {
+								// 既に存在しないオブジェクトかも知れないので弱参照だけ渡す
+								std::forward<CB>(cb)(hPrev.asWeak());
+							}
 						});
 					}
 				}
@@ -177,18 +179,29 @@ namespace boom {
 			using base = spn::ResMgrA<CMem, this_t>;
 			// --- collision handle type ----
 			using HCol = typename base::SHdl;
+			using WCol = typename base::WHdl;
 			using HLCol = typename base::LHdl;
+
+			struct HistW {
+				WCol	wCol;
+				int		nFrame;				//!< 衝突継続したフレーム数
+			};
 			// 単方向リスト
 			struct Hist {
 				HCol	hCol;
+				WCol	wCol;
 				int		nFrame;				//!< 衝突継続したフレーム数
 				int		nextOffset;			//!< 次のエントリへのバイトオフセット
 
 				Hist(HCol hc, int nf):
 					hCol(hc),
+					wCol(hc.weak()),
 					nFrame(nf),
 					nextOffset(0)
 				{}
+				HistW asWeak() const {
+					return HistW{wCol, nFrame};
+				}
 			};
 		private:
 			using Narrow = typename Types::Narrow;
