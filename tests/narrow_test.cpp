@@ -117,7 +117,7 @@ namespace boom {
 			// 変換後の座標で直接生成した物(=B)の2種類を用意
 			ShapeM s;
 			test2d::GenRShape(s, rd, spn::RangeF{-1e2f, 1e2f});
-			spn::Pose2D ps(GenR2Vec(rd, {-1e2f, 1e2f}),
+			spn::Pose2D ps(Vec2::Random(rd, {-1e2f, 1e2f}),
 							spn::DegF(rd.template getUniform<float>({-180.f, 180.f})),
 							Vec2(rd.template getUniform<float>({1e-1f, 1e1f})));
 			auto spA = std::make_shared<geo2d::TfLeaf<>>(std::make_shared<ShapeM>(s * ps.getToWorld())),
@@ -127,7 +127,7 @@ namespace boom {
 			// サポート写像が一致するか確認
 			constexpr int nCheck = 100;
 			for(int i=0 ; i<nCheck ; i++) {
-				auto dir = spn::test::GenR2Dir(rd);
+				auto dir = spn::Vec2::RandomDir(rd);
 				auto p0 = spA->im_support(dir);
 				auto p1 = spB->im_support(dir);
 				ASSERT_LE(p0.distance(p1), 5e-3f);
@@ -156,7 +156,7 @@ namespace boom {
 
 			// 基本の形状に姿勢変換を掛けた物(=A)と
 			// 変換後の座標で直接生成した物(=B)の2種類を用意
-			spn::Pose2D ps(GenR2Vec(rd, {-1e3f, 1e3f}),
+			spn::Pose2D ps(Vec2::Random(rd, {-1e3f, 1e3f}),
 							spn::DegF(rd.template getUniform<float>({-180.f, 180.f})),
 							Vec2(rd.template getUniform<float>({1e-2f, 1e2f})));
 			for(auto& vs : vA) {

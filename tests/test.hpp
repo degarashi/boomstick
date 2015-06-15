@@ -6,7 +6,7 @@ namespace boom {
 	namespace test {
 		template <int N, class RD>
 		std::vector<spn::VecT<N,false>> GenRVectors(RD& rd, const int n, const spn::RangeF& rV, const float threshold_sq) {
-			auto rv = [&](){ return spn::test::GenRVec<N,false>(rd, rV); };
+			auto rv = [&](){ return spn::VecT<N,false>::Random(rd, rV); };
 			using Vt = spn::VecT<N,false>;
 			std::vector<Vt> pl(n);
 			for(int i=0 ; i<n ; i++) {

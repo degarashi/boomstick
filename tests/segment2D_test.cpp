@@ -84,7 +84,7 @@ namespace boom {
 
 			spn::RangeF rV{-1e3f, 1e3f};
 			SegmentM s(GenRSegment(rd, rV));
-			auto dir = GenR2Dir(rd);
+			auto dir = spn::Vec2::RandomDir(rd);
 			auto sv = s.support(dir);
 			float dist0 = sv.dist_sq(s.from),
 				  dist1 = sv.dist_sq(s.to),

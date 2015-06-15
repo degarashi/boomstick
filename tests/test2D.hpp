@@ -22,19 +22,19 @@ namespace boom {
 		}
 		template <class RD>
 		geo2d::PointM GenRPoint(RD& rd, const spn::RangeF& r=defval::point_pos) {
-			return geo2d::PointM(spn::test::GenR2Vec(rd, r));
+			return geo2d::PointM(spn::Vec2::Random(rd, r));
 		}
 		template <class RD>
 		geo2d::CircleM GenRCircle(RD& rd, const spn::RangeF& rC=defval::circle_center,
 										const spn::RangeF& rR=defval::circle_radius)
 		{
-			return geo2d::CircleM(spn::test::GenR2Vec(rd, rC),
+			return geo2d::CircleM(spn::Vec2::Random(rd, rC),
 							rd.template getUniform<float>(rR));
 		}
 		template <class RD>
 		geo2d::RayM GenRRay(RD& rd, const spn::RangeF& rV=defval::ray_pos) {
-			return geo2d::RayM(spn::test::GenR2Vec(rd, rV),
-								spn::test::GenR2Dir(rd));
+			return geo2d::RayM(spn::Vec2::Random(rd, rV),
+								spn::Vec2::RandomDir(rd));
 		}
 		template <class RD>
 		geo2d::LineM GenRLine(RD& rd, const spn::RangeF& rV=defval::line_pos) {
@@ -42,19 +42,19 @@ namespace boom {
 		}
 		template <class RD>
 		geo2d::SegmentM GenRSegment(RD& rd, const spn::RangeF& rV=defval::segment_pos) {
-			auto rv = [&](){ return spn::test::GenR2Vec(rd, rV); };
+			auto rv = [&](){ return spn::Vec2::Random(rd, rV); };
 			return geo2d::SegmentM(rv(), rv());
 		}
 		template <class RD>
 		geo2d::CapsuleM GenRCapsule(RD& rd, const spn::RangeF& rV=defval::capsule_pos,
 											const spn::RangeF& rR=defval::capsule_radius) {
-			auto rv = [&](){ return spn::test::GenR2Vec(rd, rV); };
+			auto rv = [&](){ return spn::Vec2::Random(rd, rV); };
 			return geo2d::CapsuleM(rv(), rv(),
 								rd.template getUniform<float>(rR));
 		}
 		template <class RD>
 		geo2d::PolyM GenRPoly(RD& rd, const spn::RangeF& rV=defval::poly_pos) {
-			auto rv = [&](){ return spn::test::GenR2Vec(rd, rV); };
+			auto rv = [&](){ return spn::Vec2::Random(rd, rV); };
 			auto p = geo2d::PolyM(rv(), rv(), rv());
 			// 頂点が時計回りになっているかチェック
 			if(!p.isCW())
@@ -74,7 +74,7 @@ namespace boom {
 		}
 		template <class RD>
 		geo2d::AABBM GenRAABB(RD& rd, const spn::RangeF& rV=defval::aabb_pos) {
-			auto rv = [&](){ return spn::test::GenR2Vec(rd, rV); };
+			auto rv = [&](){ return spn::Vec2::Random(rd, rV); };
 			Vec2 v0 = rv(),
 				 v1 = rv(),
 				 tmp = v0;

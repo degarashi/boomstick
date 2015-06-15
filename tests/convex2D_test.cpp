@@ -54,8 +54,7 @@ namespace boom {
 		}
 		TEST_F(Convex2D, Hit_Point) {
 			auto rd = getRand();
-			auto rc = [&](){ return rd.template getUniform<float>({-1e3f,1e3f}); };
-			auto rv = [&](){ return GenRVec<2,false>(rc); };
+			auto rv = [&](){ return spn::Vec2::Random(rd, {-1e3f,1e3f}); };
 
 			// 凸包の頂点数(3〜64)
 			int np = rd.template getUniform<int>({3, 64});

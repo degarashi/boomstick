@@ -48,7 +48,7 @@ namespace boom {
 			auto rd = getRand();
 
 			CircleM c(GenRCircle(rd, {-1e3f,1e3f}));
-			Vec2 dir(GenR2Dir(rd));
+			Vec2 dir(Vec2::RandomDir(rd));
 			Vec2 sv = c.support(dir);
 
 			// 中心座標からの距離は全てradiusと等しい筈
