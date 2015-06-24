@@ -67,19 +67,19 @@ namespace boom {
 		namespace {
 			//! 形状をランダムに動かす
 			/*! 動かすかどうかもランダム */
-			template <class RD>
-			void MoveShape(RD& rd, geo2d::TfLeafBase* p) {
+			template <class RDF>
+			void MoveShape(const RDF& rdf, geo2d::TfLeafBase* p) {
 				// 50%の確率で動かす = 新たに形状を作成
-				if(rd.template getUniform<int>({0,1}) == 0) {
+				if(static_cast<int>(rdf({0,1+1})) == 0) {
 					void* ms = p->getModelSource()->getCore();
 					switch(p->getCID()) {
 						case CircleM::GetCID(): {
 							auto* pt = reinterpret_cast<Circle*>(ms);
-							*pt = test2d::GenRCircle(rd);
+							*pt = test2d::GenRCircle(rdf);
 							break; }
 						case AABBM::GetCID(): {
 							auto* pt = reinterpret_cast<AABB*>(ms);
-							*pt = test2d::GenRAABB(rd);
+							*pt = test2d::GenRAABB(rdf);
 							break; }
 						default:
 							Assert(Trap, "unknown shape Id")
@@ -89,11 +89,11 @@ namespace boom {
 				}
 			}
 			//! ランダムな階層構造の形状定義
-			template <class CT, class RD, class CM>
-			auto AddRandomTree(RD& rd, CM& cm, int n, CMask mask, typename CM::user_t ud) {
+			template <class CT, class RDF, class CM>
+			auto AddRandomTree(const RDF& rdf, CM& cm, int n, CMask mask, typename CM::user_t ud) {
 				std::vector<typename CM::HLCol> v(n);
 				for(int i=0 ; i<n ; i++) {
-					auto sp = test2d::MakeRandomTree<CT,CT>(rd, 4, 1);
+					auto sp = test2d::MakeRandomTree<CT,CT>(rdf, 4, 1);
 					v[i] = cm.addCol(mask, mgr_model2d.emplace(sp), ud++);
 				}
 				return std::move(v);
@@ -109,17 +109,18 @@ namespace boom {
 			if(!this_t::B_CheckCollision)
 				return;
 
+			auto rdf = rd.template getUniformF<float>();
 			// TypeAを適当に追加
-			auto vA = AddRandomTree<CT>(rd, cm, fnN({0,this_t::N_AObj}), 0x00000001, 0);
+			auto vA = AddRandomTree<CT>(rdf, cm, fnN({0,this_t::N_AObj}), 0x00000001, 0);
 			// TypeBも適当に追加
-			auto vB = AddRandomTree<CT>(rd, cm, fnN({0,this_t::N_BObj}), 0x80000001, 1000);
+			auto vB = AddRandomTree<CT>(rdf, cm, fnN({0,this_t::N_BObj}), 0x80000001, 1000);
 
 			using HCol = typename this_t::HCol;
 			using Narrow_t = typename this_t::Narrow_t;
 			using ColMgr = typename this_t::ColMgr;
 			using MMgr = typename ColMgr::MMgr;
 			using HLMdl = typename ColMgr::HLMdl;
-			HLMdl hlMdl = MMgr::_ref().emplace(test2d::MakeRandomTree<CT,CT>(rd, 4, 1));
+			HLMdl hlMdl = MMgr::_ref().emplace(test2d::MakeRandomTree<CT,CT>(rdf, 4, 1));
 			// RoundRobinクラスによる判定
 			// -> TypeA and TypeBと判定
 			using HCSet = std::unordered_set<HCol>;
@@ -159,12 +160,13 @@ namespace boom {
 
 			auto fnN = [&](const spn::RangeI& r){ return rd.template getUniform<int>(r); };
 			using CT = spn::CType<geo2d::Circle, geo2d::AABB>;
+			auto rdf = rd.template getUniformF<float>();
 			// MSBが0ならTypeA
 			// 目印としてUserData=0x00
-			auto v0 = AddRandomTree<CT>(rd, cm, fnN({0,this_t::N_AObj}), 0x00000001, 0x0000);
+			auto v0 = AddRandomTree<CT>(rdf, cm, fnN({0,this_t::N_AObj}), 0x00000001, 0x0000);
 			// MSBが1ならTypeB
 			// 目印としてUserData=0x01
-			auto v1 = AddRandomTree<CT>(rd, cm, fnN({0,this_t::N_BObj}), 0x80000001, 0x1000);
+			auto v1 = AddRandomTree<CT>(rdf, cm, fnN({0,this_t::N_BObj}), 0x80000001, 0x1000);
 
 			auto fnCollect = [](auto& vleaf, auto* mdl) {
 				auto v = dynamic_cast<geo2d::TfBase*>(mdl)->shared_from_this();
@@ -276,9 +278,9 @@ namespace boom {
 				}
 
 				for(auto* p : leaf0)
-					MoveShape(rd, p);
+					MoveShape(rdf, p);
 				for(auto* p : leaf1)
-					MoveShape(rd, p);
+					MoveShape(rdf, p);
 			}
 		}
 	}

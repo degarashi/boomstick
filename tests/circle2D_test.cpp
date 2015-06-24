@@ -16,9 +16,10 @@ namespace boom {
 		class Circle2D : public spn::test::RandomTestInitializer {};
 		TEST_F(Circle2D, Hit_Point) {
 			auto rd = getRand();
+			auto rdf = rd.template getUniformF<float>();
 
-			CircleM c(GenRCircle(rd));
-			PointM p(GenRPoint(rd));
+			CircleM c(GenRCircle(rdf));
+			PointM p(GenRPoint(rdf));
 
 			bool b0 = c.hit(p);
 			bool b1 = GSimplex(c, p).getResult();
@@ -26,9 +27,10 @@ namespace boom {
 		}
 		TEST_F(Circle2D, Hit_Circle) {
 			auto rd = getRand();
+			auto rdf = rd.template getUniformF<float>();
 
-			CircleM c0(GenRCircle(rd)),
-					c1(GenRCircle(rd));
+			CircleM c0(GenRCircle(rdf)),
+					c1(GenRCircle(rdf));
 
 			bool b0 = c0.hit(c1);
 			bool b1 = GSimplex(c0,c1).getResult();
@@ -36,9 +38,10 @@ namespace boom {
 		}
 		TEST_F(Circle2D, Hit_Segment) {
 			auto rd = getRand();
+			auto rdf = rd.template getUniformF<float>();
 
-			CircleM c(GenRCircle(rd));
-			SegmentM s(GenRSegment(rd));
+			CircleM c(GenRCircle(rdf));
+			SegmentM s(GenRSegment(rdf));
 
 			bool b0 = c.hit(s);
 			bool b1 = GSimplex(c,s).getResult();
@@ -46,9 +49,10 @@ namespace boom {
 		}
 		TEST_F(Circle2D, Support) {
 			auto rd = getRand();
+			auto rdf = rd.template getUniformF<float>();
 
-			CircleM c(GenRCircle(rd, {-1e3f,1e3f}));
-			Vec2 dir(Vec2::RandomDir(rd));
+			CircleM c(GenRCircle(rdf, {-1e3f,1e3f}));
+			Vec2 dir(Vec2::RandomDir(rdf));
 			Vec2 sv = c.support(dir);
 
 			// 中心座標からの距離は全てradiusと等しい筈
@@ -58,16 +62,17 @@ namespace boom {
 		}
 		TEST_F(Circle2D, Boundary) {
 			auto rd = getRand();
+			auto rdf = rd.template getUniformF<float>();
 
 			int n = rd.template getUniform<int>({1,64});
 			std::vector<CircleM> cv;
 			for(int i=0 ; i<n ; i++)
-				cv.push_back(GenRCircle(rd));
+				cv.push_back(GenRCircle(rdf));
 			// ランダムな個数の円で境界(代表)円を算出
 			CircleM cbound(*MakeBoundaryPtr<Circle, geo2d::IModel>(cv.data(), n, sizeof(CircleM), 0));
 
 			for(int i=0 ; i<0x100 ; i++) {
-				CircleM ctest = GenRCircle(rd);
+				CircleM ctest = GenRCircle(rdf);
 				bool b0 = ctest.hit(cbound),
 					 b1 = false;
 				for(int j=0 ; j<n ; j++) {

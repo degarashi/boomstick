@@ -17,8 +17,9 @@ namespace boom {
 		class AABB2D : public spn::test::RandomTestInitializer {};
 		TEST_F(AABB2D, Hit_Point) {
 			auto rd = getRand();
-			PointM p(GenRPoint(rd));
-			AABBM ab(GenRAABB(rd));
+			auto rdf = rd.template getUniformF<float>();
+			PointM p(GenRPoint(rdf));
+			AABBM ab(GenRAABB(rdf));
 			ASSERT_LE(ab.minV.x, ab.maxV.x);
 			ASSERT_LE(ab.minV.y, ab.maxV.y);
 			// AABB -> Point のHit関数をGJK関数で結果を比較
@@ -29,9 +30,10 @@ namespace boom {
 		}
 		TEST_F(AABB2D, Hit_Segment) {
 			auto rd = getRand();
+			auto rdf = rd.template getUniformF<float>();
 			spn::RangeF rV{-1e3f, 1e3f};
-			AABBM ab(GenRAABB(rd));
-			SegmentM s(GenRSegment(rd));
+			AABBM ab(GenRAABB(rdf));
+			SegmentM s(GenRSegment(rdf));
 			bool b0 = ab.hit(s);
 			GSimplex gs(ab, s);
 			bool b1 = gs.getResult();
@@ -39,8 +41,9 @@ namespace boom {
 		}
 		TEST_F(AABB2D, Hit_AABB) {
 			auto rd = getRand();
-			AABBM ab0(GenRAABB(rd)),
-				  ab1(GenRAABB(rd));
+			auto rdf = rd.template getUniformF<float>();
+			AABBM ab0(GenRAABB(rdf)),
+				  ab1(GenRAABB(rdf));
 			bool b0 = ab0.hit(ab1);
 			GSimplex gs(ab0, ab1);
 			bool b1 = gs.getResult();
@@ -48,8 +51,9 @@ namespace boom {
 		}
 		TEST_F(AABB2D, Hit_Circle) {
 			auto rd = getRand();
-			AABBM ab(GenRAABB(rd));
-			CircleM c(GenRCircle(rd));
+			auto rdf = rd.template getUniformF<float>();
+			AABBM ab(GenRAABB(rdf));
+			CircleM c(GenRCircle(rdf));
 
 			bool b0 = false;
 			// 内包判定(Circle in AABB)
@@ -77,16 +81,17 @@ namespace boom {
 		}
 		TEST_F(AABB2D, Boundary) {
 			auto rd = getRand();
+			auto rdf = rd.template getUniformF<float>();
 
 			int n = rd.template getUniform<int>({1,64});
 			std::vector<AABBM> av;
 			for(int i=0 ; i<n ; i++)
-				av.push_back(GenRAABB(rd));
+				av.push_back(GenRAABB(rdf));
 			// ランダムな個数のAABBで境界(代表)AABBを算出
 			AABBM abound(*MakeBoundaryPtr<AABB, geo2d::IModel>(av.data(), n, sizeof(AABBM), 0));
 
 			for(int i=0 ; i<0x100 ; i++) {
-				AABBM atest = GenRAABB(rd);
+				AABBM atest = GenRAABB(rdf);
 				bool b0 = atest.hit(abound),
 					b1 = false;
 				for(int j=0 ; j<n ; j++) {

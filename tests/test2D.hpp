@@ -20,61 +20,60 @@ namespace boom {
 								convex_pos(ray_pos),
 								aabb_pos(ray_pos);
 		}
-		template <class RD>
-		geo2d::PointM GenRPoint(RD& rd, const spn::RangeF& r=defval::point_pos) {
-			return geo2d::PointM(spn::Vec2::Random(rd, r));
+		template <class RDF>
+		geo2d::PointM GenRPoint(const RDF& rdf, const spn::RangeF& r=defval::point_pos) {
+			return geo2d::PointM(spn::Vec2::Random(rdf, r));
 		}
-		template <class RD>
-		geo2d::CircleM GenRCircle(RD& rd, const spn::RangeF& rC=defval::circle_center,
+		template <class RDF>
+		geo2d::CircleM GenRCircle(const RDF& rdf, const spn::RangeF& rC=defval::circle_center,
 										const spn::RangeF& rR=defval::circle_radius)
 		{
-			return geo2d::CircleM(spn::Vec2::Random(rd, rC),
-							rd.template getUniform<float>(rR));
+			return geo2d::CircleM(spn::Vec2::Random(rdf, rC),
+									rdf(rR));
 		}
-		template <class RD>
-		geo2d::RayM GenRRay(RD& rd, const spn::RangeF& rV=defval::ray_pos) {
-			return geo2d::RayM(spn::Vec2::Random(rd, rV),
-								spn::Vec2::RandomDir(rd));
+		template <class RDF>
+		geo2d::RayM GenRRay(const RDF& rdf, const spn::RangeF& rV=defval::ray_pos) {
+			return geo2d::RayM(spn::Vec2::Random(rdf, rV),
+								spn::Vec2::RandomDir(rdf));
 		}
-		template <class RD>
-		geo2d::LineM GenRLine(RD& rd, const spn::RangeF& rV=defval::line_pos) {
-			return GenRRay(rd, rV).asLine();
+		template <class RDF>
+		geo2d::LineM GenRLine(const RDF& rdf, const spn::RangeF& rV=defval::line_pos) {
+			return GenRRay(rdf, rV).asLine();
 		}
-		template <class RD>
-		geo2d::SegmentM GenRSegment(RD& rd, const spn::RangeF& rV=defval::segment_pos) {
-			auto rv = [&](){ return spn::Vec2::Random(rd, rV); };
+		template <class RDF>
+		geo2d::SegmentM GenRSegment(const RDF& rdf, const spn::RangeF& rV=defval::segment_pos) {
+			auto rv = [&](){ return spn::Vec2::Random(rdf, rV); };
 			return geo2d::SegmentM(rv(), rv());
 		}
-		template <class RD>
-		geo2d::CapsuleM GenRCapsule(RD& rd, const spn::RangeF& rV=defval::capsule_pos,
+		template <class RDF>
+		geo2d::CapsuleM GenRCapsule(const RDF& rdf, const spn::RangeF& rV=defval::capsule_pos,
 											const spn::RangeF& rR=defval::capsule_radius) {
-			auto rv = [&](){ return spn::Vec2::Random(rd, rV); };
-			return geo2d::CapsuleM(rv(), rv(),
-								rd.template getUniform<float>(rR));
+			auto rv = [&](){ return spn::Vec2::Random(rdf, rV); };
+			return geo2d::CapsuleM(rv(), rv(), rdf(rR));
 		}
-		template <class RD>
-		geo2d::PolyM GenRPoly(RD& rd, const spn::RangeF& rV=defval::poly_pos) {
-			auto rv = [&](){ return spn::Vec2::Random(rd, rV); };
+		template <class RDF>
+		geo2d::PolyM GenRPoly(const RDF& rdf, const spn::RangeF& rV=defval::poly_pos) {
+			auto rv = [&](){ return spn::Vec2::Random(rdf, rV); };
 			auto p = geo2d::PolyM(rv(), rv(), rv());
 			// 頂点が時計回りになっているかチェック
 			if(!p.isCW())
 				p.invert();
 			return p;
 		}
-		template <class RD>
-		geo2d::ConvexM GenRConvex(RD& rd, const spn::RangeF& rV=defval::convex_pos, int n=-1) {
+		template <class RDF>
+		geo2d::ConvexM GenRConvex(const RDF& rdf, const spn::RangeF& rV=defval::convex_pos, int n=-1) {
 			if(n < 0)
-				n = rd.template getUniform<int>({3, 32});
+				n = static_cast<int>(rdf({3, 32+1}));
 
 			return geo2d::ConvexM(
 					geo2d::Convex::FromConcave(
-						test::GenRVectors<2>(rd, n, rV, NEAR_THRESHOLD_SQ)
+						test::GenRVectors<2>(rdf, n, rV, NEAR_THRESHOLD_SQ)
 					)
 			);
 		}
-		template <class RD>
-		geo2d::AABBM GenRAABB(RD& rd, const spn::RangeF& rV=defval::aabb_pos) {
-			auto rv = [&](){ return spn::Vec2::Random(rd, rV); };
+		template <class RDF>
+		geo2d::AABBM GenRAABB(const RDF& rdf, const spn::RangeF& rV=defval::aabb_pos) {
+			auto rv = [&](){ return spn::Vec2::Random(rdf, rV); };
 			Vec2 v0 = rv(),
 				 v1 = rv(),
 				 tmp = v0;
@@ -132,9 +131,9 @@ namespace boom {
 			return std::make_shared<geo2d::TfNode_Static<T>>();
 		}
 		TfSP GenRNode(int id);
-		template <class RD>
-		TfSP GenRLeaf(RD& rd, int id) {
-			#define MAKELEAF(typ)	case geo2d::typ::GetCID(): return MakeAsLeaf<geo2d::typ>(GenR##typ(rd));
+		template <class RDF>
+		TfSP GenRLeaf(const RDF& rdf, int id) {
+			#define MAKELEAF(typ)	case geo2d::typ::GetCID(): return MakeAsLeaf<geo2d::typ>(GenR##typ(rdf));
 			switch(id) {
 				MAKELEAF(Point)
 				MAKELEAF(Line)
@@ -158,8 +157,8 @@ namespace boom {
 			*dst = T0::GetCID();
 			SetCid(dst+1, (CT<Ts...>*)nullptr);
 		}
-		template <class CTNode, class CTLeaf, class RD>
-		TfSP MakeRandomTree(RD& rd, int nIteration, int maxDepth) {
+		template <class CTNode, class CTLeaf, class RDF>
+		TfSP MakeRandomTree(const RDF& rdf, int nIteration, int maxDepth) {
 			Assert(Trap, nIteration>0)
 			TfSP spRoot;
 			do {
@@ -173,7 +172,7 @@ namespace boom {
 					MNP_MakeChild,		//!< 子ノードを作ってそこにカーソルを移動
 					N_Manipulation
 				};
-				auto fnI = [&rd](const spn::RangeI& r){ return rd.template getUniform<int>(r); };
+				auto fnI = [&rdf](const spn::RangeI& r){ return static_cast<int>(rdf({r.from, r.to+1})); };
 				constexpr int NLeaf = CTLeaf::size,
 								NNode = CTNode::size;
 				int CidId_Leaf[NLeaf],
@@ -189,7 +188,7 @@ namespace boom {
 					int m = fnI({0, N_Manipulation-1});
 					switch(m) {
 						case MNP_Add: {
-							spCursor->addChild(GenRLeaf(rd, CidId_Leaf[fnI({0,NLeaf-1})]));
+							spCursor->addChild(GenRLeaf(rdf, CidId_Leaf[fnI({0,NLeaf-1})]));
 							break; }
 						case MNP_Up:
 							// 深度が0の時は何もしない

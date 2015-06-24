@@ -12,9 +12,10 @@ namespace boom {
 		class Sphere3D : public spn::test::RandomTestInitializer {};
 		TEST_F(Sphere3D, Hit_Point) {
 			auto rd = getRand();
+			auto rdf = rd.template getUniformF<float>();
 
-			auto s = GenRSphere(rd);
-			auto p = GenRPoint(rd);
+			auto s = GenRSphere(rdf);
+			auto p = GenRPoint(rdf);
 			bool b0 = s.hit(p);
 			bool b1 = GSimplex(s, p).getResult();
 			ASSERT_EQ(b0, b1);

@@ -14,10 +14,11 @@ namespace boom {
 		class Segment2D : public spn::test::RandomTestInitializer {};
 		TEST_F(Segment2D, Hit_Point) {
 			auto rd = getRand();
+			auto rdf = rd.template getUniformF<float>();
 			auto rc = [&rd](){ return rd.template getUniform<float>({0, 1.f}); };
 			spn::RangeF rV{-1e3f, 1e3f};
-			SegmentM s(GenRSegment(rd));
-			PointM v(GenRPoint(rd, rV));
+			SegmentM s(GenRSegment(rdf));
+			PointM v(GenRPoint(rdf, rV));
 			// 点との判定がGJKと一致するか
 			auto chk = [&s,&v](){
 				bool b0 = s.hit(v);
@@ -43,9 +44,10 @@ namespace boom {
 		}
 		TEST_F(Segment2D, Nearest_Point) {
 			auto rd = getRand();
+			auto rdf = rd.template getUniformF<float>();
 			spn::RangeF rV{-1e3f, 1e3f};
-			SegmentM s(GenRSegment(rd, rV));
-			PointM p(GenRPoint(rd, rV));
+			SegmentM s(GenRSegment(rdf, rV));
+			PointM p(GenRPoint(rdf, rV));
 			constexpr auto NS = NEAR_THRESHOLD_SQ;
 			// 最近傍点がきちんと線分上に乗っているかのテスト
 			auto res = s.nearest(p);
@@ -66,9 +68,10 @@ namespace boom {
 		TEST_F(Segment2D, Hit_Segment) {
 			// 線分との判定結果をGJKと比較
 			auto rd = getRand();
+			auto rdf = rd.template getUniformF<float>();
 			spn::RangeF rV{-1e3f, 1e3f};
-			SegmentM s0(GenRSegment(rd, rV)),
-					 s1(GenRSegment(rd, rV));
+			SegmentM s0(GenRSegment(rdf, rV)),
+					 s1(GenRSegment(rdf, rV));
 			bool b0 = s0.hit(s1);
 			GSimplex gs(s0, s1);
 			bool b1 = gs.getResult();
@@ -81,10 +84,11 @@ namespace boom {
 		}
 		TEST_F(Segment2D, Support) {
 			auto rd = getRand();
+			auto rdf = rd.template getUniformF<float>();
 
 			spn::RangeF rV{-1e3f, 1e3f};
-			SegmentM s(GenRSegment(rd, rV));
-			auto dir = spn::Vec2::RandomDir(rd);
+			SegmentM s(GenRSegment(rdf, rV));
+			auto dir = spn::Vec2::RandomDir(rdf);
 			auto sv = s.support(dir);
 			float dist0 = sv.dist_sq(s.from),
 				  dist1 = sv.dist_sq(s.to),

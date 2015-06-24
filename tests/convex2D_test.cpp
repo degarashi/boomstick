@@ -19,7 +19,7 @@ namespace boom {
 		TEST_F(Convex2D, BVolume) {
 			auto rd = getRand();
 			int np = rd.template getUniform<int>({3, 64});
-			ConvexM cv = GenRConvex(rd, defval::convex_pos, np);
+			ConvexM cv = GenRConvex(rd. template getUniformF<float>(), defval::convex_pos, np);
 
 			Circle c = cv.bs_getBCircle();
 			// 全ての点が円の中に入ってるかチェック
@@ -32,7 +32,7 @@ namespace boom {
 			auto rcf = [&](){ return rd.template getUniform<float>({0, 1.f}); };
 
 			int np = rd.template getUniform<int>({3, 64});
-			ConvexM cv = GenRConvex(rd, defval::convex_pos, np);
+			ConvexM cv = GenRConvex(rd.template getUniformF<float>(), defval::convex_pos, np);
 			np = cv.getNPoints();
 			ASSERT_TRUE(cv.checkCW());
 			Vec2 center = (cv.getPoint(0) + cv.getPoint(1) + cv.getPoint(2)) / 3.f;
@@ -54,22 +54,24 @@ namespace boom {
 		}
 		TEST_F(Convex2D, Hit_Point) {
 			auto rd = getRand();
-			auto rv = [&](){ return spn::Vec2::Random(rd, {-1e3f,1e3f}); };
+			auto rdf = rd.template getUniformF<float>();
+			auto rv = [&](){ return spn::Vec2::Random(rdf, {-1e3f,1e3f}); };
 
 			// 凸包の頂点数(3〜64)
 			int np = rd.template getUniform<int>({3, 64});
-			ConvexM c = GenRConvex(rd, defval::convex_pos, np);
-			PointM p(GenRPoint(rd, {-1e3f, 1e3f}));
+			ConvexM c = GenRConvex(rdf, defval::convex_pos, np);
+			PointM p(GenRPoint(rdf, {-1e3f, 1e3f}));
 			bool b0 = c.hit(p);
 			bool b1 = GSimplex(c,p).getResult();
 			ASSERT_EQ(b0, b1);
 		}
 		TEST_F(Convex2D, Hit_Convex) {
 			auto rd = getRand();
+			auto rdf = rd.template getUniformF<float>();
 			auto rnp = [&](){ return rd.template getUniform<int>({3, 64}); };
 			// 凸包の頂点数(3〜64)
-			ConvexM c0 = GenRConvex(rd, {-1e2f, 1e2f}, rnp()),
-					c1 = GenRConvex(rd, {-1e2f, 1e2f}, rnp());
+			ConvexM c0 = GenRConvex(rdf, {-1e2f, 1e2f}, rnp()),
+					c1 = GenRConvex(rdf, {-1e2f, 1e2f}, rnp());
 			int nc0 = c0.getNPoints(),
 				nc1 = c1.getNPoints();
 			// ポリゴンを総当りで地道に(確実に)判定

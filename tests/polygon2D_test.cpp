@@ -13,7 +13,8 @@ namespace boom {
 		class Poly2D : public spn::test::RandomTestInitializer {};
 		TEST_F(Poly2D, BVolume) {
 			auto rd = getRand();
-			PolyM p(GenRPoly(rd, {-1e2f, 1e2f}));
+			auto rdf = rd.template getUniformF<float>();
+			PolyM p(GenRPoly(rdf, {-1e2f, 1e2f}));
 			Circle c = p.bs_getBCircle();
 
 			for(auto& p2 : p.point) {
@@ -22,10 +23,11 @@ namespace boom {
 		}
 		TEST_F(Poly2D, Triangle) {
 			auto rd = getRand();
+			auto rdf = rd.template getUniformF<float>();
 			spn::RangeF rV{0,1};
 
-			PolyM p(GenRPoly(rd, rV));
-			auto rc = [&](){ return rd.template getUniform<float>(rV); };
+			PolyM p(GenRPoly(rdf, rV));
+			auto rc = [&](){ return rdf(rV); };
 			// 3頂点を合計1になるような係数で合成した座標は必ず三角形の中に入る
 			float c[3];
 			c[0] = rc();

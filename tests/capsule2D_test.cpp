@@ -13,9 +13,10 @@ namespace boom {
 		class Capsule2D : public spn::test::RandomTestInitializer {};
 		TEST_F(Capsule2D, Hit_Point) {
 			auto rd = getRand();
+			auto rdf = rd.template getUniformF<float>();
 
-			CapsuleM c(GenRCapsule(rd));
-			PointM p(GenRPoint(rd));
+			CapsuleM c(GenRCapsule(rdf));
+			PointM p(GenRPoint(rdf));
 
 			bool b0 = c.hit(p);
 			bool b1 = GSimplex(c, p).getResult();
@@ -25,10 +26,11 @@ namespace boom {
 		}
 		TEST_F(Capsule2D, Hit_Capsule) {
 			auto rd = getRand();
+			auto rdf = rd.template getUniformF<float>();
 
 			auto range = spn::RangeF{0, 1e2f};
-			CapsuleM c0(GenRCapsule(rd, range, range)),
-					 c1(GenRCapsule(rd, range, range));
+			CapsuleM c0(GenRCapsule(rdf, range, range)),
+					 c1(GenRCapsule(rdf, range, range));
 			bool b0 = c0.hit(c1);
 			bool b1 = GSimplex(c0, c1).getResult();
 			geo2d::Segment s0(c0.from, c0.to),

@@ -12,9 +12,10 @@ namespace boom {
 		class Point2D : public spn::test::RandomTestInitializer {};
 		TEST_F(Point2D, Hit_Point) {
 			auto rd = getRand();
+			auto rdf = rd.template getUniformF<float>();
 
-			PointM p0(GenRPoint(rd)),
-				   p1(GenRPoint(rd));
+			PointM p0(GenRPoint(rdf)),
+				   p1(GenRPoint(rdf));
 			// Point -> Point の、Hit関数とGJK関数で結果が一致するかチェック
 			bool b0 = p0.hit(p1);
 			GSimplex gs(p0, p1);

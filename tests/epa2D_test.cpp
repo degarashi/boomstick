@@ -18,27 +18,28 @@ namespace boom {
 		namespace {
 			const spn::RangeF c_rangeV{-1e2f, 1e2f},
 								c_rangeR{0, 1e2f};
-			template <class RD>
-			void GenRShapeEPA(geo2d::CircleM& c, RD& rd) {
-				test2d::GenRShape(c, rd, c_rangeV, c_rangeR);
+			template <class RDF>
+			void GenRShapeEPA(geo2d::CircleM& c, const RDF& rdf) {
+				test2d::GenRShape(c, rdf, c_rangeV, c_rangeR);
 			}
-			template <class S, class RD>
-			void GenRShapeEPA(S& s, RD& rd) {
-				test2d::GenRShape(s, rd, c_rangeV);
+			template <class S, class RDF>
+			void GenRShapeEPA(S& s, const RDF& rdf) {
+				test2d::GenRShape(s, rdf, c_rangeV);
 			}
-			template <class RD>
-			void GenRShapeEPA(geo2d::ConvexM& c, RD& rd) {
-				test2d::GenRShape(c, rd, c_rangeV);
+			template <class RDF>
+			void GenRShapeEPA(geo2d::ConvexM& c, const RDF& rdf) {
+				test2d::GenRShape(c, rdf, c_rangeV);
 			}
 		}
 
 		TYPED_TEST(Epa2D, Epa) {
 			auto rd = this->getRand();
+			auto rdf = rd.template getUniformF<float>();
 
 			using ShapeM = geo2d::Model<TypeParam>;
 			ShapeM c0, c1;
-			GenRShapeEPA(c0, rd);
-			GenRShapeEPA(c1, rd);
+			GenRShapeEPA(c0, rdf);
+			GenRShapeEPA(c1, rdf);
 			constexpr float ErrorAdjust = 5e-3f,
 							MinDist = 1e-3f,
 							HitPoint_Dist = 1e-2f;
