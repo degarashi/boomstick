@@ -312,7 +312,12 @@ namespace boom {
 			return std::make_pair(posf, tmpA.index);
 		}
 		bool Convex::hit(const Vec2& p, float t) const {
-			return checkPosition(p, t).first != ConvexPos::Outer;
+			int sz = point.size();
+			for(int i=0 ; i<sz ; i++) {
+				if((point[(i+1)%sz] - point[i]).cw(p - point[i]) < -t)
+					return false;
+			}
+			return true;
 		}
 		std::tuple<float,float,Vec2> Convex::area_inertia_center() const {
 			int nL = point.size();
