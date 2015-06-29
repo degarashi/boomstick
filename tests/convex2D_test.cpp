@@ -27,7 +27,7 @@ namespace boom {
 				ASSERT_LE(c.vCenter.distance(p), c.fRadius + NEAR_THRESHOLD);
 			}
 		}
-		TEST_F(Convex2D, CheckPosition) {
+		TEST_F(Convex2D, CheckPosition_0) {
 			auto rd = getRand();
 			auto rcf = [&](){ return rd.template getUniform<float>({0, 1.f}); };
 
@@ -50,6 +50,19 @@ namespace boom {
 				auto res = cv.checkPosition(tmp);
 				EXPECT_NE(ConvexPos::Outer, res.first);
 				EXPECT_EQ(i, res.second);
+			}
+		}
+		TEST_F(Convex2D, CheckPosition_1) {
+			auto rd = getRand();
+			auto rdf = rd.template getUniformF<float>();
+			auto rnp = [&](){ return rd.template getUniform<int>({3, 64}); };
+			ConvexM c = GenRConvex(rdf, {-1e2f, 1e2f}, rnp());
+			PointM p = GenRPoint(rdf, {-1e2f, 1e2f});
+			auto res = c.checkPosition(p).first;
+			if(c.hit(p)) {
+				ASSERT_NE(ConvexPos::Outer, res);
+			} else {
+				ASSERT_EQ(ConvexPos::Outer, res);
 			}
 		}
 		TEST_F(Convex2D, Hit_Point) {
