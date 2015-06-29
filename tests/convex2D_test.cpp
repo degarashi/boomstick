@@ -162,5 +162,35 @@ namespace boom {
 				}
 			}
 		}
+		TEST_F(Convex2D, ConcaveToMonotone) {
+			auto rd = getRand();
+			auto rff = rd.template getUniformF<float>();
+			auto rfi = rd.template getUniformF<int>();
+			auto cc = ConcavePolygon::Random(rff, rfi, {-1e2f, 1e2f}, 2);
+
+			auto pts = cc.getPoints();
+			Vec2 dir(1,0);
+			std::vector<Convex>	cnvV;
+			Convex::ConcaveToMonotone(pts, dir, [&dir, &cnvV](geo2d::PointL&& pl){
+				// ちゃんとMonotoneになってるかチェック
+				ASSERT_TRUE(Convex::IsMonotone(pl, dir));
+				Convex::MonotoneToConvex(pl, dir, [&cnvV](Convex&& c){
+					// Convexのテストは他でやってるのでここではしない
+					cnvV.push_back(std::move(c));
+				});
+			});
+
+			constexpr int NCheck = 0x100;
+			for(int i=0 ; i<NCheck ; i++) {
+				auto p = GenRPoint(rff);
+				bool b0 = cc.hit(p),
+					 b1 = false;
+				for(auto& c : cnvV) {
+					if((b1 = c.hit(p)))
+						break;
+				}
+				ASSERT_EQ(b0, b1);
+			}
+		}
 	}
 }

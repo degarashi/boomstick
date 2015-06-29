@@ -1,4 +1,5 @@
 #include "geom2D.hpp"
+#include <unordered_set>
 #include <spinner/structure/cyclevalue.hpp>
 
 namespace boom {
@@ -266,6 +267,112 @@ namespace boom {
 				}
 			}
 			fnMergeTriangle(cb);
+		}
+		void Convex::ConcaveToMonotone(const PointL& pts, const Vec2& dir, const CBPoints& cb) {
+			int sz = pts.size();
+			Assert(Trap, sz >= 3)
+			if(sz < 4) {
+				cb(PointL(pts));
+				return;
+			}
+			// Dir方向でソートする
+			auto ia = MakeIndexArray(pts, dir);
+			// 頂点インデックスからソート済みのデータを参照出来るようにしておく
+			std::vector<SortPairV::const_iterator> idxToIA(sz);
+			for(auto itr=ia.cbegin() ; itr!=ia.cend() ; itr++)
+				idxToIA[itr->first] = itr;
+			enum class Type {
+				Merge,
+				Split,
+				None
+			};
+			// idx = ソート前の実インデックス
+			auto fnType = [&idxToIA](const auto& idx){
+				const int idx_p = (idx - 1).get(),
+							idx_n = (idx + 1).get();
+				const auto &itr = idxToIA[idx.get()],
+							&itr_p = idxToIA[idx_p],
+							&itr_n = idxToIA[idx_n];
+				const float dt = itr->second.x,
+							dt_p = itr_p->second.x - dt,
+							dt_n = itr_n->second.x - dt;
+				if(dt_p * dt_n < 0)
+					return Type::None;
+				const Vec2 &pt = itr->second,
+							&pt_p = itr_p->second,
+							&pt_n = itr_n->second;
+				float cw = (pt_p - pt).cw(pt_n - pt);
+				if(cw > 0) {
+					if(dt_p > 0) {
+						// 両方共ラインの右
+						return Type::Split;
+					} else {
+						// 両方共ラインの左
+						return Type::Merge;
+					}
+				}
+				return Type::None;
+			};
+			using IdxPair = std::unordered_map<int,int>;
+			IdxPair ivm;
+			// merge point, split point を探す
+			for(int i=0 ; i<sz ; i++) {
+				int idx = ia[i].first;
+				switch(fnType(spn::CyInt(idx, sz, spn::CyInt::AsInRange))) {
+					case Type::Merge: {
+						// 右の最寄り頂点
+						Assert(Trap, i+1 < sz)
+						int idx_to = ia[i+1].first;
+						// リンクを設定
+						ivm.emplace(idx, idx_to);
+						ivm.emplace(idx_to, idx);
+						break; }
+					case Type::Split: {
+						// 左の最寄り頂点
+						Assert(Trap, i>=1)
+						int idx_to = ia[i-1].first;
+						// リンクを設定
+						ivm.emplace(idx, idx_to);
+						ivm.emplace(idx_to, idx);
+						break; }
+					case Type::None:
+						break;
+				}
+			}
+
+			std::unordered_set<EdgeIndex> eset;
+			// 終了地点は開始と同じにする
+			// first=巡回開始インデックス
+			// second=巡回終了インデックス(これ自体は含まない)
+			using IdxStack = std::vector<std::pair<spn::CyInt, spn::CyInt>>;
+			auto fnInt = spn::CyInt::MakeValueF(sz);
+			IdxStack stk = {{fnInt(0), fnInt(0)}};
+			while(!stk.empty()) {
+				auto loop = stk.back();
+				stk.pop_back();
+
+				PointL pl;
+				pl.push_back(pts[loop.first]);
+				loop.first += 1;
+				while(loop.first != loop.second) {
+					auto itr = ivm.find(loop.first);
+					if(itr != ivm.end()) {
+						if(eset.count(EdgeIndex(itr->first, itr->second)) == 0) {
+							eset.emplace(EdgeIndex(itr->first, itr->second));
+							eset.emplace(EdgeIndex(itr->second, itr->first));
+							// 頂点分岐先は後で辿る
+							stk.push_back({fnInt(loop.first), fnInt(loop.first)});
+						}
+						pl.push_back(pts[loop.first]);
+						loop.first = itr->second;
+					} else {
+						pl.push_back(pts[loop.first]);
+						loop.first += 1;
+					}
+				}
+				// コールバック関数に送出
+				cb(std::move(pl));
+			}
 		}
 		bool Convex::IsMonotone(const PointL& pts, const Vec2& dir) {
 			// dir方向についてソート

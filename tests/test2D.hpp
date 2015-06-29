@@ -27,6 +27,30 @@ namespace boom {
 				bool hit(const spn::Vec2& p, float threshold=NEAR_THRESHOLD) const;
 				static MonoPolygon Random(const FRandF& rff, const FRandI& rfi, const spn::RangeF& rV, const spn::RangeF& rLen, int nMaxV);
 		};
+		/*! 3角ポリゴンを1つずつ加えていって最後に外周をとればConcaveになる
+			3角ポリゴンの集合体なので
+			当たり判定のチェックは容易に出来る */
+		class ConcavePolygon {
+			template <class T>
+			struct Neighbor {
+				T*	pNeighbor;
+				int	edgeId;		//!< pNeighbor側のエッジ
+			};
+			template <class T>
+			using PtrT = std::array<Neighbor<T>, 3>;
+			using IdxT = IdxTriangleDataR<PtrT>;
+			using PolyPV = std::vector<IdxT*>;
+			private:
+				geo2d::PointL	_vtx;
+				PolyPV			_poly;
+
+				ConcavePolygon() = default;
+			public:
+				geo2d::PointL getPoints() const;
+				bool hit(const spn::Vec2& p, float threshold=NEAR_THRESHOLD) const;
+				static ConcavePolygon Random(const FRandF& rff, const FRandI& rfi, const spn::RangeF& rV, int nPoly);
+		};
+
 		using RangeF_OP = spn::Optional<spn::RangeF>;
 		using Int_OP = spn::Optional<int>;
 		namespace defval {
