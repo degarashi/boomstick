@@ -117,5 +117,50 @@ namespace boom {
 				ASSERT_TRUE(Convex::IsConvex(c.point));
 			}
 		}
+		TEST_F(Convex2D, MonotoneToConvex) {
+			auto rd = getRand();
+			auto rff = rd.template getUniformF<float>();
+			auto rfi = rd.template getUniformF<int>();
+			auto mp = MonoPolygon::Random(rff, rfi,
+											{-1e2f, 1e2f},
+											{1.f, 1e2f},
+											32);
+			auto pts = mp.getPoints();
+			auto& dir = mp.getDir();
+			ASSERT_TRUE(Convex::IsMonotone(pts, dir));
+
+			std::vector<geo2d::Convex>	cnvL;
+			ASSERT_NO_FATAL_FAILURE(Convex::MonotoneToConvex(pts, dir, [&cnvL](Convex&& cnv){
+				// ちゃんとConvexになってるかチェック
+				ASSERT_TRUE(Convex::IsConvex(cnv.point));
+				cnvL.emplace_back(std::move(cnv));
+			}));
+
+			// 生成されたConvex群の判定結果とMonotonePolygonの判定結果を比べる
+			// Convexの集合とMonotoneが同じ形状かを判定
+			constexpr int NCheck = 0x100;
+			for(int i=0 ; i<NCheck ; i++) {
+				auto p = GenRPoint(rff);
+				bool b0 = mp.hit(p, 0.f),
+					 b1 = false;
+				for(auto& c : cnvL) {
+					if((b1 = c.hit(p, 0.f)))
+						break;
+				}
+				// 誤差を考慮し、片方だけが衝突している場合は他方の誤差値を増やして再トライ
+				if(b0 != b1) {
+					if(!b0) {
+						b0 = mp.hit(p, 1e-2f);
+						ASSERT_TRUE(b0);
+					} else {
+						for(auto& c : cnvL) {
+							if((b1 = c.hit(p, 1e-2f)))
+								break;
+						}
+						ASSERT_TRUE(b1);
+					}
+				}
+			}
+		}
 	}
 }

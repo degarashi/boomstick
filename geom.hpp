@@ -12,6 +12,56 @@
 #include "handle.hpp"
 
 namespace boom {
+	struct EdgeIndex : std::pair<int,int> {
+		using base_t = std::pair<int,int>;
+		using base_t::base_t;
+
+		EdgeIndex getInverted() const {
+			return {second, first};
+		}
+	};
+	struct IdxTriangle {
+		int index[3];
+
+		EdgeIndex getEdge(int n) const {
+			return std::make_pair(index[n], index[(n+1)%3]);
+		}
+		//! Edgeに属さない頂点番号を取得
+		int getNonEdgePoint(int eId) const {
+			constexpr int lst[] = {2, 0, 1};
+			return index[lst[eId]];
+		}
+	};
+	template <class T>
+	struct IdxTriangleData : IdxTriangle {
+		T	data;
+
+		IdxTriangleData() = default;
+		IdxTriangleData(const IdxTriangle& base, const T& ta):
+			IdxTriangle(base),
+			data(ta)
+		{}
+	};
+	template <template <class> class T>
+	struct IdxTriangleDataR : IdxTriangle {
+		using Data_t = T<IdxTriangleDataR>;
+		Data_t	data;
+
+		IdxTriangleDataR() = default;
+		IdxTriangleDataR(const IdxTriangle& base, const Data_t& ta):
+			IdxTriangle(base),
+			data(ta)
+		{}
+	};
+}
+template <>
+struct std::hash<boom::EdgeIndex> {
+	std::size_t operator()(const boom::EdgeIndex& e) const {
+		std::hash<int> h;
+		return h(e.first) ^ h(e.second);
+	}
+};
+namespace boom {
 	constexpr static float DOT_THRESHOLD = 1e-4f,		//!< 内積による表裏判定基準
 							NEAR_THRESHOLD = 1e-4f,		//!< 同じ座標と判断する基準
 							ZEROVEC_LENGTH = 1e-5f,

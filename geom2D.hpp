@@ -540,7 +540,11 @@ namespace boom {
 			Convex(Convex&& c);
 			Convex& operator = (Convex&& c);
 
+			using CBConvex = std::function<void (Convex&&)>;
+			static void MonotoneToConvex(const PointL& pts, const Vec2& dir, const CBConvex& cb);
+			static bool IsMonotone(const PointL& pts, const Vec2& dir);
 			static bool IsConvex(const PointL& pts);
+			//! 凹ポリゴンを内包するような凸形状を求める
 			static Convex FromConcave(const PointL& src);
 			bool addPoint(const Vec2& p);
 			// -----------------------------

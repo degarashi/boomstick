@@ -5,6 +5,28 @@
 
 namespace boom {
 	namespace test2d {
+		template <class T>
+		using FRand = std::function<T (const spn::Range<T>&)>;
+		using FRandF = FRand<float>;
+		using FRandI = FRand<int>;
+		// Monotoneの内部距離をとっとけば点との判定可能
+		class MonoPolygon {
+			using DistV = std::vector<Vec2>;
+			private:
+				spn::Vec2		_vOrigin,
+								_vDir;		//!< 軸方向
+				// 主軸で左右に分けた場合の頂点数と原点からの距離
+				DistV			_distL,
+								_distR;
+				float			_widthOffset;
+
+				MonoPolygon(DistV&& dL, DistV&& dR, const Vec2& ori, const Vec2& dir, float wofs);
+			public:
+				geo2d::PointL getPoints() const;
+				const spn::Vec2& getDir() const;
+				bool hit(const spn::Vec2& p, float threshold=NEAR_THRESHOLD) const;
+				static MonoPolygon Random(const FRandF& rff, const FRandI& rfi, const spn::RangeF& rV, const spn::RangeF& rLen, int nMaxV);
+		};
 		using RangeF_OP = spn::Optional<spn::RangeF>;
 		using Int_OP = spn::Optional<int>;
 		namespace defval {

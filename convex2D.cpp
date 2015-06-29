@@ -1,4 +1,5 @@
 #include "geom2D.hpp"
+#include <spinner/structure/cyclevalue.hpp>
 
 namespace boom {
 	namespace geo2d {
@@ -66,6 +67,27 @@ namespace boom {
 			pts.resize(pDst - &pts[0]);
 			return Convex(std::move(pts));
 		}
+		namespace {
+			using SortPair = std::pair<int, Vec2>;
+			using SortPairV = std::vector<SortPair>;
+			SortPairV MakeIndexArray(const PointL& pts, const Vec2& dir) {
+				Vec2 dir90(-dir.y, dir.x);
+				Mat22 m(dir.x, dir90.x,
+						dir.y, dir90.y);
+				int sz = pts.size();
+				SortPairV index(sz);
+				for(int i=0 ; i<sz ; i++)
+					index[i] = std::make_pair(i, pts[i] * m);
+				std::sort(index.begin(), index.end(), [](const auto& p0, const auto& p1){
+					return p0.second.x < p1.second.x;
+				});
+				return std::move(index);
+			}
+			struct IdxCursor {
+				spn::CyInt	cw,
+							ccw;
+			};
+		}
 		bool Convex::addPoint(const Vec2& p) {
 			int sz = point.size();
 			Assert(Trap, sz >= 3)
@@ -106,6 +128,165 @@ namespace boom {
 					if((pts[j+1] - pts[j]).cw(pt - pts[j]) < -1e4f)
 						return false;
 				}
+			}
+			return true;
+		}
+		void Convex::MonotoneToConvex(const PointL& pts, const Vec2& dir, const CBConvex& cb) {
+			int sz = pts.size();
+			Assert(Trap, sz>=3)
+			if(sz < 4) {
+				cb(PointL(pts));
+				return;
+			}
+			auto fnIsCW = [&pts](int i0, int i1, int i2) {
+				auto& pt0 = pts[i0];
+				return (pts[i1] - pt0).cw(pts[i2] - pt0) > 0;
+			};
+			using IdxTriangle = IdxTriangleData<bool>;
+			struct IdxLink {
+				IdxTriangle*	pTri;
+				int				edgeId;
+			};
+			std::unordered_map<EdgeIndex, IdxLink>	edgeMap;
+			std::vector<std::unique_ptr<IdxTriangle>>	idxTriangle;
+			auto fnMergeTriangle = [&pts, &edgeMap, &idxTriangle](const auto& cb){
+				for(auto& t : idxTriangle) {
+					if(!t->data) {
+						t->data = true;
+						// 最初のConvexを生成
+						Convex cnv{pts[t->index[0]], pts[t->index[1]], pts[t->index[2]]};
+						std::vector<IdxLink> cand;
+						// 隣接ポリゴンを連結していく
+						for(int i=0 ; i<3 ; i++) {
+							auto edge = t->getEdge(i);
+							std::swap(edge.first, edge.second);
+							auto itr = edgeMap.find(edge);
+							if(itr != edgeMap.end())
+								cand.push_back(itr->second);
+						}
+						while(!cand.empty()) {
+							auto p = cand.back();
+							cand.pop_back();
+							if(p.pTri->data)
+								continue;
+							int ptId = p.pTri->getNonEdgePoint(p.edgeId);
+								Assert(Trap, Convex::IsConvex(cnv.point))
+							if(cnv.addPoint(pts[ptId])) {
+								Assert(Trap, Convex::IsConvex(cnv.point))
+								p.pTri->data = true;
+								// 追加できたのなら他の候補を追加
+								for(int i=0 ; i<3; i++) {
+									if(i!=p.edgeId) {
+										auto edge = p.pTri->getEdge(i);
+										std::swap(edge.first, edge.second);
+										auto itr = edgeMap.find(edge);
+										if(itr != edgeMap.end())
+											cand.push_back(itr->second);
+									}
+								}
+							}
+						}
+						// 最後にConvexを出力
+						cb(std::move(cnv));
+					}
+				}
+			};
+			auto fnOutputTriangle = [&edgeMap, &idxTriangle](int i0, int i1, int i2){
+				idxTriangle.emplace_back(new IdxTriangle{{{i0,i1,i2}}, false});
+				auto* pTri = idxTriangle.back().get();
+				Assert(Trap, edgeMap.count(std::make_pair(i0, i1))==0)
+				Assert(Trap, edgeMap.count(std::make_pair(i1, i2))==0)
+				Assert(Trap, edgeMap.count(std::make_pair(i2, i0))==0)
+				edgeMap.emplace(std::make_pair(i0, i1), IdxLink{pTri, 0});
+				edgeMap.emplace(std::make_pair(i1, i2), IdxLink{pTri, 1});
+				edgeMap.emplace(std::make_pair(i2, i0), IdxLink{pTri, 2});
+			};
+			auto fnOutputStack = [&fnOutputTriangle](const bool bc, auto& stk, int idxCw, int idxCcw, int cur) {
+				if(bc) {
+					// 直前までCwだったケース
+					for(int i=0 ; i<stk.size()-1 ; i++)
+						fnOutputTriangle(cur, stk[i], stk[i+1]);
+				} else {
+					// 直前までCcwだったケース
+					for(int i=0 ; i<stk.size()-1 ; i++)
+						fnOutputTriangle(cur, stk[i+1], stk[i]);
+				}
+			};
+			auto fnChkAndOutput = [&fnOutputTriangle, &fnIsCW](int i0, int i1, int i2) {
+				if(fnIsCW(i0,i1,i2)) {
+					fnOutputTriangle(i0,i1,i2);
+					return true;
+				}
+				return false;
+			};
+			bool bCw = true;			//< Cw,Ccwどちらがstkを使っているか
+			std::vector<int>	stk;
+			auto ia = MakeIndexArray(pts, dir);
+			// 紐の両端
+			auto fnInt = spn::CyInt::MakeValueF(sz);
+			auto idx_cw = fnInt(1),
+				idx_ccw = fnInt(0);
+			if(fnInt(ia[idx_cw].first-1) != ia[idx_ccw].first)
+				std::swap(idx_cw, idx_ccw);
+			idx_cw.set(ia[idx_cw].first);
+			idx_ccw.set(ia[idx_ccw].first);
+
+			stk = {idx_ccw, idx_cw};
+			for(int cur=2 ; cur<sz ; cur++) {
+				auto& a = ia[cur];
+				if(a.first == idx_cw+1) {
+					if(!bCw) {
+						fnOutputStack(bCw, stk, idx_cw, idx_ccw, a.first);
+						bCw = true;
+						stk = {idx_ccw};
+					} else {
+						while(stk.size() > 1) {
+							if(fnChkAndOutput(stk[stk.size()-2], stk[stk.size()-1], a.first))
+								stk.pop_back();
+							else break;
+						}
+					}
+					stk.push_back(a.first);
+					idx_cw = a.first;
+				} else {
+					Assert(Trap, a.first==idx_ccw-1)
+					if(bCw) {
+						fnOutputStack(bCw, stk, idx_cw, idx_ccw, a.first);
+						bCw = false;
+						stk = {idx_cw};
+					} else {
+						while(stk.size() > 1) {
+							if(fnChkAndOutput(stk[stk.size()-2], a.first, stk[stk.size()-1]))
+								stk.pop_back();
+							else break;
+						}
+					}
+					stk.push_back(a.first);
+					idx_ccw = a.first;
+				}
+			}
+			fnMergeTriangle(cb);
+		}
+		bool Convex::IsMonotone(const PointL& pts, const Vec2& dir) {
+			// dir方向についてソート
+			int sz = pts.size();
+			Assert(Trap, sz >= 3)
+			if(sz < 4)
+				return true;
+			auto ia = MakeIndexArray(pts, dir);
+			auto fnInt = spn::CyInt::MakeValueF(sz);
+			IdxCursor cur{fnInt(ia[0].first),
+							fnInt(ia[0].first)};
+			// 最初の2点を基準にする
+			for(int idx=1 ; idx<sz-1 ; idx++) {
+				auto& p = ia[idx];
+				// 何れかのカーソルと隣接してなければMonotoneではない
+				if((cur.cw+1) == p.first) {
+					cur.cw = p.first;
+				} else if((cur.ccw-1) == p.first) {
+					cur.ccw = p.first;
+				} else
+					return false;
 			}
 			return true;
 		}
