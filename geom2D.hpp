@@ -542,6 +542,7 @@ namespace boom {
 
 			static bool IsConvex(const PointL& pts);
 			static Convex FromConcave(const PointL& src);
+			bool addPoint(const Vec2& p);
 			// -----------------------------
 			float bs_getArea() const;
 			Circle bs_getBCircle() const;

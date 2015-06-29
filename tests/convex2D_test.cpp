@@ -94,5 +94,15 @@ namespace boom {
 			// 結果を比較
 			ASSERT_EQ(b0, b1);
 		}
+		TEST_F(Convex2D, AddPoint) {
+			auto rd = getRand();
+			auto rdf = rd.template getUniformF<float>();
+			auto rnp = [&](){ return rd.template getUniform<int>({3, 64}); };
+			ConvexM c = GenRConvex(rdf, {-1e2f, 1e2f}, rnp());
+			PointM p = GenRPoint(rdf, {-1e2f, 1e2f});
+			if(c.addPoint(p)) {
+				ASSERT_TRUE(Convex::IsConvex(c.point));
+			}
+		}
 	}
 }

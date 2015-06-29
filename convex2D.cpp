@@ -66,6 +66,34 @@ namespace boom {
 			pts.resize(pDst - &pts[0]);
 			return Convex(std::move(pts));
 		}
+		bool Convex::addPoint(const Vec2& p) {
+			int sz = point.size();
+			Assert(Trap, sz >= 3)
+			auto res = checkPosition(p);
+			if(res.first == ConvexPos::Inner) {
+				// pが凸包内部にある場合は追加出来ない
+				return false;
+			}
+			bool bResult = false;
+			if(res.first == ConvexPos::OnLine) {
+				// エッジ上にあるならOk
+				bResult = true;
+			} else if(res.first == ConvexPos::Outer) {
+				// 左側のエッジの右側で
+				if(getOuterLine(spn::CndSub(res.second+1, sz, sz)).checkSide(p) != LineDivision::Ccw) {
+					// 右側のエッジの左側にあれば
+					if(getOuterLine(spn::CndAdd(res.second-1, 0, sz)).checkSide(p) != LineDivision::Ccw) {
+						// 凸形状を保てるのでOk
+						bResult = true;
+					}
+				}
+			}
+			if(bResult) {
+				point.emplace(point.begin()+res.second+1, p);
+				return true;
+			}
+			return false;
+		}
 		bool Convex::IsConvex(const PointL& pts) {
 			int sz = pts.size();
 			if(sz < 3)
