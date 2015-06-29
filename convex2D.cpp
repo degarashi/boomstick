@@ -66,6 +66,21 @@ namespace boom {
 			pts.resize(pDst - &pts[0]);
 			return Convex(std::move(pts));
 		}
+		bool Convex::IsConvex(const PointL& pts) {
+			int sz = pts.size();
+			if(sz < 3)
+				return false;
+			if(sz == 3)
+				return true;
+			for(int i=0 ; i<sz ; i++) {
+				auto& pt = pts[i];
+				for(int j=0 ; j<sz-1 ; j++) {
+					if((pts[j+1] - pts[j]).cw(pt - pts[j]) < -1e4f)
+						return false;
+				}
+			}
+			return true;
+		}
 
 		float Convex::bs_getArea() const {
 			AreaSum as;

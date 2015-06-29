@@ -540,6 +540,7 @@ namespace boom {
 			Convex(Convex&& c);
 			Convex& operator = (Convex&& c);
 
+			static bool IsConvex(const PointL& pts);
 			static Convex FromConcave(const PointL& src);
 			// -----------------------------
 			float bs_getArea() const;
