@@ -2,6 +2,16 @@
 
 namespace boom {
 	namespace geo2d {
+		bool IsCW(const PointL& pts) {
+			int nP = pts.size();
+			if(nP < 3)
+				return false;
+			for(int i=0 ; i<nP-2 ; i++) {
+				if((pts[i+1] - pts[i]).cw(pts[i+2] - pts[i+1]) < 0)
+					return false;
+			}
+			return (pts[0] - pts[nP-1]).cw(pts[1] - pts[0]) >= 0;
+		}
 		bool IsCrossing(const Line& ls0, const Line& ls1, float len0, float len1, float t) {
 			bool res0 = false,
 				 res1 = false;

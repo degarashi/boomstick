@@ -713,6 +713,7 @@ namespace boom {
 			float d = ls.dir.dot(toP);
 			return ls.pos + ls.dir * clip(d);
 		}
+		bool IsCW(const PointL& pts);
 		bool IsCrossing(const Line& ls0, const Line& ls1, float len0, float len1, float t=NEAR_THRESHOLD);
 		template <class CLIP0, class CLIP1>
 		inline Vec2x2_OP NearestPoint(const Line& ls0, const Line& ls1, CLIP0 clip0, CLIP1 clip1) {
