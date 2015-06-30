@@ -313,34 +313,102 @@ namespace boom {
 				}
 				return Type::None;
 			};
-			using IdxPair = std::unordered_map<int,int>;
+			class Link {
+				private:
+					Vec2	_prevDir,
+							_pos;
+					using LinkV = std::vector<std::pair<float, int>>;
+					LinkV	_linkV;
+
+				public:
+					Link(int prevId, const Vec2& prevPos, const Vec2& pos):
+						_prevDir((prevPos-pos).normalization()),
+						_pos(pos)
+					{
+						_linkV.emplace_back(1.f, prevId);
+					}
+					void add(int idx, const Vec2& pt) {
+						float d = _prevDir.dot((pt - _pos).normalization());
+						_linkV.emplace_back(d, idx);
+					}
+					void sort() {
+						std::sort(_linkV.begin(), _linkV.end(), [](const auto& p0, const auto& p1){
+							return p0.first > p1.first;
+						});
+					}
+					int getNextLink(int id) const {
+						int cur,
+							sz = _linkV.size();
+						for(cur=0 ; cur<sz ; cur++) {
+							if(id == _linkV[cur].second) {
+								Assert(Trap, cur<sz-1)
+								return _linkV[cur+1].second;
+							}
+						}
+						Assert(Trap, false)
+						return -1;
+					}
+			};
+			using IdxPair = std::unordered_map<int, Link>;
 			IdxPair ivm;
+			auto fnSetLink = [&pts, &ivm, sz](int i0, int i1){
+				auto fnLink = [&pts, &ivm, sz](int from, int to){
+					auto itr = ivm.find(from);
+					if(itr == ivm.end()) {
+						int prevId = spn::CyInt(from-1, sz).get();
+						auto &p_p = pts[prevId],
+							 &p = pts[from];
+						itr = ivm.emplace(from, Link(prevId, p_p, p)).first;
+					}
+					itr->second.add(to, pts[to]);
+				};
+				fnLink(i0, i1);
+				fnLink(i1, i0);
+			};
 			// merge point, split point を探す
 			for(int i=0 ; i<sz ; i++) {
-				int idx = ia[i].first;
-				switch(fnType(spn::CyInt(idx, sz, spn::CyInt::AsInRange))) {
+				auto& ia_itr = idxToIA[i];
+				switch(fnType(spn::CyInt(i, sz, spn::CyInt::AsInRange))) {
 					case Type::Merge: {
 						// 右の最寄り頂点
-						Assert(Trap, i+1 < sz)
-						int idx_to = ia[i+1].first;
+						Assert(Trap, (ia_itr+1) < ia.end())
+						auto ia_to = ia_itr+1;
+						while(ia_itr->second.x + 1e-4f > ia_to->second.x) {
+							++ia_to;
+							Assert(Trap, ia_to < ia.end())
+						}
 						// リンクを設定
-						ivm.emplace(idx, idx_to);
-						ivm.emplace(idx_to, idx);
+						fnSetLink(i, ia_to->first);
 						break; }
 					case Type::Split: {
 						// 左の最寄り頂点
-						Assert(Trap, i>=1)
-						int idx_to = ia[i-1].first;
+						Assert(Trap, (ia_itr-1)>=ia.begin())
+						auto ia_to = ia_itr-1;
+						while(ia_itr->second.x - 1e-4f < ia_to->second.x) {
+							--ia_to;
+							Assert(Trap, ia_to >= ia.begin())
+						}
 						// リンクを設定
-						ivm.emplace(idx, idx_to);
-						ivm.emplace(idx_to, idx);
+						fnSetLink(i, ia_to->first);
 						break; }
 					case Type::None:
 						break;
 				}
 			}
+			for(auto& e : ivm)
+				e.second.sort();
 
 			std::unordered_set<EdgeIndex> eset;
+			auto fnHasEdge = [&eset](int i0, int i1){
+				if(i0 > i1)
+					std::swap(i0, i1);
+				return eset.count(EdgeIndex(i0, i1)) != 0;
+			};
+			auto fnAddEdge = [&eset](int i0, int i1){
+				if(i0 > i1)
+					std::swap(i0, i1);
+				eset.emplace(i0, i1);
+			};
 			// 終了地点は開始と同じにする
 			// first=巡回開始インデックス
 			// second=巡回終了インデックス(これ自体は含まない)
@@ -351,23 +419,29 @@ namespace boom {
 				auto loop = stk.back();
 				stk.pop_back();
 
+				bool bSkip = false;
 				PointL pl;
+				int prevId = loop.first;
 				pl.push_back(pts[loop.first]);
 				loop.first += 1;
 				while(loop.first != loop.second) {
 					auto itr = ivm.find(loop.first);
-					if(itr != ivm.end()) {
-						if(eset.count(EdgeIndex(itr->first, itr->second)) == 0) {
-							eset.emplace(EdgeIndex(itr->first, itr->second));
-							eset.emplace(EdgeIndex(itr->second, itr->first));
+					if(!bSkip && itr != ivm.end()) {
+						int idx_to = itr->second.getNextLink(prevId);
+						if(!fnHasEdge(loop.first, idx_to)) {
+							fnAddEdge(loop.first, idx_to);
 							// 頂点分岐先は後で辿る
 							stk.push_back({fnInt(loop.first), fnInt(loop.first)});
+							bSkip = true;
 						}
 						pl.push_back(pts[loop.first]);
-						loop.first = itr->second;
+						prevId = loop.first;
+						loop.first = idx_to;
 					} else {
 						pl.push_back(pts[loop.first]);
+						prevId = loop.first;
 						loop.first += 1;
+						bSkip = false;
 					}
 				}
 				// コールバック関数に送出
