@@ -463,8 +463,7 @@ namespace boom {
 			if(mdl0->imn_refresh(t) && mdl1->imn_refresh(t)) {
 				if(_HitSingle(mdl0, mdl1)) {
 					if(mdl0->hasInner() | mdl1->hasInner())
-						return _HitL(mdl1, mdl0, false, t) ||
-								_HitL(mdl0, mdl1, true, t);
+						return _HitL(mdl1, mdl0, false, t);
 					return true;
 				}
 			}
