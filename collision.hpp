@@ -6,13 +6,14 @@ namespace boom {
 	/*! コリジョン情報を纏めた構造体
 		\tparam CMGR	コリジョンマネージャ
 		\tparam BV		BoundingVolume Type
-		\tparam HLMDL	モデルハンドル(Locked)
+		\tparam IM		モデルインタフェース
 		\tparam BCID	BroadCollisionクラスのオブジェクトを特定できるようなデータ型
 		\tparam UD		任意のユーザーデータ型
 	*/
-	template <class CMGR, class BV, class HLMDL, class BCID, class UD>
+	template <class CMGR, class BV, class IM, class BCID, class UD>
 	class ColMem {
 		private:
+			using SP = std::shared_ptr<IM>;
 			CMask	_mask;	//!< 当たり判定対象フラグ
 			struct Index {
 				CTime	time;	//!< indexが指している累積時間
@@ -38,15 +39,15 @@ namespace boom {
 			using Index_OP = spn::Optional<Index>;
 			Index_OP	_cur,
 						_prev;
-			HLMDL		_hlMdl;
+			SP			_spMdl;
 			BCID		_bcid;
 			UD			_udata;
 
 		public:
 			template <class UD2>
-			ColMem(CMask ms, HLMDL hm, UD2&& ud):
+			ColMem(CMask ms, const SP& mdl, UD2&& ud):
 				_mask(ms),
-				_hlMdl(hm),
+				_spMdl(mdl),
 				_udata(std::forward<UD2>(ud))
 			{}
 			void setBCID(const BCID& ns) {
@@ -57,16 +58,12 @@ namespace boom {
 			}
 			BV getBVolume(CTime t) const {
 				BV bv;
-				auto& r = _hlMdl.cref();
-				AssertP(Trap, r->imn_refresh(t))
-				r->im_getBVolume(bv);
+				AssertP(Trap, _spMdl->imn_refresh(t))
+				_spMdl->im_getBVolume(bv);
 				return bv;
 			}
-			decltype(_hlMdl.get()) getModelHandle() const {
-				return _hlMdl.get();
-			}
-			auto getModel() const -> decltype(_hlMdl.cref().get()) {
-				return _hlMdl.cref().get();
+			const SP& getModel() const {
+				return _spMdl;
 			}
 			CMask getMask() const {
 				return _mask;
@@ -154,7 +151,7 @@ namespace boom {
 				class UD>
 	class ColMgr : public spn::ResMgrA<ColMem<ColMgr<BC,Types,UD>,
 											typename BC::BVolume,
-											typename Types::MMgr::LHdl,
+											typename Types::IModel,
 											typename BC::IDType,
 											UD>,
 										ColMgr<BC,Types,UD>>,
@@ -162,19 +159,15 @@ namespace boom {
 	{
 		public:
 			using IModel = typename Types::IModel;									//!< IModel interface
-			using MMgr = typename Types::MMgr;										//!< ModelManager
 			using user_t = UD;														//!< Userdata
 			using BVolume = typename BC::BVolume;									//!< Bounding-volume
 			using this_t = ColMgr<BC, Types, user_t>;
 			using BroadC = BC;														//!< BroadCollision class
 			using BCId = typename BroadC::IDType;									//!< BroadCollision dependant Id
 			using BCIdV = typename BroadC::IDTypeV;
-			// ---- model handle type ----
-			using HMdl = typename MMgr::SHdl;
-			using HLMdl = typename MMgr::LHdl;
-			using MdlRef = decltype(std::declval<HMdl>().ref());
-			using MdlP = decltype(std::declval<MdlRef>().get());
-			using CMem = ColMem<this_t, BVolume, HLMdl, BCId, user_t>;						//!< Collision information structure
+			// ---- model interface type ----
+			using MdlSP = std::shared_ptr<IModel>;
+			using CMem = ColMem<this_t, BVolume, IModel, BCId, user_t>;						//!< Collision information structure
 
 			using base = spn::ResMgrA<CMem, this_t>;
 			// --- collision handle type ----
@@ -321,10 +314,10 @@ namespace boom {
 			//! 当たり判定対象を追加
 			/*! \param ms[in] マスク */
 			template <class UD2>
-			HLCol addCol(CMask ms, HMdl hm, UD2&& ud=UD()) {
-				HLCol hlC = base::emplace(ms, hm, std::forward<UD2>(ud));
+			HLCol addCol(CMask ms, const MdlSP& spMdl, UD2&& ud=UD()) {
+				HLCol hlC = base::emplace(ms, spMdl, std::forward<UD2>(ud));
 				hlC.ref().setBCID(_broadC.add(hlC, ms));
-				AssertP(Trap, hm->get()->imn_refresh(_accum), "empty object detected")
+				AssertP(Trap, spMdl->imn_refresh(_accum), "empty object detected")
 				return std::move(hlC);
 			}
 			//! ハンドル解放処理を一時的に遅延させる (デストラクタ時以外)
@@ -341,7 +334,7 @@ namespace boom {
 				\param[in] mp		判定対象のモデルポインタ
 				\param[in] cb		コールバック関数(HCol) */
 			template <class CB>
-			void checkCollision(CMask ms, MdlP mp, CB&& cb) {
+			void checkCollision(CMask ms, const IModel* mp, CB&& cb) {
 				if(!mp->imn_refresh(_accum))
 					return;
 				BVolume bv;
@@ -353,14 +346,14 @@ namespace boom {
 					{
 						auto hc = HCol::FromHandle(sh);
 						// 詳細判定
-						if(Narrow::Hit(pMdl, hc->getModel(), ac))
+						if(Narrow::Hit(pMdl, hc->getModel().get(), ac))
 							cb(hc);
 					}
 				);
 			}
 			template <class CB>
-			void checkCollision(CMask ms, HMdl hMdl, CB&& cb) {
-				checkCollision(ms, hMdl->get(), std::forward<CB>(cb));
+			void checkCollision(CMask ms, const MdlSP& spMdl, CB&& cb) {
+				checkCollision(ms, spMdl.get(), std::forward<CB>(cb));
 			}
 			//! 全てのオブジェクトを相互に当たり判定
 			/*!	A->Bの組み合わせでコールバックを呼び、B->Aは呼ばない
@@ -381,7 +374,7 @@ namespace boom {
 						hc1(HCol::FromHandle(sh1));
 					// 詳細判定
 					// 毎フレームヒットリストを再構築
-					if(Narrow::Hit(hc0->getModel(), hc1->getModel(), _accum)) {
+					if(Narrow::Hit(hc0->getModel().get(), hc1->getModel().get(), _accum)) {
 						if(bAdvance)
 							_makeHist(hc0, hc1);
 						cb(hc0, hc1);

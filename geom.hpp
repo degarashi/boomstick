@@ -174,23 +174,21 @@ namespace boom {
 		friend std::ostream& operator << (std::ostream& os, const IModelNode& mdl);
 	};
 
-	//! IModelとHMdlの差異吸収
-	template <class MMGR>
+	//! IModelとModel_SPの差異吸収
+	template <class IM>
 	class VModel {
-		using HMdl = typename MMGR::SHdl;
-		using HLMdl = typename MMGR::LHdl;
-		using IModel = typename MMGR::data_type::element_type;
-		using VMdl = boost::variant<const IModel&, HLMdl>;
+		using IModel = IM;
+		using SP = std::shared_ptr<IM>;
+		using VMdl = boost::variant<const IModel&, SP>;
 		VMdl	_vMdl;
 
 		struct Visitor : boost::static_visitor<const IModel&> {
-			const IModel& operator()(const HLMdl& hl) const {
-				return *hl.cref().get(); }
+			const IModel& operator()(const SP& sp) const { return *sp; }
 			const IModel& operator()(const IModel& m) const { return m; }
 		};
 		public:
 			VModel(const IModel& mdl): _vMdl(mdl) {}
-			VModel(HMdl hMdl): _vMdl(hMdl) {}
+			VModel(const SP& sp): _vMdl(sp) {}
 			const IModel& get() const {
 				return boost::apply_visitor(Visitor(), _vMdl);
 			}

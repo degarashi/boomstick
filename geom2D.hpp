@@ -144,8 +144,6 @@ namespace boom {
 			const AMat32& getToLocalI() const;
 			const AMat32& getToWorldI() const;
 		};
-		#define mgr_model2d (::boom::geo2d::ModelMgr::_ref())
-		class ModelMgr : public spn::ResMgrA<Model_SP, ModelMgr> {};
 
 		//! TにIModelインタフェースを付加
 		template <class T>
@@ -743,7 +741,6 @@ namespace boom {
 
 		struct Types {
 			using CTGeo = ::boom::geo2d::CTGeo;
-			using MMgr = ::boom::geo2d::ModelMgr;
 			using IModel = ::boom::geo2d::IModel;
 			using GJK = ::boom::geo2d::GSimplex;
 			using Narrow = ::boom::Narrow<Types>;

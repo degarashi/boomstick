@@ -14,14 +14,10 @@ namespace boom {
 
 		struct IModel;
 		using Model_SP = std::shared_ptr<IModel>;
-		class ModelMgr;
-		DEF_AHANDLE(ModelMgr, Mdl, Model_SP, Model_SP)
 	}
 	namespace geo3d {
 		struct IModel;
 		using Model_SP = std::shared_ptr<IModel>;
-		class ModelMgr;
-		DEF_AHANDLE(ModelMgr, Mdl, Model_SP, Model_SP)
 	}
 }
 

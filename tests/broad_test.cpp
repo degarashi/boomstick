@@ -16,7 +16,6 @@ namespace boom {
 		using geo2d::CircleM;
 		using geo2d::AABB;
 		using geo2d::AABBM;
-		using geo2d::ModelMgr;
 		template <class T>
 		class BroadC_Dim2 : public test2d::Narrow {
 			public:
@@ -25,14 +24,11 @@ namespace boom {
 				constexpr static int N_AObj = std::tuple_element<1, T>::type::value,
 									N_BObj = std::tuple_element<2, T>::type::value;
 				constexpr static bool B_CheckCollision = std::tuple_element<3, T>::type::value;
-				ModelMgr	_mmgr;
 				ColMgr		_cmgr;
 			public:
 				using HCol = typename ColMgr::SHdl;
 				using HLCol = typename ColMgr::LHdl;
 				using HLCol_V = std::vector<HLCol>;
-				using MMgr = typename ColMgr::MMgr;
-				using HLMdl = typename ColMgr::HLMdl;
 				BroadC_Dim2(): _cmgr(1e4f*2, -1e4f) {}
 				auto& getColMgr() {
 					return _cmgr;
@@ -94,7 +90,7 @@ namespace boom {
 				std::vector<typename CM::HLCol> v(n);
 				for(int i=0 ; i<n ; i++) {
 					auto sp = test2d::MakeRandomTree<CT,CT>(rdf, 4, 1);
-					v[i] = cm.addCol(mask, mgr_model2d.emplace(sp), ud++);
+					v[i] = cm.addCol(mask, sp, ud++);
 				}
 				return std::move(v);
 			}
@@ -117,32 +113,29 @@ namespace boom {
 
 			using HCol = typename this_t::HCol;
 			using Narrow_t = typename this_t::Narrow_t;
-			using ColMgr = typename this_t::ColMgr;
-			using MMgr = typename ColMgr::MMgr;
-			using HLMdl = typename ColMgr::HLMdl;
-			HLMdl hlMdl = MMgr::_ref().emplace(test2d::MakeRandomTree<CT,CT>(rdf, 4, 1));
+			auto spMdl = test2d::MakeRandomTree<CT,CT>(rdf, 4, 1);
 			// RoundRobinクラスによる判定
 			// -> TypeA and TypeBと判定
 			using HCSet = std::unordered_set<HCol>;
 			HCSet result_rb[2];
-			cm.checkCollision(0x00000001, hlMdl, [&](HCol hc){
+			cm.checkCollision(0x00000001, spMdl, [&](HCol hc){
 				result_rb[0].insert(hc);
 			});
 			// -> TypeAと判定
-			cm.checkCollision(0x80000001, hlMdl, [&](HCol hc){
+			cm.checkCollision(0x80000001, spMdl, [&](HCol hc){
 				result_rb[1].insert(hc);
 			});
 
 			// 自前で判定
 			HCSet result_diy[2];
 			for(auto& a : vA) {
-				if(Narrow_t::Hit(hlMdl->get(), a->getModel(), 0)) {
+				if(Narrow_t::Hit(spMdl.get(), a->getModel().get(), 0)) {
 					result_diy[0].insert(a);
 					result_diy[1].insert(a);
 				}
 			}
 			for(auto& b : vB) {
-				if(Narrow_t::Hit(hlMdl->get(), b->getModel(), 0)) {
+				if(Narrow_t::Hit(spMdl.get(), b->getModel().get(), 0)) {
 					result_diy[0].insert(b);
 				}
 			}
@@ -177,16 +170,16 @@ namespace boom {
 			test2d::TfLeaf2DPtr_V	leaf0,
 									leaf1;
 			for(auto& h : v0)
-				fnCollect(leaf0, h->getModel());
+				fnCollect(leaf0, h->getModel().get());
 			for(auto& h : v1)
-				fnCollect(leaf1, h->getModel());
+				fnCollect(leaf1, h->getModel().get());
 
 			// RoundRobinを使わずに判定した結果の格納
 			auto fnCheck = [](auto& fcmCur, auto& fcmPrev, auto& cm, int id0, int id1, HCol hc0, HCol hc1, auto t){
 				auto idc0 = (hc0.getIndex() << 16) | hc1.getIndex();
 				auto idc1 = (hc1.getIndex() << 16) | hc0.getIndex();
-				auto *p0 = hc0->getModel(),
-					 *p1 = hc1->getModel();
+				auto *p0 = hc0->getModel().get(),
+					 *p1 = hc1->getModel().get();
 				auto idpair = std::make_tuple(id0,id1);
 				auto itr = fcmPrev.find(idpair);
 				ASSERT_EQ(fcmCur.count(idpair), 0);

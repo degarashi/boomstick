@@ -94,8 +94,6 @@ namespace boom {
 			const AMat43& getToLocalI() const;
 			const AMat43& getToWorldI() const;
 		};
-		#define mgr_model3d (::boom::geo3d::ModelMgr::_ref())
-		class ModelMgr : public spn::ResMgrA<Model_SP, ModelMgr> {};
 
 		template <class T>
 		struct Model : IModelP_base<T, IModel> {
@@ -113,7 +111,7 @@ namespace boom {
 		//! IModelに行列変換をプラス
 		template <class T>
 		class TModel : public ITagP<T>, public IModel {
-			using VMdl = VModel<ModelMgr>;
+			using VMdl = VModel<IModel>;
 			VMdl		_model;
 			AMat43 		_mToWorld,
 						_mToLocal;
@@ -123,7 +121,7 @@ namespace boom {
 			public:
 				TModel(const TModel&) = default;
 				TModel(const IModel& mdl, const AMat43& mw): _model(mdl), _mToWorld(mw) { _calcInv(); }
-				TModel(HMdl hMdl, const AMat43& mw): _model(hMdl), _mToWorld(mw) { _calcInv(); }
+				TModel(const Model_SP& sp, const AMat43& mw): _model(sp), _mToWorld(mw) { _calcInv(); }
 
 				Sphere im_getBVolume() const override {
 					return _model.get().im_getBVolume() * _mToWorld; }
@@ -768,7 +766,6 @@ namespace boom {
 
 		struct Types {
 			using CTGeo = ::boom::geo3d::CTGeo;
-			using MMgr = ::boom::geo3d::ModelMgr;
 			using IModel = ::boom::geo3d::IModel;
 			using GJK = ::boom::geo3d::GSimplex;
 			using Narrow = ::boom::Narrow<Types>;
