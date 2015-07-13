@@ -530,13 +530,10 @@ namespace boom {
 			const static uint8_t cs_index[1<<8];
 
 			Convex() = default;
-			Convex(const Convex& c) = default;
 			/*! \param[in] v 凸包と分かっている頂点 */
 			Convex(std::initializer_list<Vec2> v);
 			Convex(const PointL& pl);
 			Convex(PointL&& pl);
-			Convex(Convex&& c);
-			Convex& operator = (Convex&& c);
 
 			using CBPoints = std::function<void (PointL&&)>;
 			using CBConvex = std::function<void (Convex&&)>;

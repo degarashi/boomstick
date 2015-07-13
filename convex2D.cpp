@@ -5,17 +5,12 @@
 namespace boom {
 	namespace geo2d {
 		Convex::Convex(const PointL& pl): point(pl) {}
-		Convex::Convex(PointL&& pl): point(pl) {}
+		Convex::Convex(PointL&& pl): point(std::move(pl)) {}
 		Convex::Convex(std::initializer_list<Vec2> v): point(v.size()) {
 			auto itrD = point.begin();
 			auto itr = v.begin();
 			while(itr != v.end())
 				*itrD++ = *itr++;
-		}
-		Convex::Convex(Convex&& c): point(std::forward<PointL>(c.point)) {}
-		Convex& Convex::operator = (Convex&& c) {
-			point = std::move(c.point);
-			return *this;
 		}
 		Vec2 Convex::bs_getCenter() const {
 			return std::get<2>(area_inertia_center());
