@@ -8,10 +8,10 @@ namespace boom {
 		Capsule::Capsule(const Segment& s, float r):
 			Segment(s), radius(r) {}
 		Vec3 Capsule::bs_getCenter() const {
-			return bs_getCenter();
+			return Segment::bs_getCenter();
 		}
 		Vec3 Capsule::bs_getGCenter() const {
-			return bs_getGCenter();
+			return Segment::bs_getGCenter();
 		}
 		Sphere Capsule::bs_getBVolume() const {
 			auto s = bs_getBVolume();

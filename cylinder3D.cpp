@@ -27,10 +27,10 @@ namespace boom {
 			return sp;
 		}
 		Vec3 Cylinder::bs_getGCenter() const {
-			return bs_getGCenter();
+			return Capsule::bs_getGCenter();
 		}
 		Vec3 Cylinder::bs_getCenter() const {
-			return bs_getCenter();
+			return Capsule::bs_getCenter();
 		}
 		float Cylinder::bs_getArea() const { INVOKE_ERROR }
 		Mat33 Cylinder::bs_getInertia() const { INVOKE_ERROR }
