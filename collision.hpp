@@ -318,7 +318,7 @@ namespace boom {
 				HLCol hlC = base::emplace(ms, spMdl, std::forward<UD2>(ud));
 				hlC.ref().setBCID(_broadC.add(hlC, ms));
 				AssertP(Trap, spMdl->imn_refresh(_accum), "empty object detected")
-				return std::move(hlC);
+				return hlC;
 			}
 			//! ハンドル解放処理を一時的に遅延させる (デストラクタ時以外)
 			void release(HCol hCol) {

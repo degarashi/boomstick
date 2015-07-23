@@ -85,7 +85,7 @@ namespace boom {
 					auto sp = std::make_shared<TfLeaf>(*this);
 					// ModelSpのクローン
 					sp->setModelSource(this->getModelSource()->im_clone());
-					return std::move(sp);
+					return sp;
 				}
 		};
 		//! キャッシュ有りのTfLeaf
@@ -136,7 +136,7 @@ namespace boom {
 					auto sp = std::make_shared<TfLeafC>(*this);
 					// ModelSpのクローン
 					sp->setModelSource(this->getModelSource()->im_clone());
-					return std::move(sp);
+					return sp;
 				}
 		};
 	}

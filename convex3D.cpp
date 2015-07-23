@@ -317,7 +317,7 @@ namespace boom {
 				for(int i=0 ; i<nP ; i++)
 					*pDst++ = *_pface[i].get();
 			}
-			return std::move(ret);
+			return ret;
 		}
 		// ------------------------- ConvexP -------------------------
 		ConvexP::ConvexP(): _rflg(~0) {}
@@ -415,7 +415,7 @@ namespace boom {
 			auto* pDst = &vlL[0];
 			for(auto& p : plL)
 				*pDst++ = DualTransform(p);
-			return std::move(vlL);
+			return vlL;
 		}
 		Vec3List ConvexP::exportDualTransform() {
 			auto& plL = getPolyFace();
@@ -423,7 +423,7 @@ namespace boom {
 			auto* pDst = &vlL[0];
 			for(auto& itr : plL)
 				*pDst++ = DualTransform(Plane::FromPts(_vtx[itr.getID(0)], _vtx[itr.getID(1)], _vtx[itr.getID(2)]));
-			return std::move(vlL);
+			return vlL;
 		}
 		const Vec3& ConvexP::getVtx(int n) const { return _vtx[n]; }
 		const Vec3List& ConvexP::getVtxArray() const { return _vtx; }

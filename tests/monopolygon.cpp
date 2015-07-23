@@ -34,7 +34,7 @@ namespace boom {
 					d.x /= sumL;
 					d.x *= len;
 				}
-				return std::move(distL);
+				return distL;
 			};
 			float width_offset = rff(rLen * 1e-1f);
 			auto distL = fnMakeLengthList(nLeft, length),
@@ -71,7 +71,7 @@ namespace boom {
 				cur -= dist.x;
 			}
 			Assert(Trap, pts.data()+pts.size() == ptr)
-			return std::move(pts);
+			return pts;
 		}
 		const spn::Vec2& MonoPolygon::getDir() const {
 			return _vDir;

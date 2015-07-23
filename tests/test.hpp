@@ -24,7 +24,7 @@ namespace boom {
 				} while(bLoop);
 				pl[i] = p;
 			}
-			return std::move(pl);
+			return pl;
 		}
 	}
 }

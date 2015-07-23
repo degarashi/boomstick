@@ -65,7 +65,7 @@ namespace boom {
 			geo2d::PointL pl(sz);
 			for(int i=0 ; i<sz ; i++)
 				pl[i] = _vtx[index[i]];
-			return std::move(pl);
+			return pl;
 		}
 		bool ConcavePolygon::hit(const spn::Vec2& p, float threshold) const {
 			// 中身は単なる三角形ポリゴンのリストなので個別に判定
@@ -154,7 +154,7 @@ namespace boom {
 				pe.edgeId = 2;
 				--nPoly;
 			}
-			return std::move(res);
+			return res;
 		}
 	}
 }

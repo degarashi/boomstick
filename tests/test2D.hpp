@@ -166,7 +166,7 @@ namespace boom {
 					v.push_back(static_cast<D>(&node));
 				return spn::Iterate::StepIn;
 			});
-			return std::move(v);
+			return v;
 		}
 		template <class T, class A>
 		TfSP MakeAsLeaf(const A& s) {
@@ -256,7 +256,7 @@ namespace boom {
 					Assert(Trap, cursorDepth <= maxDepth)
 				}
 			} while(!spRoot->imn_refresh(0));
-			return std::move(spRoot);
+			return spRoot;
 		}
 	}
 }

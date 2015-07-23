@@ -92,7 +92,7 @@ namespace boom {
 					auto sp = test2d::MakeRandomTree<CT,CT>(rdf, 4, 1);
 					v[i] = cm.addCol(mask, sp, ud++);
 				}
-				return std::move(v);
+				return v;
 			}
 		}
 		TYPED_TEST(BroadC_Dim2, CheckCollision) {

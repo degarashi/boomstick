@@ -77,7 +77,7 @@ namespace boom {
 				std::sort(index.begin(), index.end(), [](const auto& p0, const auto& p1){
 					return p0.second.x < p1.second.x;
 				});
-				return std::move(index);
+				return index;
 			}
 			struct IdxCursor {
 				spn::CyInt	cw,
@@ -501,7 +501,7 @@ namespace boom {
 			PointL pl(nP);
 			for(int i=0 ; i<nP ; i++)
 				pl[i] = point[i].asVec3(1) * m;
-			return std::move(pl);
+			return pl;
 		}
 		Convex& Convex::operator *= (const AMat32& m) {
 			for(auto& p : point)
@@ -578,7 +578,7 @@ namespace boom {
 			for(int i=0 ; i<nVD ; i++)
 				v2[i] = -Dual2(cc.point[i], cc.point[spn::CndSub(i+1, nVD)]) + inner;
 
-			return std::move(v2);
+			return v2;
 		}
 		int Convex::getNPoints() const { return point.size(); }
 		Vec2 Convex::getPoint(int n) const { return point[n]; }
