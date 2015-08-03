@@ -14,7 +14,7 @@ namespace boom {
 			return Segment::bs_getGCenter();
 		}
 		Sphere Capsule::bs_getBVolume() const {
-			auto s = bs_getBVolume();
+			auto s = Segment::bs_getBVolume();
 			s.radius += radius;
 			return s;
 		}

@@ -73,7 +73,7 @@ namespace boom {
 			return std::make_pair(_getAreaNumX(p.x),
 									_getAreaNumY(p.y));
 		}
-		bool AABB::hit(const Segment& l, float t) const {
+		bool AABB::hit(const Segment& l, float /*t*/) const {
 			auto f0 = _getAreaNum(l.from),
 				f1 = _getAreaNum(l.to);
 			auto diffX = std::abs(f0.first - f1.first);

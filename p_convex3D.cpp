@@ -832,7 +832,7 @@ namespace boom {
 			}
 			return _plane;
 		}
-		DEF(bool)::isOnPlane(const Plane& p, float th) const {
+		DEF(bool)::isOnPlane(const Plane& /*p*/, float th) const {
 			FList fl = checkPlaneFlags(_plane);
 			int nv = getNVtx();
 			for(int i=0 ; i<nv ; i++) {

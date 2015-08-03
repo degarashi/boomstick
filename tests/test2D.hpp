@@ -161,7 +161,7 @@ namespace boom {
 		template <class T, class D=decltype(std::declval<T>().get())>
 		auto CollectLeaf(T& spRoot, D=nullptr) {
 			std::vector<D> v;
-			spRoot->template iterateDepthFirst<false>([&v](auto& node, int depth){
+			spRoot->template iterateDepthFirst<false>([&v](auto& node, int /*depth*/){
 				if(node.isLeaf())
 					v.push_back(static_cast<D>(&node));
 				return spn::Iterate::StepIn;
@@ -196,7 +196,7 @@ namespace boom {
 			return nullptr;
 		}
 		template <template <class...> class CT>
-		void SetCid(int* dst, CT<>*) {}
+		void SetCid(int* /*dst*/, CT<>*) {}
 		template <template <class...> class CT,
 					class T0, class... Ts>
 		void SetCid(int* dst, CT<T0, Ts...>*) {

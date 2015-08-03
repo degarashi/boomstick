@@ -15,7 +15,7 @@ namespace boom {
 			INVOKE_ERROR }
 		const Mat33& Point::bs_getInertia() const {
 			INVOKE_ERROR }
-		const Vec3& Point::support(const Vec3& dir) const {
+		const Vec3& Point::support(const Vec3& /*dir*/) const {
 			return *this;
 		}
 

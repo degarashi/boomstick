@@ -97,7 +97,7 @@ namespace boom {
 			if(std::fabs(Plane::FromPts(_vtx[0],_vtx[1],_vtx[2]).dot(_vtx[3])) > 1e-4f) {
 				Vec3 center = (_vtx[0]+_vtx[1]+_vtx[2]+_vtx[3])/4,
 					cp;
-				for(int i=0 ; i<countof(cs_index) ; i++) {
+				for(int i=0 ; i<static_cast<int>(countof(cs_index)) ; i++) {
 					auto& idx = cs_index[i];
 					Polygon poly(_vtx[idx[0]],_vtx[idx[1]],_vtx[idx[2]]);
 					const auto& plane = poly.getPlane();
@@ -116,7 +116,7 @@ namespace boom {
 			} else {
 				// 4面体がつぶれている場合は別の判定方法
 				bInPoly = false;
-				for(int i=0 ; i<countof(cs_index) ; i++) {
+				for(int i=0 ; i<static_cast<int>(countof(cs_index)) ; i++) {
 					auto& idx = cs_index[i];
 					Vec3 toV1 = _vtx[idx[1]]-_vtx[idx[0]],
 						toV2 = _vtx[idx[2]]-_vtx[idx[0]],

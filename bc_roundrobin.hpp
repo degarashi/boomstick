@@ -70,7 +70,7 @@ namespace boom {
 			BroadC_RoundRobin(FGetBV cb, float /*fieldSize*/, float /*fieldOfs*/): _fGetBV(cb) {}
 			IDType add(spn::SHandle sh, CMask mask) {
 				Type typ = _DetectType(mask);
-				return IDType{_node[typ].add(Node{mask, sh}), typ};
+				return IDType{_node[typ].add(Node{mask, sh, {}}), typ};
 			}
 			void rem(const IDType& idt) {
 				_node[idt.typ].rem(idt.id);

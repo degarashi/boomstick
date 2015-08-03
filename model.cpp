@@ -15,7 +15,7 @@ namespace boom {
 		return v0.cross(v1).length();
 	}
 	// -------------------------- IModelNode --------------------------
-	bool IModelNode::imn_refresh(Time_t t) const {
+	bool IModelNode::imn_refresh(Time_t /*t*/) const {
 		return true;
 	}
 	bool IModelNode::hasInner() const {

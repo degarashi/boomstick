@@ -24,7 +24,7 @@ namespace boom {
 			return *(new(this) Points(pts)); }
 		Frustum::Points Frustum::Points::operator * (const AMat43& m) const {
 			Points pts;
-			for(int i=0 ; i<countof(point) ; i++)
+			for(int i=0 ; i<static_cast<int>(countof(point)) ; i++)
 				pts.point[i] = point[i].asVec4(1) * m;
 			return pts;
 		}
@@ -48,7 +48,7 @@ namespace boom {
 			return *(new(this) Planes(ps)); }
 		Frustum::Planes Frustum::Planes::operator * (const AMat43& m) const {
 			Planes ret;
-			for(int i=0 ; i<countof(plane) ; i++)
+			for(int i=0 ; i<static_cast<int>(countof(plane)) ; i++)
 				ret.plane[i] = plane[i] * m;
 			return ret;
 		}
@@ -158,15 +158,15 @@ namespace boom {
 			plane[3] = Plane(vU,0);
 
 			// 線分の絶対値化は面倒なので5平面と比較
-			for(int i=0 ; i<countof(pts.point) ; i++) {
+			for(int i=0 ; i<static_cast<int>(countof(pts.point)) ; i++) {
 				auto &p0 = pts.point[i],
 					&p1 = pts.point[(i+1)%countof(pts.point)];
 				// 線分が必ず2つの平面を横切っている前提 (1つ少なくて済む)
-				for(int j=0 ; j<countof(plane)-1 ; j++) {
+				for(int j=0 ; j<static_cast<int>(countof(plane)-1) ; j++) {
 					if(auto cp = Segment(p0,p1).crossPoint(plane[j])) {
 						bool bHit = true;
 						// cpが前にあるか他の平面とチェック
-						for(int k=0 ; k<countof(plane) ; k++) {
+						for(int k=0 ; k<static_cast<int>(countof(plane)) ; k++) {
 							float d = plane[k].dot(*cp);
 							if(d < 0) {
 								bHit = false;
@@ -199,7 +199,7 @@ namespace boom {
 		}
 		int Frustum::checkSide(const Plane& plane, float threshold) const {
 			uint32_t flag = 0;
-			auto cb = [&flag, threshold](int idx, float d) {
+			auto cb = [&flag, threshold](int /*idx*/, float d) {
 				if(d >= threshold)
 					flag |= 0x02;
 				else if(d <= -threshold)
@@ -221,7 +221,7 @@ namespace boom {
 			// 5点の符号を比べる
 			const auto& pts = getPoints(false);
 			const auto& sc = getScale();
-			for(int i=0 ; i<countof(pts.point) ; i++) {
+			for(int i=0 ; i<static_cast<int>(countof(pts.point)) ; i++) {
 				auto& p = pts.point[i];
 				cb(i, tplane.dot(Vec3(p.x*sc.x, p.y*sc.y, p.z*sc.z)));
 			}
@@ -233,7 +233,7 @@ namespace boom {
 			Vec3 v[5] = { Vec3(0,0,0),Vec3(-1,1,1), Vec3(1,1,1), Vec3(1,-1,1), Vec3(-1,-1,1) };
 			Vec3 v2[8];
 			AMat43 m = getToWorld().convertA44() * mV;
-			for(int i=0 ; i<countof(v) ; i++)
+			for(int i=0 ; i<static_cast<int>(countof(v)) ; i++)
 				v[i] = v[i].asVec4(1) * m;
 			// ビュー座標へ変換し，Z平面0でクリップ
 			const int cIdx[8][2] = {
@@ -377,7 +377,7 @@ namespace boom {
 				{0,1},{0,2},{0,3},{0,4},
 				{1,2},{1,3},{2,4},{3,4}
 			};
-			for(int i=0 ; i<countof(pIdx) ; i++) {
+			for(int i=0 ; i<static_cast<int>(countof(pIdx)) ; i++) {
 				if(cone.hit(Segment(pPts[pIdx[i][0]], pPts[pIdx[i][1]])))
 					return true;
 			}

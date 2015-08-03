@@ -197,14 +197,14 @@ namespace boom {
 				edgeMap.emplace(std::make_pair(i1, i2), IdxLink{pTri, 1});
 				edgeMap.emplace(std::make_pair(i2, i0), IdxLink{pTri, 2});
 			};
-			auto fnOutputStack = [&fnOutputTriangle](const bool bc, auto& stk, int idxCw, int idxCcw, int cur) {
+			auto fnOutputStack = [&fnOutputTriangle](const bool bc, auto& stk, int /*idxCw*/, int /*idxCcw*/, int cur) {
 				if(bc) {
 					// 直前までCwだったケース
-					for(int i=0 ; i<stk.size()-1 ; i++)
+					for(int i=0 ; i<static_cast<int>(stk.size()-1) ; i++)
 						fnOutputTriangle(cur, stk[i], stk[i+1]);
 				} else {
 					// 直前までCcwだったケース
-					for(int i=0 ; i<stk.size()-1 ; i++)
+					for(int i=0 ; i<static_cast<int>(stk.size()-1) ; i++)
 						fnOutputTriangle(cur, stk[i+1], stk[i]);
 				}
 			};

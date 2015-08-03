@@ -10,7 +10,7 @@ namespace boom {
 			_olist.clear();
 			_nLower = 0;
 		}
-		void CTreeEntry::addObj(CMask mask, const VolEntry& ve) {
+		void CTreeEntry::addObj(CMask /*mask*/, const VolEntry& ve) {
 			_olist.emplace_back(ve);
 		}
 		void CTreeEntry::_remObj(VolVec& v, CacheId cid) {
@@ -19,7 +19,7 @@ namespace boom {
 			AssertP(Trap, itr != v.cend())
 			v.erase(itr);
 		}
-		bool CTreeEntry::remObj(CMask mask, CacheId cid) {
+		bool CTreeEntry::remObj(CMask /*mask*/, CacheId cid) {
 			_remObj(_olist, cid);
 			return isEmpty();
 		}
