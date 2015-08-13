@@ -14,7 +14,7 @@ namespace boom {
 			_olist.emplace_back(ve);
 		}
 		void CTreeEntry::_remObj(VolVec& v, CacheId cid) {
-			auto itr = std::find_if(v.cbegin(), v.cend(),
+			auto itr = std::find_if(v.begin(), v.end(),
 						[cid](const VolEntry& e){ return e.cacheId == cid; });
 			AssertP(Trap, itr != v.cend())
 			v.erase(itr);
