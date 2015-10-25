@@ -321,14 +321,14 @@ namespace boom {
 				return hlC;
 			}
 			//! ハンドル解放処理を一時的に遅延させる (デストラクタ時以外)
-			void release(HCol hCol) {
+			bool release(HCol hCol) {
 				if(!_bDelete && hCol.count() == 1) {
 					// OnCollisionEndの処理がある為、次のupdateまでハンドル解放を遅延
 					_getCurRM().push_back(hCol);
 					// しかしBroadCからは即刻外す
 					_broadC.rem(hCol.cref().getBCID());
 				}
-				base::release(hCol);
+				return base::release(hCol);
 			}
 			/*!	\param[in] mask		コリジョンマスク値
 				\param[in] mp		判定対象のモデルポインタ
@@ -384,6 +384,10 @@ namespace boom {
 			//! 時間を1進め、衝突履歴の更新
 			void update() {
 				update([](auto,auto){}, true);
+			}
+			const std::string& getResourceName(spn::SHandle /*sh*/) const override {
+				const static std::string str("");
+				return str;
 			}
 	};
 }
