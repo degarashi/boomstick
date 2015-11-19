@@ -75,8 +75,7 @@ namespace boom {
 				}
 				const void* getCore[[noreturn]]() const override {
 					// canCacheShapeがfalseのオブジェクトに対して呼んではいけない
-					AssertT(Trap, false, (std::domain_error)(const char*), "calling getCore() is not valid for TfLeaf")
-					throw 0;
+					AssertFT(Trap, std::domain_error, "calling getCore() is not valid for TfLeaf")
 				}
 				void* getCore[[noreturn]]() override {
 					static_cast<const TfLeaf*>(this)->getCore();

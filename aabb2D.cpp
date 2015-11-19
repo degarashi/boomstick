@@ -102,7 +102,7 @@ namespace boom {
 			return (minV + maxV) * 0.5f;
 		}
 		float AABB::bs_getInertia() const {
-			AssertT(Trap, false, (std::domain_error)(const char*), "not implemented yet") throw 0;
+			AssertFT(Trap, std::domain_error, "not implemented yet")
 		}
 		float AABB::bs_getArea() const {
 			Vec2 sz = maxV - minV;
