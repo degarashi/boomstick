@@ -488,17 +488,16 @@ namespace boom {
 					CacheId cid = itr->second;
 					auto& cache = _cache.get(cid);
 					MortonId num = cache.mortonId;
-					if(bRemMM) {
-						_cache.rem(itr->second);
-						_mmap.erase(itr);
-					}
 					AssertP(Trap, _ent.hasEntry(num))
-
 					auto& e = _ent.refEntry(num);
 					// リストが空になったらエントリを削除
 					if(e.remObj(cache.mask, cid))
 						_ent.remEntry(num);
 					_decrementUpper(num);
+					if(bRemMM) {
+						_cache.rem(itr->second);
+						_mmap.erase(itr);
+					}
 // 					LogOutput("Rem(%1%) %2%", idt.getIndex(), num);
 					return num;
 				}
