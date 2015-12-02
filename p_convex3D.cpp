@@ -28,7 +28,7 @@ namespace boom {
 		DEF(void)::degeneration() {
 			constexpr auto nth = Point::NEAR_THRESHOLD;
 			int nVtx = _vtx.size();
-			if(spn::Bit::ChClear(_rflg, RFLG_DEGENERATE)) {
+			if(spn::Bit::ChClear<decltype(_rflg)>(_rflg, RFLG_DEGENERATE)) {
 				// 頂点が2つ以下の場合は何もしない
 				int nv = getNVtx();
 				if(nv < 2)
@@ -43,7 +43,7 @@ namespace boom {
 					}
 				}
 				if(nv != wcur)
-					spn::Bit::Set(_rflg, RFLG_CENTER|RFLG_CPOINT);
+					spn::Bit::Set<decltype(_rflg)>(_rflg, RFLG_CENTER|RFLG_CPOINT);
 
 				nVtx = wcur;
 
@@ -53,7 +53,7 @@ namespace boom {
 				// 始点と終端チェック
 				if(wcur > 1 && getPos(0).dist_sq(getPos(wcur-1)) <= spn::Square(nth)) {
 					nVtx--;
-					spn::Bit::Set(_rflg, RFLG_CENTER|RFLG_CPOINT);
+					spn::Bit::Set<decltype(_rflg)>(_rflg, RFLG_CENTER|RFLG_CPOINT);
 				}
 				setNVtx(nVtx);
 				if(checkLinear())
@@ -78,7 +78,7 @@ namespace boom {
 				float d = plane.dot(v);
 				v += (nml * -d);
 			}
-			spn::Bit::Set(_rflg, RFLG_ALL);
+			spn::Bit::Set<decltype(_rflg)>(_rflg, RFLG_ALL);
 		}
 
 		DEF(UD&)::refUserData() {
@@ -90,7 +90,7 @@ namespace boom {
 		DEF(void)::setVertexArray(const VType* src, int nv) {
 			setNVtx(nv);
 			std::memcpy(&_vtx[0], src, sizeof(VType)*nv);
-			spn::Bit::Set(_rflg, RFLG_ALL);
+			spn::Bit::Set<decltype(_rflg)>(_rflg, RFLG_ALL);
 		}
 
 		DEF(void)::splitThis(const Plane& plane, Convex& bDst) {
@@ -397,19 +397,19 @@ namespace boom {
 			int nv = getNVtx();
 			setNVtx(nv+1);
 			refVtx(nv) = v;
-			spn::Bit::Set(_rflg, RFLG_ALL);
+			spn::Bit::Set<decltype(_rflg)>(_rflg, RFLG_ALL);
 		}
 		DEF(void)::popVtx() {
 			int nv = getNVtx();
 			if(nv > 0)
 				setNVtx(nv-1);
-			spn::Bit::Set(_rflg, RFLG_CENTER|RFLG_CPOINT);
+			spn::Bit::Set<decltype(_rflg)>(_rflg, RFLG_CENTER|RFLG_CPOINT);
 		}
 		DEF(int)::getNVtx() const {
 			return _vtx.size();
 		}
 		DEF(const Vec3&)::getCPoint() const {
-			if(spn::Bit::ChClear(_rflg, RFLG_CPOINT)) {
+			if(spn::Bit::ChClear<decltype(_rflg)>(_rflg, RFLG_CPOINT)) {
 				// 各軸の最大と最小値を計算
 				Vec3 tmin(1e7f, 1e7f, 1e7f), tmax(-1e7f, -1e7f, -1e7f);
 				int nv = getNVtx();
@@ -435,7 +435,7 @@ namespace boom {
 			return _vCPoint;
 		}
 		DEF(const Vec3&)::getCenter() const {
-			if(spn::Bit::ChClear(_rflg, RFLG_CENTER)) {
+			if(spn::Bit::ChClear<decltype(_rflg)>(_rflg, RFLG_CENTER)) {
 				// 中心座標の計算
 				Vec3 c(0,0,0);
 				int nv = getNVtx();
@@ -447,7 +447,7 @@ namespace boom {
 			return _vCenter;
 		}
 		DEF(const Vec3&)::getNormal() const {
-			if(spn::Bit::ChClear(_rflg, RFLG_NORMAL)) {
+			if(spn::Bit::ChClear<decltype(_rflg)>(_rflg, RFLG_NORMAL)) {
 				if(getNVtx() <= 2) {
 					AssertP(Trap, false, "Poly::calcNormal()\n頂点数が2個以下");
 					_vNormal *= 0;
@@ -485,7 +485,7 @@ namespace boom {
 			return const_cast<VType&>(getVtx(n));
 		}
 		DEF(Vec3&)::refPos(int n) {
-			spn::Bit::Set(_rflg, RFLG_ALL);
+			spn::Bit::Set<decltype(_rflg)>(_rflg, RFLG_ALL);
 			return (Vec3&)refVtx(n);
 		}
 		DEF(int)::getNPoly() const {
@@ -609,7 +609,7 @@ namespace boom {
 			(*this) = tp;
 		}
 		DEF(void)::invert() {
-			spn::Bit::Set(_rflg, RFLG_NORMAL|RFLG_PLANE);
+			spn::Bit::Set<decltype(_rflg)>(_rflg, RFLG_NORMAL|RFLG_PLANE);
 			int cur0=0, cur1=getNVtx()-1;
 			while(cur0 < cur1) {
 				std::swap(_vtx[cur0], _vtx[cur1]);
@@ -741,7 +741,7 @@ namespace boom {
 			int nv = getNVtx();
 			for(int i=0 ; i<nv ; i++)
 				refPos(i) += ofs;
-			spn::Bit::Set(_rflg, RFLG_CENTER|RFLG_CPOINT);
+			spn::Bit::Set<decltype(_rflg)>(_rflg, RFLG_CENTER|RFLG_CPOINT);
 		}
 		DEF_TEMP
 		Convex<VType,UD> Convex<VType,UD>::cloneReverse() const {
@@ -814,7 +814,7 @@ namespace boom {
 			return Polygon(getPos(0), getPos(n+1), getPos(n+2));
 		}
 		DEF(const Plane&)::getPlane() const {
-			if(spn::Bit::ChClear(_rflg, RFLG_PLANE)) {
+			if(spn::Bit::ChClear<decltype(_rflg)>(_rflg, RFLG_PLANE)) {
 				const Vec3& nml = getNormal();
 
 				// 平面の計算

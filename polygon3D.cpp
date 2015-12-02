@@ -19,17 +19,17 @@ namespace boom {
 			_vtx[0] = v0;
 			_vtx[1] = v1;
 			_vtx[2] = v2;
-			spn::Bit::Set(_rflg, NORMALFLAG | PLANEFLAG | CENTERFLAG);
+			spn::Bit::Set<decltype(_rflg)>(_rflg, NORMALFLAG | PLANEFLAG | CENTERFLAG);
 		}
 		void Polygon::init(const Vec3* vsrc) {
 			_vtx[0] = vsrc[0];
 			_vtx[1] = vsrc[1];
 			_vtx[2] = vsrc[2];
-			spn::Bit::Set(_rflg, NORMALFLAG | PLANEFLAG | CENTERFLAG);
+			spn::Bit::Set<decltype(_rflg)>(_rflg, NORMALFLAG | PLANEFLAG | CENTERFLAG);
 		}
 		const Vec3& Polygon::getNormal() const {
 			// NORMAL更新フラグチェック
-			if(spn::Bit::ChClear(_rflg, NORMALFLAG)) {
+			if(spn::Bit::ChClear<decltype(_rflg)>(_rflg, NORMALFLAG)) {
 				// 法線更新
 				_vNormal = *spn::NormalFromPoints(_vtx[0], _vtx[1], _vtx[2]);
 			}
@@ -43,18 +43,18 @@ namespace boom {
 			// 3頂点を行列変換
 			for(int i=0 ; i<3 ; i++)
 				ret._vtx[i] = _vtx[i].asVec4(1) * m;
-			spn::Bit::Set(ret._rflg, NORMALFLAG | PLANEFLAG | CENTERFLAG);
+			spn::Bit::Set<decltype(ret._rflg)>(ret._rflg, NORMALFLAG | PLANEFLAG | CENTERFLAG);
 			// ユーザーデータコピー
 			ret.setUserData(getUserData());
 			return ret;
 		}
 		void Polygon::setVtx(int n, const Vec3& src) {
 			_vtx[n] = src;
-			spn::Bit::Set(_rflg, NORMALFLAG | PLANEFLAG | CENTERFLAG);
+			spn::Bit::Set<decltype(_rflg)>(_rflg, NORMALFLAG | PLANEFLAG | CENTERFLAG);
 		}
 		const Plane& Polygon::getPlane() const {
 			// PLANE更新フラグチェック
-			if(spn::Bit::ChClear(_rflg, PLANEFLAG)) {
+			if(spn::Bit::ChClear<decltype(_rflg)>(_rflg, PLANEFLAG)) {
 				// 平面生成
 				_plane = Plane::FromPtDir(_vtx[0], getNormal());
 			}
@@ -62,7 +62,7 @@ namespace boom {
 		}
 
 		const Vec3& Polygon::getGCenter3D() const {
-			if(spn::Bit::ChClear(_rflg, CENTERFLAG)) {
+			if(spn::Bit::ChClear<decltype(_rflg)>(_rflg, CENTERFLAG)) {
 				// 中心点計算
 				_vCenter *= 0;
 				for(int i=0 ; i<3 ; i++)

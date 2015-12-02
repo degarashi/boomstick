@@ -95,7 +95,7 @@ namespace boom {
 			++a;
 			getModelAccum();
 			getPose();
-			return {};
+			return {true, 0};
 		}
 		spn::RFlagRet TfLeafBase::_refresh(AMat32& m, Global*) const {
 			getNodeAccum();
@@ -105,38 +105,38 @@ namespace boom {
 				AssertP(Trap, std::abs(sc.x - sc.y) < 1e-4f);
 			}
 			ps.getToWorld().convert(m);
-			return {};
+			return {true, 0};
 		}
 		spn::RFlagRet TfLeafBase::_refresh(AMat32& m, Local*) const {
 			Mat33 tm;
 			getGlobal().convert33().inversion(tm);
 			tm.convert(m);
-			return {};
+			return {true, 0};
 		}
 		spn::RFlagRet TfLeafBase::_refresh(float& d, Determinant*) const {
 			d = getGlobal().convertA22().calcDeterminant();
-			return {};
+			return {true, 0};
 		}
 		spn::RFlagRet TfLeafBase::_refresh(float& f, Inertia*) const {
 			getModelAccum();
 			f = _model->im_getInertia() * getDeterminant();
-			return {};
+			return {true, 0};
 		}
 		spn::RFlagRet TfLeafBase::_refresh(float& f, Area*) const {
 			getModelAccum();
 			f = _model->im_getArea() * getDeterminant();
-			return {};
+			return {true, 0};
 		}
 		spn::RFlagRet TfLeafBase::_refresh(spn::Vec2& v, Center*) const {
 			getModelAccum();
 			v = toWorld(_model->im_getCenter());
-			return {};
+			return {true, 0};
 		}
 		spn::RFlagRet TfLeafBase::_refresh(Circle& c, BCircle*) const {
 			getModelAccum();
 			_model->im_getBVolume(c);
 			c = c * getPose().getToWorld();
-			return {};
+			return {true, 0};
 		}
 		spn::RFlagRet TfLeafBase::_refresh(AABB& a, BBox*) const {
 			getModelAccum();
@@ -146,7 +146,7 @@ namespace boom {
 			a.maxV.y = toWorld(_model->im_support(toLocalDir({0,1}))).y;
 			a.minV.x = toWorld(_model->im_support(toLocalDir({-1,0}))).x;
 			a.minV.y = toWorld(_model->im_support(toLocalDir({0,-1}))).y;
-			return {};
+			return {true, 0};
 		}
 	}
 }

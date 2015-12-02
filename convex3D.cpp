@@ -349,7 +349,7 @@ namespace boom {
 			return _vtx[idx];
 		}
 		const Vec3& ConvexP::bs_getGCenter() const {
-			if(spn::Bit::ChClear(_rflg, RFL_GCENTER)) {
+			if(spn::Bit::ChClear<decltype(_rflg)>(_rflg, RFL_GCENTER)) {
 				int nV = getNVtx();
 				Vec3 c(_vtx[0]);
 				for(int i=1 ; i<nV ; i++)
@@ -430,7 +430,7 @@ namespace boom {
 
 		bool ConvexP::quickHull() {
 // 			mgr_profiler.start("quickHull");
-			spn::Bit::Clear(_rflg, RFL_POLYFACE);
+			spn::Bit::Clear<decltype(_rflg)>(_rflg, RFL_POLYFACE);
 
 			int nV = getNVtx();
 			// 頂点が4点なら必然的に凸型である
@@ -559,7 +559,7 @@ namespace boom {
 			}
 		}
 		const Idx3List& ConvexP::getPolyFace() {
-			if(spn::Bit::ChClear(_rflg, RFL_POLYFACE))
+			if(spn::Bit::ChClear<decltype(_rflg)>(_rflg, RFL_POLYFACE))
 				quickHull();
 			return _pface;
 		}
