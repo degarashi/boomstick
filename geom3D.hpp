@@ -8,6 +8,9 @@
 #include <memory>
 #include <unordered_set>
 #include <map>
+#ifdef Convex
+	#undef Convex
+#endif
 
 // TODO: 3D用にIModelNodeインタフェース定義
 namespace boom {
