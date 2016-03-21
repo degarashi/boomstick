@@ -1,12 +1,14 @@
 cmake_minimum_required(VERSION 2.8)
 project(boomstick)
-include("crosscompile/${BUILD_TYPE}.cmake" require)
-include_directories(${PROJECT_SOURCE_DIR}/spinner)
-link_directories(${CMAKE_INSTALL_PREFIX}/lib_${TOOL_PREFIX})
 
+set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 find_package(Boost REQUIRED system regex)
 find_package(GTest REQUIRED)
 find_package(Threads REQUIRED)
+
+include("crosscompile/${BUILD_TYPE}.cmake" require)
+include_directories(${PROJECT_SOURCE_DIR}/spinner)
+link_directories(${CMAKE_INSTALL_PREFIX}/lib_${TOOL_PREFIX})
 
 file(GLOB_RECURSE HEADERS "*.hpp")
 file(GLOB MODEL3D "./*3D.cpp")
