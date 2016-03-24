@@ -66,11 +66,12 @@ namespace boom {
 		geo3d::FrustumM GenRFrustum(const RDF& rdf,
 									const RangeF& r={-1e4f, 1e4f},
 									const RangeF& rDist={1e-2f, 1e2f},
+									const RangeF& rAngDeg={5.f, 170.f},
 									const RangeF& rAsp={1e-1f, 1e1f})
 		{
 			const auto pos = Vec3::Random(rdf, r);
 			auto q = Quat::Random(rdf);
-			const auto ang = rdf({5.f, 170.f});
+			const auto ang = rdf(rAngDeg);
 			const auto dist = rdf(rDist);
 			const auto asp = rdf(rAsp);
 			return geo3d::FrustumM(pos, Vec3{0,0,1}*q, Vec3{0,1,0}*q, DegF(ang), dist, asp);

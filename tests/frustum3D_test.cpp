@@ -15,7 +15,7 @@ namespace boom {
 			auto rdf = rd.template getUniformF<float>();
 
 			auto a = GenRAABB(rdf, {-1e1, 1e1});
-			auto f = GenRFrustum(rdf, {-1.f, 1.f}, {1e-1f, 1e1f}, {1e-1f, 1e1f});
+			auto f = GenRFrustum(rdf, {-1.f, 1.f}, {1e-1f, 1e1f}, {30.f, 120.f}, {1e-1f, 2.f});
 			const bool b0 = f.hit(a);
 			bool b1 = GSimplex(a, f).getResult();
 			if(b0 != b1) {
