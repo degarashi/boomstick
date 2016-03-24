@@ -42,8 +42,8 @@ namespace boom {
 
 		Frustum::Planes::Planes(const Planes& ps) {
 			std::memcpy(this, &ps, sizeof(Planes)); }
-		Frustum::Planes::Planes(const Plane& pL, const Plane& pR, const Plane& pB, const Plane& pT, const Plane& pF):
-			plane{pL, pR, pB, pT, pF} {}
+		Frustum::Planes::Planes(const Plane& pL, const Plane& pR, const Plane& pB, const Plane& pT, const Plane& pF, const Plane& pBack):
+			plane{pL, pR, pB, pT, pF, pBack} {}
 		Frustum::Planes& Frustum::Planes::operator = (const Planes& ps) {
 			return *(new(this) Planes(ps)); }
 		Frustum::Planes Frustum::Planes::operator * (const AMat43& m) const {
@@ -52,10 +52,10 @@ namespace boom {
 				ret.plane[i] = plane[i] * m;
 			return ret;
 		}
-		Frustum::Frustum(const Vec3& ori, const Vec3& dir, const Vec3& up, spn::RadF fov, float dist, float aspect) {
+		Frustum::Frustum(const Vec3& ori, const Vec3& dir, const Vec3& up, const spn::RadF fov, const float dist, const float aspect) {
 			setOffset(ori);
 			setRot(AQuat::FromAxis(up % dir, up, dir));
-			float h = std::tan(fov.get()/2);
+			const float h = std::tan(fov.get()/2);
 			setScale({h*aspect, h, dist});
 		}
 		Frustum::Frustum(const Vec3& ori, const Vec3& at, const Vec3& up, spn::RadF fov, float aspect):
@@ -83,50 +83,60 @@ namespace boom {
 		Mat33 Frustum::bs_getInertia() const { INVOKE_ERROR }
 
 		namespace {
-			const float c_len = spn::Sqrt(1.25f);
-			constexpr float Half = 0.5f;
+			const float c_len = 1.f / spn::Sqrt(2.f);
 		}
 		const Frustum::Points Frustum::cs_pointsLocal(
 			Vec3(0,0,0),
-			Vec3(-Half, Half, 1),
-			Vec3(Half, Half, 1),
-			Vec3(-Half, -Half, 1),
-			Vec3(Half, -Half, 1)
+			Vec3(-1, 1, 1),
+			Vec3(1, 1, 1),
+			Vec3(-1, -1, 1),
+			Vec3(1, -1, 1)
 		);
-		const Frustum::Planes Frustum::cs_planesLocal(
-			Plane::FromPtDir(Vec3(0), Vec3(c_len, 0, Half*c_len)),
-			Plane::FromPtDir(Vec3(0), Vec3(-c_len, 0, Half*c_len)),
-			Plane::FromPtDir(Vec3(0), Vec3(0, c_len, Half*c_len)),
-			Plane::FromPtDir(Vec3(0), Vec3(0, -c_len, Half*c_len)),
-			Plane::FromPtDir(Vec3(0), Vec3(0, 0, -1))
-		);
-
 		Frustum::Points Frustum::getPoints(bool bWorld) const {
 			if(!bWorld)
 				return cs_pointsLocal;
 			return cs_pointsLocal * getToWorld();
 		}
 		Frustum::Planes Frustum::getPlanes(bool bWorld) const {
+			const auto& sc = getScale();
+			const float lenv = 1.f / Vec2(sc.x, sc.z).length();
+			Planes planes(
+				// -X: (-sc.x, 0, sc.z) -> (sc.z, 0, sc.x)
+				Plane::FromPtDir(Vec3(0), Vec3(sc.z, 0, sc.x)*lenv),
+				// +X: (sc.x, 0, sc.z) -> (-sc.z, 0, sc.x)
+				Plane::FromPtDir(Vec3(0), Vec3(-sc.z, 0, sc.x)*lenv),
+				// -Y: (0, sc.y, sc.z) -> (0, -sc.z, sc.y)
+				Plane::FromPtDir(Vec3(0), Vec3(0, -sc.z, sc.y)*lenv),
+				// +Y: (0, -sc.y, sc.z) -> (0, sc.z, sc.y)
+				Plane::FromPtDir(Vec3(0), Vec3(0, sc.z, sc.y)*lenv),
+				Plane::FromPtDir(Vec3(0,0,1), Vec3(0, 0, -1)),
+				Plane::FromPtDir(Vec3(0,0,0), Vec3(0,0,1))
+			);
 			if(!bWorld)
-				return cs_planesLocal;
-			return cs_planesLocal * getToWorld();
+				return planes;
+			const auto& tw = getToWorld();
+			const auto& rot = getRot();
+			for(auto& p : planes.plane) {
+				auto ori = p.getOrigin().asVec4(1) * tw;
+				auto dir = p.getNormal() * rot;
+				p = Plane::FromPtDir(ori, dir);
+			}
+			return planes;
 		}
 		//TODO: 遅い実装なので後で何とかする
 		Vec3 Frustum::support(const Vec3& dir) const {
-			// dirをローカルに変換
-			Vec3 ldir = dir.asVec4(0) * getToLocal();
-			auto pts = getPoints(false);
+			const auto pts = getPoints(true);
 
-			float d = pts.point[Points::Center].dot(ldir);
+			float d = pts.point[Points::Center].dot(dir);
 			int idx = 0;
 			for(int i=1 ; i<Points::NumPos ; i++) {
-				float td = ldir.dot(pts.point[i]);
+				const float td = dir.dot(pts.point[i]);
 				if(d < td) {
 					d = td;
-					idx = i+1;
+					idx = i;
 				}
 			}
-			return pts.point[idx].asVec4(1) * getToWorld();
+			return pts.point[idx];
 		}
 		Frustum Frustum::operator * (const AMat43& m) const {
 			auto ap = spn::AffineParts::Decomp(m);
@@ -392,6 +402,46 @@ namespace boom {
 		}
 		bool Frustum::hit(const Plane& p) const {
 			return getPoints(true).hit(p);
+		}
+		AABB Frustum::toAABB() const {
+			const auto& sc = getScale();
+			const auto& rot = getRot();
+			const auto& ofs = getOffset();
+			const auto xa = rot.getXAxis() * sc.x,
+						ya = rot.getYAxis() * sc.y,
+						za = rot.getZAxis() * sc.z;
+			const AVec3 xA[2] = {xa, -xa},
+						yA[2] = {ya, -ya},
+						zA[2] = {za, AVec3(0)};
+			AABB ret{Vec3(std::numeric_limits<float>::max()),
+					Vec3(std::numeric_limits<float>::lowest())};
+			for(int i=0 ; i<0b1000 ; i++) {
+				const auto p = xA[i&1] +
+								yA[(i>>1)&1] +
+								zA[(i>>2)&1];
+				ret.vmin.selectMin(p);
+				ret.vmax.selectMax(p);
+			}
+			return ret;
+		}
+		const EdgeList Frustum::Points::cs_edge = {
+			{Points::LeftTop, Points::Center},
+			{Points::RightTop, Points::Center},
+			{Points::LeftBottom, Points::Center},
+			{Points::RightBottom, Points::Center},
+			{Points::RightTop, Points::LeftTop},
+			{Points::RightBottom, Points::LeftBottom},
+			{Points::LeftTop, Points::LeftBottom},
+			{Points::RightTop, Points::RightBottom}
+		};
+
+		bool Frustum::hit(const AABB& a) const {
+			const auto pts = getPoints(true);
+			Vec3List ptsv(Points::NumPos);
+			for(int i=0 ; i<Points::NumPos ; i++)
+				ptsv[i] = pts.point[i];
+			return HitCheck(ptsv, Points::cs_edge,
+							a.getPoints(), AABB::cs_edge, 1e-5f);
 		}
 		std::ostream& operator << (std::ostream& os, const Frustum& f) {
 			return os << "Frustum(3d) [ pose: " << static_cast<const Pose3D&>(f) << ']';

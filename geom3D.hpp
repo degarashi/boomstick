@@ -368,6 +368,7 @@ namespace boom {
 					NumPos
 				};
 				Vec3 point[NumPos];
+				const static EdgeList cs_edge;
 
 				Points() = default;
 				Points(const Vec3& cen, const Vec3& lt, const Vec3& rt, const Vec3& lb, const Vec3& rb);
@@ -383,18 +384,18 @@ namespace boom {
 					Bottom,
 					Top,
 					Front,
+					Back,
 					NumPlane
 				};
 				Plane plane[NumPlane];
 
 				Planes() = default;
-				Planes(const Plane& pL, const Plane& pR, const Plane& pB, const Plane& pT, const Plane& pF);
+				Planes(const Plane& pL, const Plane& pR, const Plane& pB, const Plane& pT, const Plane& pF, const Plane& pBack);
 				Planes(const Planes& ps);
 				Planes& operator = (const Planes& ps);
 				Planes operator * (const AMat43& m) const;
 			};
 			const static Points cs_pointsLocal;
-			const static Planes cs_planesLocal;
 
 			Frustum() = default;
 			using Pose3D::Pose3D;
@@ -416,6 +417,7 @@ namespace boom {
 			bool hit(const Cone& c) const;
 			bool hit(const Frustum& f) const;
 			bool hit(const Plane& p) const;
+			bool hit(const AABB& a) const;
 
 			//! 5頂点と引数の平面との距離をコールバックで順次受け取る
 			/*! \param[in] cb [(0=中央,1以降はPoints::POSの順番と同じ), 面との距離] */
@@ -435,6 +437,7 @@ namespace boom {
 			//! 指定された行列で変換した時の透視平面上での大きさ
 			spn::Rect get2DRect(const AMat43& mV, const AMat44& mP) const;
 			friend std::ostream& operator << (std::ostream& os, const Frustum& f);
+			AABB toAABB() const;
 		};
 		using FrustumM = Model<Frustum>;
 
