@@ -17,14 +17,14 @@ namespace boom {
 			_hr = Result::Default;
 		}
 		bool GSimplex::_checkDuplication(const Vec3& v) const {
-			int nV = _nVtx;
+			const int nV = _nVtx;
 			for(int i=0 ; i<nV ; i++) {
-				if(_vtx[i].dist_sq(v) < 1e-4f)
+				if(_vtx[i].dist_sq(v) < 1e-5f)
 					return true;
 			}
 			return false;
 		}
-		bool GSimplex::_addVtx(const Vec3& vA, const Vec3& vB, int id) {
+		bool GSimplex::_addVtx(const Vec3& vA, const Vec3& vB, const int id) {
 			AssertP(Trap, _nVtx <= 4)
 			Vec3 v = vA - vB;
 			if(_checkDuplication(v))
@@ -32,11 +32,12 @@ namespace boom {
 
 			AssertP(Trap, !v.isNaN())
 			if(_nVtx == 4) {
-				// 不要な頂点を省く
+				// 不要な頂点を省く -> [id]に代入
 				AssertP(Trap, id >= 0)
 				_vtx[id] = v;
 				_posB[id] = vB;
 			} else {
+				// 配列の末尾に追加
 				_vtx[_nVtx] = v;
 				_posB[_nVtx++] = vB;
 			}
@@ -45,84 +46,96 @@ namespace boom {
 
 		const Vec3 GSimplex::cs_randVec[6] = {Vec3(1,0,0), Vec3(0,1,0), Vec3(0,0,1),
 												Vec3(-1,0,0), Vec3(0,-1,0), Vec3(0,0,-1)};
-		std::tuple<Vec3,GSimplex::Result,int> GSimplex::getNearestDir() {
+		GSimplex::NDResult GSimplex::getNearestDir() {
 			AssertP(Trap, _nVtx > 1)
+			constexpr float Eps = 1e-6f;
 			const Vec3 ori(0,0,0);
 			if(_nVtx == 2) {
 				if(_retryCount == 0) {
 					// 線分と点の最短距離
-					LNear lnear = Segment(_vtx[0], _vtx[1]).nearest(ori);
-					_nearP = lnear.first;
+					const LNear lnear = Segment(_vtx[0], _vtx[1]).nearest(ori);
+					_nearP = -lnear.first;
 					if(lnear.second == LinePos::OnLine) {
-						float len = _nearP.length();
-						if(len >= 1e-5f)
-							return std::make_tuple(Vec3(_nearP/len), Result::Default, -1);
+						const float len = _nearP.length();
+						if(len >= Eps)
+							return NDResult(_nearP/len, Result::Default, -1);
 					}
 				}
 				while(_retryCount != countof(cs_randVec)) {
-					Vec3 toV1 = _vtx[1]-_vtx[0];
-					Vec3 dir = cs_randVec[_retryCount].cross(toV1);
-					float len = dir.length();
-					if(len > 1e-5f)
-						return std::make_tuple(Vec3(dir/len), Result::Default, -1);
+					const Vec3 toV1 = _vtx[1]-_vtx[0];
+					const Vec3 dir = cs_randVec[_retryCount].cross(toV1);
+					const float len = dir.length();
+					if(len > Eps)
+						return NDResult(dir/len, Result::Default, -1);
 					++_retryCount;
 				}
-				return std::make_tuple(Vec3(), Result::NoHit, -1);
+				return NDResult(Vec3(), Result::NoHit, -1);
 			}
 			if(_nVtx == 3) {
-				Polygon poly(_vtx[0], _vtx[1], _vtx[2]);
-				if(_retryCount == 0) {
-					// ポリゴンと点の最短距離
-					auto res = poly.nearest(ori);
-					if(res.second) {
-						auto v = res.first;
-						v.len_sq();
-						float lens = res.first.len_sq();
-						if(lens > 1e-6f) {
-							_nearP = res.first;
-							return std::make_tuple(res.first * spn::Rcp22Bit(lens), Result::Default, -1);
-						}
-					}
+				const Polygon poly(_vtx[0], _vtx[1], _vtx[2]);
+				// ポリゴンと点の最短距離
+				const auto res = poly.nearest(ori);
+				const float len = res.first.length();
+				_nearP = res.first;
+				if(len > Eps)
+					return NDResult(-res.first * spn::Rcp22Bit(len), Result::Default, -1);
+				// 衝突したことにする
+				return NDResult(-_nearP, Result::Hit, -1);
+			}
+			const auto center = (_vtx[0] + _vtx[1] + _vtx[2] + _vtx[3]) /4;
+			{
+				int use_count[4] = {};
+				for(int i=0 ; i<static_cast<int>(countof(cs_index)) ; i++) {
+					const auto& idx = cs_index[i];
+					++use_count[idx[0]];
+					++use_count[idx[1]];
+					++use_count[idx[2]];
 				}
-				int rc = _retryCount;
-				if(rc == 0)
-					return std::make_tuple(Vec3(-poly.getNormal()), Result::Default, -1);
-				else if(rc == 1)
-					return std::make_tuple(poly.getNormal(), Result::Default, -1);
-				return std::make_tuple(Vec3(), Result::NoHit, -1);
+				for(int i=0 ; i<4 ; i++) {
+					AssertP(Trap, use_count[i] == 3)
+				}
 			}
 			// 4面体と点の最短ベクトル
 			float minD = std::numeric_limits<float>::max();
 			bool bInPoly = true;
-			if(std::fabs(Plane::FromPts(_vtx[0],_vtx[1],_vtx[2]).dot(_vtx[3])) > 1e-4f) {
-				Vec3 center = (_vtx[0]+_vtx[1]+_vtx[2]+_vtx[3])/4,
-					cp;
+			const auto isConvex = [](const Vec3 (&vtx)[4]){
+				return std::fabs(Plane::FromPts(vtx[0], vtx[1], vtx[2]).dot(vtx[3])) > Eps*4;
+			};
+			if(isConvex(_vtx)) {
 				for(int i=0 ; i<static_cast<int>(countof(cs_index)) ; i++) {
-					auto& idx = cs_index[i];
-					Polygon poly(_vtx[idx[0]],_vtx[idx[1]],_vtx[idx[2]]);
+					const auto& idx = cs_index[i];
+					const Polygon poly(_vtx[idx[0]],_vtx[idx[1]],_vtx[idx[2]]);
 					const auto& plane = poly.getPlane();
 
-					if(plane.dot(center) * plane.d < -std::numeric_limits<float>::min())
+					const float f0 = plane.dot(ori),
+								f1 = plane.dot(center);
+					// 全ての面の裏側に原点があれば衝突している
+					if(f0 * f1 < 0) {
 						bInPoly = false;
-					cp = poly.nearest(ori).first;
 
-					float d = cp.len_sq();
-					if(minD > d) {
-						minD = d;
-						_nearP = cp;
-						_nearIDX = i;
+						const auto res = poly.nearest(ori);
+						const float d = res.first.length();
+						if(minD > d) {
+							minD = d;
+							_nearP = res.first;
+							_nearIDX = i;
+						}
 					}
+				}
+				if(minD < Eps) {
+					// 衝突とみなす
+					return NDResult(-_nearP, Result::Hit, _nearIDX);
 				}
 			} else {
 				// 4面体がつぶれている場合は別の判定方法
 				bInPoly = false;
 				for(int i=0 ; i<static_cast<int>(countof(cs_index)) ; i++) {
-					auto& idx = cs_index[i];
-					Vec3 toV1 = _vtx[idx[1]]-_vtx[idx[0]],
-						toV2 = _vtx[idx[2]]-_vtx[idx[0]],
-						vC = (toV1%toV2).normalization();
-					float det = spn::CramerDet(toV1, toV2, vC);
-					Vec3 res = spn::CramersRule(toV1, toV2, vC, -_vtx[idx[0]], 1.0f/det);
+					const auto& idx = cs_index[i];
+					const Vec3 toV1 = _vtx[idx[1]]-_vtx[idx[0]],
+								toV2 = _vtx[idx[2]]-_vtx[idx[0]],
+								vC = (toV1%toV2).normalization();
+					const float det = spn::CramerDet(toV1, toV2, vC);
+					const Vec3 res = spn::CramersRule(toV1, toV2, vC, -_vtx[idx[0]], 1.0f/det);
 					if(std::fabs(res.z) > 1e-4f ||
 						!spn::IsInRange(res.x, 0.0f, 1.0f) ||
 						!spn::IsInRange(res.y, 0.0f, 1.0f) ||
@@ -155,7 +168,9 @@ namespace boom {
 					return std::make_tuple(Vec3(_nearPosB.normalization()), Result::NoHit, -1);
 				}
 			}
-			return std::make_tuple(Vec3(_nearP.normalization()), bInPoly ? Result::Hit : Result::Default, cs_index[_nearIDX][3]);
+			return NDResult(-_nearP.normalization(),
+							bInPoly ? Result::Hit : Result::Default,
+							cs_index[_nearIDX][3]);
 		}
 
 		const int GSimplex::cs_index[4][4] = {{0,1,2, 3}, {0,3,2, 1}, {0,1,3, 2}, {2,3,1, 0}};
@@ -164,92 +179,104 @@ namespace boom {
 		bool GSimplex::_gjkMethod() {
 			_clear();
 
-			// GJKにおいて support方向が前回と同じ又は既存の頂点と同じ結果を得た: false
-			// 点や線分やポリゴンが原点を含んだ: true
-			// 4面体が原点を内包した: true
-
+			constexpr float Eps = 1e-5f;
 			// 1個目の頂点
 			Vec3 dir = _m1.im_getCenter() - _m0.im_getCenter();
-			float lens = dir.len_sq();
-			if(lens < 1e-6f)
+			if(dir.normalize() < Eps)
 				dir = Vec3(1,0,0);
-			else
-				dir *= spn::Rcp22Bit(lens);
-			Vec3 pos0 = _m0.im_support(-dir),
-				pos1 = _m1.im_support(dir);
+			Vec3 pos0 = _m0.im_support(dir),
+				pos1 = _m1.im_support(-dir);
 			_vtx[0] = pos0 - pos1;
 			_posB[0] = pos1;
 			_nVtx = 1;
-			if(_vtx[0].len_sq() < 1e-4f) {
+			// 原点に十分近ければ衝突として扱う
+			if(_vtx[0].len_sq() < Eps) {
 				_hr = Result::Hit;
 				return true;
 			}
-			dir = _vtx[0].normalization();
+			// 次回の探索は頂点へ向かう方向
+			dir = -_vtx[0].normalization();
 
 			int delID = -1;
 			for(;;) {
 				// ワールドへ変換
-				pos0 = _m0.im_support(-dir);
-				pos1 = _m1.im_support(dir);
-				//if(_nVtx == 4 && (pos0-pos1).dot(dir) < 0) {
-				//	_hr = Result::NoHit;
-				//	return false;
-				//}
+				pos0 = _m0.im_support(dir);
+				pos1 = _m1.im_support(-dir);
+				if((pos0-pos1).dot(dir) < 0) {
+					_hr = Result::NoHit;
+					return false;
+				}
 				// 同時に不要な点を削除 (supportベクトルの算出にかかわらなかった頂点)
 				if(_addVtx(pos0, pos1, delID)) {
-					++_retryCount;
-					if(_nVtx == 4) {
-						_hr = Result::NoHit;
-						return false;
-					}
+					// 重複したらこれ以上は進捗が望めない
+					_hr = Result::NoHit;
+					return false;
 				} else
 					_retryCount = 0;
 
+				// 4面体の面の中で一番原点に近い物を選別
 				std::tie(dir, _hr, delID) = getNearestDir();
-				if(_hr != Result::Default)
+				if(_hr != Result::Default) {
+					// 4面体が原点を内包した or
+					// 点や線分やポリゴンが原点を含んだ: -> Hit
 					return _hr == Result::Hit;
-			}
-		}
-		namespace {
-			bool IsValidValue(float v) { return v>=0 || v<=0; }
-			bool IsValidValue(const Vec3& v) {
-				return IsValidValue(v.x+v.y+v.z);
+				}
 			}
 		}
 		Vec3 GSimplex::getInterPoint() const {
 			AssertP(Trap, _hr == Result::Hit)
-			if(_nVtx == 1)
-				return _posB[0];
-			AssertP(Trap, _nVtx == 4)
+			const Vec3 ori(0,0,0);
+			switch(_nVtx) {
+				case 1:
+					return _posB[0];
+				case 2: {
+					const auto& to1 = _vtx[1] - _vtx[0];
+					const float len1 = to1.length();
+					if(len1 < 1e-6f)
+						return _posB[0];
+					const float d = -_vtx[0].dot(to1) / (_vtx[0].length() * len1);
+					if(d < 0)
+						return _posB[0];
+					return spn::Lerp(_posB[0], _posB[1], d);
+				}
+				case 3: {
+					return TriangleLerp(_vtx[0], _vtx[1], _vtx[2],
+										ori,
+										_posB[0], _posB[1], _posB[2]);
+				}
+				case 4:
+				{
+					// 直前に消された側の面からposBを補間する
+					// 最寄り点ベクトルの半分を移動すれば中点が求まる
+					const auto& idx = cs_index[_nearIDX];
+					const Polygon poly(_vtx[idx[0]], _vtx[idx[1]], _vtx[idx[2]]);
+					auto& nml = poly.getNormal();
+					if(!nml.isOutstanding()) {
+						const Vec3 cp = poly.nearest(ori).first;
 
-			// 直前に消された側の面からposBを補間する
-			// 最寄り点ベクトルの半分を移動すれば中点が求まる
-			Vec3 ori(0,0,0);
-			auto& idx = cs_index[_nearIDX];
-			Polygon poly(_vtx[idx[0]], _vtx[idx[1]], _vtx[idx[2]]);
-			auto& nml = poly.getNormal();
-			if(IsValidValue(nml)) {
-				Vec3 cp = poly.nearest(ori).first;
-
-				Vec3 nml = poly.getNormal();
-				Vec3 toV1 = poly.getVtx(1)-poly.getVtx(0),
-					toV2 = poly.getVtx(2)-poly.getVtx(0);
-				float detInv = 1.0f / spn::CramerDet(toV1, toV2, nml);
-				Vec3 res = spn::CramersRule(toV1,toV2, nml, cp-poly.getVtx(0), detInv);
-				Vec3 toP1 = _posB[idx[1]] - _posB[idx[0]],
-						toP2 = _posB[idx[2]] - _posB[idx[0]];
-				Vec3 ret = toP1 * res.x + toP2 * res.y + _posB[idx[0]];
-				return ret;
+						const Vec3 nml = poly.getNormal();
+						const Vec3 toV1 = poly.getVtx(1)-poly.getVtx(0),
+									toV2 = poly.getVtx(2)-poly.getVtx(0);
+						const float detInv = 1.0f / spn::CramerDet(toV1, toV2, nml);
+						const Vec3 res = spn::CramersRule(toV1,toV2, nml, cp-poly.getVtx(0), detInv);
+						const Vec3 toP1 = _posB[idx[1]] - _posB[idx[0]],
+									toP2 = _posB[idx[2]] - _posB[idx[0]];
+						const Vec3 ret = toP1 * res.x + toP2 * res.y + _posB[idx[0]];
+						return ret;
+					}
+					return _posB[0];
+				}
+				default:
+					AssertFP(Trap, "invalid vertex count")
 			}
-			return _posB[0];
 		}
 		namespace {
 			Vec3 CalcPolyRatio(const Vec3& dir0, const Vec3& dir1, const Vec3& cp,
 				const Vec3& od0, const Vec3& od1, const Vec3& odOri)
 			{
-				Vec3 nml = dir0.cross(dir1);
-				float detInv = 1.0f / spn::CramerDet(dir0,dir1,nml);
-				Vec3 res = spn::CramersRule(dir0, dir1, nml, cp, detInv);
+				const Vec3 nml = dir0.cross(dir1);
+				const float detInv = 1.0f / spn::CramerDet(dir0,dir1,nml);
+				const Vec3 res = spn::CramersRule(dir0, dir1, nml, cp, detInv);
 				AssertP(Trap, (dir0*res.x + dir1*res.y).distance(cp) < 1e-3f)
 				return od0*res.x + od1*res.y + odOri;
 			}
@@ -271,19 +298,19 @@ namespace boom {
 			if(_nVtx == 2) {
 				// 2回分の履歴を線分の近傍点で割合をかけたもの
 				// (nearPは線分上にある)
-				float r = (_vtx[1] - _vtx[0]).dot(_nearP - _vtx[0]);
+				const float r = (_vtx[1] - _vtx[0]).dot(_nearP - _vtx[0]);
 				AssertP(Trap, spn::IsInRange(r, 0.0f-1e-5f, 1.0f+1e-5f))
-				Vec3 v0 = _posB[0].l_intp(_posB[1], r),
-					v1 = v0 + _nearP;
+				const Vec3 v0 = _posB[0].l_intp(_posB[1], r),
+						v1 = v0 + _nearP;
 				return Vec3x2(v0, v1);
 			}
 			// 4面体は最寄りの3角ポリゴンと同義
 			if(_nearIDX >= 0) {
 				// (nearPはポリゴン上にある)
 				const int* use = cs_index[(_nVtx==3) ? 0 : _nearIDX];
-				Vec3 v0 = CalcPolyRatio(_vtx[use[0]], _vtx[use[1]], _vtx[use[2]], _nearP,
+				const Vec3 v0 = CalcPolyRatio(_vtx[use[0]], _vtx[use[1]], _vtx[use[2]], _nearP,
 										_posB[use[0]], _posB[use[1]], _posB[use[2]]),
-					v1 = v0 + _nearP;
+						v1 = v0 + _nearP;
 				return Vec3x2(v0, v1);
 			}
 			return Vec3x2(_nearPosB, Vec3(_nearPosB+_nearP));

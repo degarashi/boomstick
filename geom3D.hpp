@@ -725,9 +725,10 @@ namespace boom {
 
 			//! minkowski差を, 重複してなければ追加 (不要な頂点の削除)
 			bool _addVtx(const Vec3& vA, const Vec3& vB, int id);
+			using NDResult = std::tuple<Vec3,Result,int>;
 			//! 次に探索すべき方向を求める
 			/*! @return 算出された方向, 衝突と判定できるか(0=未定, 1=衝突, -1=非衝突), 4面体において使用されなかった頂点 */
-			std::tuple<Vec3,Result,int> getNearestDir();
+			NDResult getNearestDir();
 			//! 既存の頂点と重複を調べる
 			bool _checkDuplication(const Vec3& v) const;
 			void _clear();
