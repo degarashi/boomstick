@@ -474,6 +474,7 @@ namespace boom {
 			AABB() = default;
 			AABB(const Vec3& v_min, const Vec3& v_max);
 			static AABB FromPoints(const Vec3* v, int n);
+			const static EdgeList cs_edge;
 
 			// ---- cacheable functions ----
 			Vec3 bs_getGCenter() const;
@@ -484,10 +485,27 @@ namespace boom {
 			// -----------------------------
 			Vec3 support(const Vec3& dir) const;
 			AABB operator * (const AMat43& m) const;
+			AABB expand(float w) const;
 
 			spn::none_t hit(...) const;
+			bool hit(const Vec3& p) const;
 			bool hit(const AABB& ab) const;
 			bool hit(const Plane& p) const;
+			template <class CB>
+			void iteratePoints(CB&& cb) const {
+				const Vec3 tmp[2] = {vmin, vmax};
+				for(int i=0 ; i<0b1000 ; i++) {
+					cb(
+						Vec3(
+							tmp[i&1].x,
+							tmp[(i>>1)&1].y,
+							tmp[(i>>2)&1].z
+						)
+					);
+				}
+			}
+			Vec3List getPoints() const;
+			bool isBackside(const Plane& p, float t) const;
 			friend std::ostream& operator << (std::ostream& os, const AABB& a);
 		};
 		//! 平面上の一点が三角形の内部に含まれるかどうかを判定

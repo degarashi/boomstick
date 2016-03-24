@@ -61,13 +61,55 @@ namespace boom {
 							vmax.asVec4(1) * m};
 			return FromPoints(tmp, 2);
 		}
-
+		AABB AABB::expand(const float w) const {
+			auto proc = [w](auto& f0, auto& f1){
+				if(w < 0 && (f1-f0)<std::abs(w)) {
+					f0 = f1 = (f1+f0)/2;
+				} else {
+					f0 -= w;
+					f1 += w;
+				}
+			};
+			AABB ret(vmin, vmax);
+			proc(ret.vmin.x, ret.vmax.x);
+			proc(ret.vmin.y, ret.vmax.y);
+			proc(ret.vmin.z, ret.vmax.z);
+			return ret;
+		}
+		bool AABB::hit(const Vec3& p) const {
+			using spn::IsInRange;
+			return IsInRange(p.x, vmin.x, vmax.x) &&
+					IsInRange(p.y, vmin.y, vmax.y) &&
+					IsInRange(p.z, vmin.z, vmax.z);
+		}
 		bool AABB::hit(const AABB& ab) const {
 			for(int i=0 ; i<3 ; i++) {
 				if(ab.vmax.m[i] < vmin.m[i] || ab.vmin.m[i] > vmax.m[i])
 					return false;
 			}
 			return true;
+		}
+		const EdgeList AABB::cs_edge = {
+			{0,1}, {0,2}, {1,3}, {2,3},
+			{4,5}, {4,6}, {5,7}, {6,7},
+			{0,4}, {2,6}, {1,5}, {3,7}
+		};
+		Vec3List AABB::getPoints() const {
+			Vec3List tmp(8);
+			auto* dst = tmp.data();
+			iteratePoints([&dst](const Vec3& v){
+				*dst++ = v;
+			});
+			return tmp;
+		}
+		bool AABB::isBackside(const Plane& p, const float t) const {
+			const Vec3 pt[2] = {vmin, vmax};
+			const Vec3 v(
+				pt[static_cast<int>(p.a > 0.f)].x,
+				pt[static_cast<int>(p.b > 0.f)].y,
+				pt[static_cast<int>(p.c > 0.f)].z
+			);
+			return p.dot(v) < t;
 		}
 		bool AABB::hit(const Plane& plane) const {
 			Vec3 v = support(-plane.getNormal());
