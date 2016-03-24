@@ -4,6 +4,10 @@
 
 namespace boom {
 	namespace test3d {
+		using spn::RangeF;
+		using spn::DegF;
+		using spn::RadF;
+		using spn::Vec3;
 		template <class RDF>
 		geo3d::PointM GenRPoint(const RDF& rdf, const spn::RangeF& r={-1e4f, 1e4f}) {
 			return geo3d::PointM(spn::Vec3::Random(rdf, r));
@@ -59,20 +63,17 @@ namespace boom {
 			return geo3d::AABBM(v0, v1);
 		}
 		template <class RDF>
-		geo3d::FrustumM GenRFrustum(const RDF& rdf, const spn::RangeF& rV={-1e4f, 1e4f},
-											const spn::RangeF& rFov={0, spn::DEGtoRAD(130.f)},
-											const spn::RangeF& rDist={0, 1e3f},
-											const spn::RangeF& rAspect={1e-2f, 1e1f})
+		geo3d::FrustumM GenRFrustum(const RDF& rdf,
+									const RangeF& r={-1e4f, 1e4f},
+									const RangeF& rDist={1e-2f, 1e2f},
+									const RangeF& rAsp={1e-1f, 1e1f})
 		{
-			using spn::Vec3;
-			return geo3d::FrustumM(
-						Vec3::Random(rdf, rV),
-						Vec3::RandomDir(rdf),
-						Vec3::RandomDir(rdf),
-						spn::RadF(rdf(rFov)),
-						rdf(rDist),
-						rdf(rAspect)
-					);
+			const auto pos = Vec3::Random(rdf, r);
+			auto q = Quat::Random(rdf);
+			const auto ang = rdf({5.f, 170.f});
+			const auto dist = rdf(rDist);
+			const auto asp = rdf(rAsp);
+			return geo3d::FrustumM(pos, Vec3{0,0,1}*q, Vec3{0,1,0}*q, DegF(ang), dist, asp);
 		}
 		template <class RDF>
 		geo3d::ConvexPM GenRConvex(const RDF& rdf, const int n, const spn::RangeF& r={-1e4f, 1e4f}) {
