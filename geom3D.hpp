@@ -23,6 +23,19 @@ namespace boom {
 		class Convex;
 		using ColCv = Convex<Vec3, ConvexUD_Col>;
 
+		using EdgeList = std::vector<std::pair<int,int>>;
+		enum class Crossing {
+			Front,
+			Back,
+			Cross,
+			OnPlane
+		};
+		Crossing CheckCrossing(const Vec3List& vl, const Plane& p, float t);
+		bool HitCheck(const Vec3List& vl, const Vec3List& vel, const EdgeList& el, float t);
+		bool HitCheck(const Vec3List& vl0, const EdgeList& el0,
+						const Vec3List& vl1, const EdgeList& el1,
+						float t);
+
 		constexpr float DOT_TOLERANCE = 1e-4f,
 						CREATE_PLANE_DIST = 5e2f,
 						PORTALBOX_VOLUME = 5e2f,

@@ -101,34 +101,28 @@ namespace boom {
 	//! 三角形(v0,v1,v2)のvtに対する重心比率
 	/*! \return first: (v1-v0)の比率 <br>
 				second: (v2-v0)の比率 */
-	inline Vec2 TriangleRatio(const Vec2& v0, const Vec2& v1, const Vec2& v2, const Vec2& vt) {
-		Float2 ret;
-		Vec2 	toV1(v1-v0),
-				toV2(v2-v0),
-				toVT(vt-v0);
-		float det = spn::CramerDet(toV1, toV2);
-		return spn::CramersRule(toV1, toV2, toVT, spn::Rcp22Bit(det));
-	}
+	Vec2 TriangleRatio(const Vec2& v0, const Vec2& v1, const Vec2& v2, const Vec2& vt);
+	Vec3 TriangleRatio(const Vec3& v0, const Vec3& v1, const Vec3& v2, const Vec3& vt);
 	//! 三角形(v0,v1,v2)のvtに対する重心比率をユーザー定義変数(f0,f1,f2)に適用した物を算出
 	/*! \param[in] v0 三角形座標0
 		\param[in] f0 ユーザー定義変数
 		\return 補間された値 */
-	template <class T>
-	T TriangleLerp(const Vec2& v0, const Vec2& v1, const Vec2& v2, const Vec2& vt,
+	template <class VT, class T>
+	T TriangleLerp(const VT& v0, const VT& v1, const VT& v2, const VT& vt,
 					const T& f0, const T& f1, const T& f2)
 	{
-		auto res = TriangleRatio(v0,v1,v2,vt);
-		auto toT01 = f1-f0,
-			toT02 = f2-f0;
+		const auto res = TriangleRatio(v0,v1,v2,vt);
+		const auto toT01 = f1-f0,
+					toT02 = f2-f0;
 		return (toT01 * res.x) + (toT02 * res.y) + f0;
 	}
-	template <class T>
-	T LineLerp(const Vec2& v0, const Vec2& v1, const Vec2& vt,
+	template <class VT, class T>
+	T LineLerp(const VT& v0, const VT& v1, const VT& vt,
 				const T& f0, const T& f1)
 	{
-		auto line(v1-v0),
-			line2(vt-v0);
-		float r = line2.length() * spn::Rcp22Bit(line.length());
+		const auto line(v1-v0),
+					line2(vt-v0);
+		const float r = line2.length() * spn::Rcp22Bit(line.length());
 		return spn::Lerp(f0, f1, r);
 	}
 

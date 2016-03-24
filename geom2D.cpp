@@ -1,6 +1,13 @@
 #include "geom2D.hpp"
 
 namespace boom {
+	Vec2 TriangleRatio(const Vec2& v0, const Vec2& v1, const Vec2& v2, const Vec2& vt) {
+		const Vec2 	toV1(v1-v0),
+					toV2(v2-v0),
+					toVT(vt-v0);
+		const float det = spn::CramerDet(toV1, toV2);
+		return spn::CramersRule(toV1, toV2, toVT, spn::Rcp22Bit(det));
+	}
 	namespace geo2d {
 		bool IsCW(const PointL& pts) {
 			int nP = pts.size();
