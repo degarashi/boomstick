@@ -168,8 +168,10 @@ namespace boom {
 					return std::make_tuple(Vec3(_nearPosB.normalization()), Result::NoHit, -1);
 				}
 			}
+			if(bInPoly)
+				return NDResult(-_nearP.normalization(), Result::Hit, -1);
 			return NDResult(-_nearP.normalization(),
-							bInPoly ? Result::Hit : Result::Default,
+							Result::Default,
 							cs_index[_nearIDX][3]);
 		}
 
