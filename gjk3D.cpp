@@ -200,7 +200,9 @@ namespace boom {
 			dir = -_vtx[0].normalization();
 
 			int delID = -1;
-			for(;;) {
+			// 何時まで経っても解が見つからないと無限ループに陥るので回数制限を設ける(応急処置)
+			constexpr int MaxIteration = 0x100;
+			for(int itr=0 ; itr<MaxIteration ; itr++) {
 				// ワールドへ変換
 				pos0 = _m0.im_support(dir);
 				pos1 = _m1.im_support(-dir);
@@ -224,6 +226,9 @@ namespace boom {
 					return _hr == Result::Hit;
 				}
 			}
+			// 衝突しなかったことにする
+			_hr = Result::NoHit;
+			return false;
 		}
 		Vec3 GSimplex::getInterPoint() const {
 			AssertP(Trap, _hr == Result::Hit)
