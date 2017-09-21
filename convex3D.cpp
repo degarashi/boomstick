@@ -178,7 +178,7 @@ namespace boom {
 		void CnvP::_enumEdge(PEVec& dst, IdxP3Set& dstI, const Vec3& vert, Idx3* poly) {
 			Idx3* toEnum[3];
 			int nE = 0;
-			poly->iterateEdge([poly, &vert, &toEnum,&nE,&dst](int i0, int i1, Idx3* neighbor) {
+			poly->iterateEdge([&vert, &toEnum,&nE,&dst](int i0, int i1, Idx3* neighbor) {
 				// 凸物体なので必ず隣接面が存在する
 				auto& plane = neighbor->getPlane();
 				if(plane.dot(vert) > 0) {

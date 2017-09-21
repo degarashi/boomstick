@@ -24,7 +24,7 @@ namespace boom {
 		int index[3];
 
 		EdgeIndex getEdge(int n) const {
-			return std::make_pair(index[n], index[(n+1)%3]);
+			return {index[n], index[(n+1)%3]};
 		}
 		//! Edgeに属さない頂点番号を取得
 		int getNonEdgePoint(int eId) const {

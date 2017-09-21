@@ -190,12 +190,12 @@ namespace boom {
 			auto fnOutputTriangle = [&edgeMap, &idxTriangle](int i0, int i1, int i2){
 				idxTriangle.emplace_back(new IdxTriangle{{{i0,i1,i2}}, false});
 				auto* pTri = idxTriangle.back().get();
-				Assert(Trap, edgeMap.count(std::make_pair(i0, i1))==0)
-				Assert(Trap, edgeMap.count(std::make_pair(i1, i2))==0)
-				Assert(Trap, edgeMap.count(std::make_pair(i2, i0))==0)
-				edgeMap.emplace(std::make_pair(i0, i1), IdxLink{pTri, 0});
-				edgeMap.emplace(std::make_pair(i1, i2), IdxLink{pTri, 1});
-				edgeMap.emplace(std::make_pair(i2, i0), IdxLink{pTri, 2});
+				Assert(Trap, edgeMap.count(EdgeIndex{i0, i1})==0)
+				Assert(Trap, edgeMap.count(EdgeIndex{i1, i2})==0)
+				Assert(Trap, edgeMap.count(EdgeIndex{i2, i0})==0)
+				edgeMap.emplace(EdgeIndex{i0, i1}, IdxLink{pTri, 0});
+				edgeMap.emplace(EdgeIndex{i1, i2}, IdxLink{pTri, 1});
+				edgeMap.emplace(EdgeIndex{i2, i0}, IdxLink{pTri, 2});
 			};
 			auto fnOutputStack = [&fnOutputTriangle](const bool bc, auto& stk, int /*idxCw*/, int /*idxCcw*/, int cur) {
 				if(bc) {

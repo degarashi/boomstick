@@ -235,7 +235,7 @@ namespace boom {
 								if(hasEntry(idx)) {
 									auto& ent = getEntry(idx);
 									if(!ent.isEmpty()) {
-										this_t::CTDim_t::Classify(ve, lowerCenterId[i], [i, idx2=idx, &lowerCenterId, &p, &stkId](const VolEntry& /*ve*/, int /*idx*/){
+										this_t::CTDim_t::Classify(ve, lowerCenterId[i], [i, idx2=idx, &lowerCenterId, &stkId](const VolEntry& /*ve*/, int /*idx*/){
 											stkId.push(Pair{idx2, lowerCenterId[i]});
 										});
 										++tcount;
